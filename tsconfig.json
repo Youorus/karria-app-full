@@ -1,0 +1,22 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    /*
+     * Autorise `import … from "./x.ts"`.
+     *
+     * Un seul fichier s'en sert : `scripts/verifier-choregraphie.ts`, que
+     * Node exécute directement — et Node exige l'extension réelle. Sans
+     * cette option, `tsc` refuse le fichier alors qu'il tourne.
+     *
+     * Elle autorise sans obliger : rien ne change pour `src/`, où les
+     * imports restent sans extension et passent par Metro. À n'employer
+     * que pour un script exécuté hors du bundle.
+     */
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
+}

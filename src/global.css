@@ -1,0 +1,12 @@
+/* ═══════════════════════════════════════════════════════════════════
+   FEUILLE RACINE
+
+   Elle n'assemble que trois choses, et ne contient **aucune valeur**.
+   Les jetons vivent dans `theme/tokens.css` : les avoir ici les
+   mélangerait au câblage de Tailwind, et l'on ne saurait plus où
+   changer une couleur.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@import "tailwindcss";
+@import "uniwind";
+@import "./theme/tokens.css";

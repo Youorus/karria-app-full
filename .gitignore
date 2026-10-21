@@ -1,0 +1,70 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# ─────────────────────────────────────────────────────────────────────
+# Les secrets de signature et de poussée
+#
+# `secrets/` porte le compte de service Firebase — celui qui permet
+# d'envoyer des notifications à tous les appareils du parc. Ce n'est pas
+# le `google-services.json` : celui-là est un fichier CLIENT, sans clé
+# privée, embarqué dans l'APK de tout le monde, et il est versionné dans
+# `config/firebase/`.
+#
+# Les deux se ressemblent et ne se confondent pas :
+#   config/firebase/google-services.json  → client Android, public, versionné
+#   secrets/firebase/*.json               → serveur, PRIVÉ, jamais commité
+#
+# Les motifs `*.p8` / `*.p12` plus bas couvrent les clés APNs, qui ne
+# doivent pas davantage entrer ici : EAS les garde pour nous.
+secrets/
+*service-account*.json
+*-firebase-adminsdk-*.json
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+example
+
+# generated native folders
+/ios
+/android
+
+# Variables d'environnement locales
+.env
+
+# Réglages d'IDE : propres à chaque poste, et au nom du dossier
+# local — un `.iml` versionné se contredit dès le second clone.
+.idea/
+.vscode/

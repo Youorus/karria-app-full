@@ -1,0 +1,98 @@
+{
+  "expo": {
+    "name": "Karria",
+    "slug": "karria",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./src/assets/branding/karria-icone-ios-clair.png",
+    "scheme": "karria",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "com.karria.app",
+      "usesAppleSignIn": true,
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "icon": {
+        "light": "./src/assets/branding/karria-icone-ios-clair.png",
+        "dark": "./src/assets/branding/karria-icone-ios-sombre.png",
+        "tinted": "./src/assets/branding/karria-icone-ios-teintee.png"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./src/assets/branding/karria-android-avant-plan.png",
+        "backgroundImage": "./src/assets/branding/karria-android-arriere-plan.png",
+        "backgroundColor": "#F7F9FF",
+        "monochromeImage": "./src/assets/branding/karria-android-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.karria.app"
+    },
+    "plugins": [
+      "./plugins/sans-sandbox-de-script",
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./src/assets/branding/karria-k-clair.png",
+          "imageWidth": 96,
+          "resizeMode": "contain",
+          "backgroundColor": "#F7F9FF",
+          "dark": {
+            "image": "./src/assets/branding/karria-k-sombre.png",
+            "backgroundColor": "#0C1024"
+          }
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Karria peut protéger ta session avec Face ID, pour que personne d'autre ne l'ouvre sur ce téléphone."
+        }
+      ],
+      "expo-asset",
+      "expo-apple-authentication",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.1004662797475-irkue21qcs238gd1uu4plokv62u25njg"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./src/assets/branding/karria-android-monochrome.png",
+          "color": "#1877F2",
+          "defaultChannel": "defaut"
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Karria t'écoute quand tu préfères parler plutôt qu'écrire, pour rédiger ton CV avec toi."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Karria a besoin de tes photos pour en mettre une sur ton CV, seulement si tu le choisis.",
+          "cameraPermission": "Karria peut prendre une photo pour ton CV, seulement si tu le choisis.",
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "platforms": ["ios", "android"],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f16b05cf-f66e-4051-ad1f-eb11db9dd2a2"
+      }
+    }
+  }
+}

@@ -1,0 +1,265 @@
+/* ═══════════════════════════════════════════════════════════════════
+   LES JETONS DE DESIGN DE KARRIA — SOURCE DE VÉRITÉ UNIQUE
+   ═══════════════════════════════════════════════════════════════════
+
+   Tout ce qui a une couleur, un rayon ou une taille de texte dans
+   l'application vient d'ici. Changer une ligne change l'application
+   entière.
+
+   ─── La palette ───
+
+   Celle de la V1 (`Karria-Frontend`, `src/theme/theme.ts`), reprise à la
+   valeur près : le bleu `#1877F2`, le quasi-noir chaud `#0E0D0C` du mode
+   sombre — le mode par défaut de la V1 —, les cartes `#1A1816`, le
+   salaire vert sur vert pâle. La refonte n'y ajoute que l'« aura » : le
+   halo bleu-violet qui donne sa présence à l'IA.
+
+   ─── Pourquoi ce fichier et pas un objet TypeScript ───
+
+   Parce que les classes utilitaires (`bg-primary`, `text-foreground`)
+   lisent ces variables directement. Un objet TypeScript en parallèle
+   serait une seconde source de vérité. Seule exception, documentée dans
+   `src/theme/index.ts` : les API natives qui n'acceptent pas de classe
+   (dégradés SVG, barre d'état, fond de navigation).
+
+   ─── Les trois pièges d'UniWind (vérifiés sur Zoumani) ───
+
+   1. Les deux blocs `@variant` doivent déclarer **exactement** les mêmes
+      noms — l'empaquetage refuse sinon, et c'est une bonne chose.
+   2. Le préfixe `--color-` fait exister la classe. `--primary` seul
+      produit une classe vide, sans erreur : un écran transparent.
+   3. Aucun suffixe d'opacité (`bg-primary/10`) : il se compile figé sur
+      le mode clair. Une semi-transparence utilisée deux fois reçoit son
+      propre jeton, défini dans les deux modes.
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ═════════════════════════════════════════════════════════════════
+     MODE CLAIR
+     ═════════════════════════════════════════════════════════════════ */
+  @variant light {
+    /* ── Marque ──
+       Le bleu néon est la couleur d'action : un élément bleu plein se
+       touche, rien d'autre ne l'est. */
+    --color-primary: #1877f2;
+    --color-primary-foreground: #ffffff;
+    --color-on-primary-faible: #ffffffbf;
+
+    /* Le violet : la seconde moitié de l'aura. Jamais une action. */
+    --color-secondary: #a855f7;
+    --color-secondary-foreground: #ffffff;
+
+    /* Le bleu glacier : les reflets de l'aura et les détails. */
+    --color-accent: #6366f1;
+    --color-accent-foreground: #ffffff;
+
+    --color-wordmark: #0f172a;
+
+    /* ── L'aura de l'IA ──
+       Trois teintes, lues par les dégradés SVG via `theme/index.ts`.
+       Déclarées ici aussi pour que la charte reste lisible d'un seul
+       coup d'œil, et pour les rares usages en classe. */
+    /* ── Repris de la V1 ──
+       Le salaire est vert sur vert pâle dans les deux modes, comme la V1 :
+       c'est une information, pas une action. « remplissage » est le
+       `systemFill` de la V1 : le fond des pastilles et des boutons ronds. */
+    /* La barre d'onglets de la V1 : pastille de l'onglet actif, icônes
+       au repos. */
+    --color-onglet-actif: #ffffffeb;
+    --color-onglet-inactif: #00000061;
+    /* L'or de la V1 : modèles Pro, étoiles des avis. */
+    --color-premium: #d4a63a;
+    --color-salaire: #e8f5e9;
+    --color-salaire-foreground: #1b5e20;
+    --color-nouveau: #f97316;
+    --color-remplissage: #2563eb14;
+    --color-remplissage-doux: #2563eb0d;
+
+    --color-aura-1: #1e90ff;
+    --color-aura-2: #a259ff;
+    --color-aura-3: #81d4fa;
+    --color-aura-reflet: #ffffff; /* le « K » posé sur l’orbe */
+
+    /* ── Fonds et textes ──
+       Un blanc légèrement bleuté plutôt qu'un blanc pur : il prolonge
+       l'aura au lieu de la couper net. */
+    --color-background: #f6f8fc;
+    --color-foreground: #0f172a;
+
+    --color-card: #ffffff;
+    --color-card-foreground: #0f172a;
+    --color-popover: #ffffff;
+    --color-popover-foreground: #0f172a;
+
+    /* La bulle de ce que l'utilisateur écrit. Celle de l'IA n'en a pas :
+       l'IA parle sur le fond, comme dans ChatGPT ou Claude — c'est ce qui
+       donne l'impression d'une présence plutôt que d'une messagerie. */
+    --color-bulle: #e9eef8;
+    --color-bulle-foreground: #0f172a;
+
+    /* Le verre du compositeur, quand le verre natif n'existe pas
+       (Android, iOS antérieur à 26). */
+    --color-verre: #ffffffe6;
+
+    /* ── Ce qui structure ── */
+    --color-border: #0f172a;
+    --color-input: #0f172a;
+    --color-ring: #1877f2;
+
+    --color-muted: #e9eef8;
+    --color-muted-foreground: #0f172aad;
+
+    /* ── Les états ── */
+    --color-success: #22c55e;
+    --color-success-foreground: #ffffff;
+    --color-warning: #f97316;
+    --color-warning-foreground: #ffffff;
+    --color-destructive: #ef4444;
+    --color-destructive-foreground: #ffffff;
+    --color-info: #14b8a6;
+    --color-info-foreground: #ffffff;
+
+    /* ── Les semi-transparences dont l'application se sert vraiment ── */
+    --color-border-subtle: #0f172a12;
+    --color-border-champ: #0f172a1a;
+    --color-track: #0f172a14;
+    --color-foreground-faint: #0f172a6b;
+    --color-surface-primary: #2563eb14;
+    --color-surface-secondary: #a855f71a; /* l'analyse de Karria, en violet comme la V1 */
+    --color-surface-success: #22c55e1a;
+    --color-surface-warning: #f973161a;
+    --color-border-warning: #f973164d;
+    --color-surface-destructive: #ef44441a;
+    --color-border-destructive: #ef44444d;
+
+    --color-scrim: #0f172a59;
+    --color-scrim-fort: #0f172abf;
+    --color-on-scrim: #ffffff;
+    --color-on-scrim-doux: #ffffffcc;
+    --color-inverse: #0f172a;
+    --color-inverse-foreground: #f5f3f0;
+  }
+
+  /* ═════════════════════════════════════════════════════════════════
+     MODE SOMBRE — le mode d'immersion
+
+     C'est le décor que la V1 avait déjà (`#0C1024`, cartes `#141A33`).
+     Le bleu d'action est éclairci d'un cran : sur fond nuit, le `#1E90FF`
+     d'origine perd du contraste avec le texte blanc des boutons.
+     ═════════════════════════════════════════════════════════════════ */
+  @variant dark {
+    --color-primary: #1877f2;
+    --color-primary-foreground: #ffffff;
+    --color-on-primary-faible: #ffffffbf;
+
+    --color-secondary: #c084fc;
+    --color-secondary-foreground: #0e0d0c;
+
+    --color-accent: #818cf8;
+    --color-accent-foreground: #0e0d0c;
+
+    --color-wordmark: #f5f3f0;
+
+    --color-onglet-actif: #ffffff24;
+    --color-onglet-inactif: #ffffff6b;
+    --color-premium: #f2c46d;
+    --color-salaire: #e8f5e9;
+    --color-salaire-foreground: #1b5e20;
+    --color-nouveau: #f97316;
+    --color-remplissage: #2563eb1f;
+    --color-remplissage-doux: #2563eb14;
+
+    --color-aura-1: #1e90ff;
+    --color-aura-2: #a259ff;
+    --color-aura-3: #81d4fa;
+    --color-aura-reflet: #ffffff; /* le « K » posé sur l’orbe */
+
+    --color-background: #0e0d0c;
+    --color-foreground: #f5f3f0;
+
+    --color-card: #1a1816;
+    --color-card-foreground: #f5f3f0;
+    --color-popover: #1f1d1b;
+    --color-popover-foreground: #f5f3f0;
+
+    --color-bulle: #1f1d1b;
+    --color-bulle-foreground: #f5f3f0;
+
+    --color-verre: #1a1816e6;
+
+    --color-border: #eeeae4;
+    --color-input: #eeeae4;
+    --color-ring: #1877f2;
+
+    --color-muted: #1f1d1b;
+    --color-muted-foreground: #eeeae4b3;
+
+    --color-success: #4ade80;
+    --color-success-foreground: #0e0d0c;
+    --color-warning: #fb923c;
+    --color-warning-foreground: #0e0d0c;
+    --color-destructive: #f87171;
+    --color-destructive-foreground: #0e0d0c;
+    --color-info: #2dd4bf;
+    --color-info-foreground: #0e0d0c;
+
+    --color-border-subtle: #eeeae417;
+    --color-border-champ: #eeeae41f;
+    --color-track: #eeeae41f;
+    --color-foreground-faint: #eeeae46b;
+    --color-surface-primary: #2563eb1f;
+    --color-surface-secondary: #c084fc24;
+    --color-surface-success: #4ade8021;
+    --color-surface-warning: #fb923c24;
+    --color-border-warning: #fb923c66;
+    --color-surface-destructive: #f8717124;
+    --color-border-destructive: #f8717166;
+
+    --color-scrim: #00000073;
+    --color-scrim-fort: #000000bf;
+    --color-on-scrim: #ffffff;
+    --color-on-scrim-doux: #ffffffcc;
+    --color-inverse: #f5f3f0;
+    --color-inverse-foreground: #0e0d0c;
+  }
+}
+
+@theme {
+  /* ── Rayons ──
+     Plus ronds que Zoumani : une interface conversationnelle se lit
+     douce, et les bulles et le compositeur sont des capsules. */
+  --radius-xs: 8px;
+  --radius-sm: 14px;
+  --radius-champ: 18px;
+  --radius-md: 22px;
+  /* Les rayons de la V1 : la carte d'offre (24), la tuile de logo (18),
+     les pastilles (10), les étiquettes du détail (14). */
+  --radius-carte: 24px;
+  --radius-tuile: 18px;
+  --radius-pastille: 10px;
+  --radius-etiquette: 14px;
+  --radius-lg: 30px;
+  --radius-full: 999px;
+
+  /* ── Typographie ──
+     Manrope : géométrique, lisible petit, assez de caractère pour un
+     titre. La V1 n'avait aucune police chargée (« System » partout). */
+  --font-sans: "Manrope";
+  --font-display: "ManropeExtraBold";
+  --font-medium: "ManropeMedium";
+  --font-bold: "ManropeBold";
+
+  --text-caption: 12px;
+  --text-footnote: 13px;
+  --text-body: 16px; /* jamais moins pour du texte courant */
+  --text-callout: 17px;
+  --text-title-sm: 20px;
+  --text-title: 24px;
+  --text-title-lg: 30px;
+  --text-hero: 36px;
+
+  /* ── Espacements ── */
+  --spacing-touch: 48px;
+  --spacing-champ: 56px;
+  --spacing-champ-compact: 48px;
+}

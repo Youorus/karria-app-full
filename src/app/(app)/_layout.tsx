@@ -1,0 +1,89 @@
+/**
+ * L'espace connecté : les onglets, et ce qui s'ouvre par-dessus.
+ *
+ * ═══ Le garde ═══
+ *
+ * Toute route de ce groupe exige une session. Le contrôle vit ici, une
+ * fois : un écran ajouté demain est protégé sans qu'on y pense.
+ *
+ * ═══ Le détail d'une offre ═══
+ *
+ * Empilé **au-dessus** des onglets — la barre disparaît, le détail occupe
+ * tout l'écran, le retour ramène au fil. Sur Android et sur les iOS
+ * antérieurs à 18, il monte en fondu (`fade_from_bottom`, celui de la
+ * V1) ; sur iOS 18+, la carte touchée s'y déplie (zoom natif, posé par la
+ * carte elle-même).
+ */
+
+import { Redirect, Stack } from "expo-router";
+
+import { useSession } from "@/features/auth/hooks/use-session";
+import { useAppareilConnecte } from "@/features/notifications/hooks/use-appareil-connecte";
+import { FOND } from "@/theme";
+import { useTheme } from "@/theme/preference";
+
+export default function LayoutApp() {
+  const { etat } = useSession();
+  const { mode } = useTheme();
+
+  if (etat !== "connecte") {
+    return <Redirect href="/bienvenue" />;
+  }
+
+  return (
+    <>
+      <GardeAppareil />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: FOND[mode] },
+        }}
+      >
+        <Stack.Screen name="(onglets)" />
+        {/* La question des notifications : une parenthèse en fondu, qu'un
+            glissement ne doit pas fermer avant qu'on ait répondu. */}
+        <Stack.Screen
+          name="notifications"
+          options={{ animation: "fade", animationDuration: 320, gestureEnabled: false }}
+        />
+        {/* Les deux détails montent de la même façon : un détail se lit et
+            se quitte pareil, quel que soit l'onglet d'où l'on vient. */}
+        <Stack.Screen
+          name="offre/[id]"
+          options={{ animation: "fade_from_bottom", animationDuration: 240 }}
+        />
+        <Stack.Screen
+          name="modele/[id]"
+          options={{ animation: "fade_from_bottom", animationDuration: 240 }}
+        />
+        {/* La création du CV ne « s'empile » pas comme un détail : Karria
+            prend tout l'écran, en fondu, et on ne la quitte pas d'un
+            glissement involontaire au milieu d'une réponse. */}
+        <Stack.Screen
+          name="cv/creer"
+          options={{ animation: "fade", animationDuration: 320, gestureEnabled: false }}
+        />
+        {/* Les paramètres s'empilent comme un détail : on y va, on revient.
+            La suppression monte en fondu depuis le bas, comme une feuille
+            qu'on ouvre — et le geste de retour reste permis : on doit
+            pouvoir y renoncer d'un glissement. */}
+        <Stack.Screen name="parametres" />
+        <Stack.Screen
+          name="compte/supprimer"
+          options={{ animation: "fade_from_bottom", animationDuration: 280 }}
+        />
+      </Stack>
+    </>
+  );
+}
+
+/**
+ * L'appareil s'enregistre et les notifications touchées s'ouvrent, tant
+ * qu'une session existe. Un composant sans rendu plutôt qu'un hook appelé
+ * ici : le hook ne doit tourner **qu'une fois connecté**, et un hook ne
+ * peut pas être appelé après le `Redirect` ci-dessus.
+ */
+function GardeAppareil() {
+  useAppareilConnecte();
+  return null;
+}
