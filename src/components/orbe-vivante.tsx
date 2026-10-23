@@ -1,239 +1,363 @@
 /**
  * L'orbe vivante : Karria, en petit, qui vit.
  *
- * ═══ Ce qui la fait vivre ═══
+ * ═══ Ce qu'on voit ═══
  *
- * Quatre mouvements superposés, tous dérivés d'une **seule horloge** de
- * 12 s qui boucle sans couture :
+ * Une sphère faite de milliers de grains fins qui coulent comme une
+ * matière en mouvement — la sphère tourne, chaque grain dérive à son
+ * rythme, et la surface ondule —, posée sur un tourbillon flou de la roue
+ * chromatique entière. Au centre, ce que l'écran y pose (le K, une
+ * flèche). C'est la **même** orbe sur le bouton du fil, dans l'agent,
+ * dans la création du CV et sur l'écran des notifications : un seul
+ * personnage.
  *
- * 1. **La lumière intérieure** — deux nappes (glacier et violet) glissent
- *    dans la sphère sur des trajectoires différentes, comme un liquide
- *    éclairé de l'intérieur. La sphère ne paraît jamais deux fois la même.
- * 2. **La flottaison** — la sphère dérive de quelques points et se
- *    déforme imperceptiblement (largeur et hauteur ne battent pas
- *    ensemble) : un être, pas un bouton.
- * 3. **Les particules** — cinq étincelles tournent autour, chacune à son
- *    rayon, sa vitesse et sa phase, et s'allument puis s'éteignent.
- * 4. **Le halo** — une lueur bleu-violet qui respire derrière.
+ * ═══ Pourquoi Skia, et un seul appel de dessin ═══
  *
- * ═══ Pourquoi une seule horloge ═══
+ * Des milliers de points animés à 60 images par seconde ne tiennent ni
+ * en vues React Native (une vue par point : le compositeur s'effondre à
+ * quelques centaines) ni en SVG (recalcul de l'arbre à chaque image).
+ * Skia dessine tous les grains d'un coup (`Atlas` : un petit disque
+ * doux, estampé N fois avec une transformation et une teinte par grain),
+ * depuis deux tampons partagés que le fil d'interface remplit à chaque
+ * image. React ne rend qu'une fois ; aucune mise à jour d'état par image.
  *
- * Chaque mouvement en tire sa propre fréquence par un multiple entier :
- * à la fin des 12 s, tout revient exactement au départ, donc la boucle
- * n'a pas de saut. Et un seul `withRepeat` à animer plutôt que quinze,
- * sur le fil natif.
+ * ═══ Le temps ═══
  *
- * Mouvement réduit : l'orbe reste fixe, sans particules.
+ * Une horloge en secondes avance à chaque image, **multipliée par une
+ * vitesse** qui glisse doucement d'un état à l'autre (repos, écoute,
+ * réflexion). Comme les mouvements sont des sinusoïdes du temps, aucune
+ * boucle à refermer, et un changement d'état n'a jamais de saut : seule
+ * la cadence change. L'amplitude de l'ondulation suit le niveau audio
+ * quand Karria écoute.
  *
- * C'est la **même** orbe sur le bouton du fil et dans l'agent : on touche
- * la petite, la grande nous accueille — un seul personnage.
+ * ═══ La batterie ═══
+ *
+ * L'horloge s'arrête quand l'écran n'est plus au premier plan, quand
+ * l'application passe en arrière-plan, et quand le système demande moins
+ * de mouvement — l'orbe reste alors une image fixe, sans tourbillon qui
+ * tourne. Le nombre de grains dépend de la taille et de l'appareil
+ * (voir `orbe-particules.ts`) ; les états changent la vitesse, jamais le
+ * nombre.
+ *
+ * ═══ Les couleurs ═══
+ *
+ * Les grains sont teintés de l'aura (glacier en haut et devant, violet en
+ * bas et derrière, bleu entre les deux) ; le tourbillon est le spectre
+ * entier, qui par définition n'est pas une couleur de charte. Le disque
+ * estampé est un **masque** — une coupole d'opacité, sans couleur
+ * propre — que la teinte du grain multiplie.
+ *
+ * ═══ Régler ═══
+ *
+ * Le nombre de grains : `nombreDeParticules` (orbe-particules.ts). Leur
+ * finesse : `taillePoint`. La cadence et l'ondulation par état : `ETATS`.
+ * L'éclat du tourbillon : `opaciteTourbillon` ; son flou : `flou`.
  */
 
-import { useEffect, type ReactNode } from "react";
-import Animated, {
+import {
+  Atlas,
+  Blur,
+  Canvas,
+  Circle,
+  Group,
+  Paint,
+  RadialGradient,
+  Skia,
+  SweepGradient,
+  TileMode,
+  drawAsImageFromPicture,
+  useColorBuffer,
+  useRSXformBuffer,
+  type SkImage,
+} from "@shopify/react-native-skia";
+import { useIsFocused } from "expo-router";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { AppState, PixelRatio, Platform } from "react-native";
+import {
   Easing,
-  useAnimatedStyle,
+  useDerivedValue,
+  useFrameCallback,
   useReducedMotion,
   useSharedValue,
-  withRepeat,
   withTiming,
   type SharedValue,
 } from "react-native-reanimated";
-import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 
 import { Box } from "@/components/ui/box";
 import { AURA } from "@/theme";
 
-const PERIODE_MS = 12_000;
-const DEUX_PI = Math.PI * 2;
+import {
+  deplacer,
+  nombreDeParticules,
+  roueChromatique,
+  semerLesParticules,
+  versComposantes,
+} from "./orbe-particules";
 
-/** Les étincelles : rayon (× rayon de l'orbe), tours par période, phase,
- *  taille en points. Des tours entiers : la boucle reste sans couture. */
-const PARTICULES = [
-  { rayon: 0.86, tours: 2, phase: 0.0, taille: 3.5, couleur: AURA.glacier },
-  { rayon: 1.02, tours: -3, phase: 0.27, taille: 2.5, couleur: AURA.violet },
-  { rayon: 0.94, tours: 4, phase: 0.55, taille: 2, couleur: AURA.bleu },
-  { rayon: 1.12, tours: -2, phase: 0.71, taille: 3, couleur: AURA.glacier },
-  { rayon: 0.9, tours: 5, phase: 0.86, taille: 2, couleur: AURA.violet },
-] as const;
+/** Le côté, en pixels, du disque estampé pour chaque grain. */
+const SPRITE = 24;
+const RECT_GRAIN = Skia.XYWHRect(0, 0, SPRITE, SPRITE);
 
-function Nappe({
-  temps,
-  taille,
-  couleur,
-  frequences,
-}: {
-  temps: SharedValue<number>;
-  taille: number;
-  couleur: string;
-  frequences: [number, number];
-}) {
-  const style = useAnimatedStyle(() => {
-    const a = temps.value * DEUX_PI;
-    return {
-      transform: [
-        { translateX: Math.cos(a * frequences[0]) * taille * 0.22 },
-        { translateY: Math.sin(a * frequences[1]) * taille * 0.22 },
+/** Les trois états, et ce qu'ils font à la matière. */
+const ETATS = {
+  repos: { vitesse: 1, amplitude: 0.05, intensite: 0 },
+  ecoute: { vitesse: 1.6, amplitude: 0.07, intensite: 0.6 },
+  reflexion: { vitesse: 2.6, amplitude: 0.11, intensite: 1 },
+} as const;
+
+/** La durée de glissement d'un état à l'autre. */
+const TRANSITION = { duration: 650, easing: Easing.out(Easing.cubic) };
+
+const ROUE = roueChromatique(12);
+const GLACIER = versComposantes(AURA.glacier);
+const BLEU = versComposantes(AURA.bleu);
+const VIOLET = versComposantes(AURA.violet);
+
+/** Le disque doux estampé pour chaque grain : fabriqué une fois pour
+ *  toute l'application, à la première orbe affichée. */
+let grainPartage: SkImage | null = null;
+function leGrain(): SkImage | null {
+  if (grainPartage !== null) return grainPartage;
+  const enregistreur = Skia.PictureRecorder();
+  const toile = enregistreur.beginRecording(RECT_GRAIN);
+  const pinceau = Skia.Paint();
+  pinceau.setAntiAlias(true);
+  // Une coupole d'opacité : pleine au centre, nulle au bord. Les
+  // composantes de couleur valent 1 pour que la teinte du grain passe
+  // telle quelle par la multiplication.
+  pinceau.setShader(
+    Skia.Shader.MakeRadialGradient(
+      { x: SPRITE / 2, y: SPRITE / 2 },
+      SPRITE / 2,
+      [
+        Float32Array.of(1, 1, 1, 1),
+        Float32Array.of(1, 1, 1, 0.5),
+        Float32Array.of(1, 1, 1, 0),
       ],
-    };
-  });
-  const r = taille * 0.42;
-  return (
-    <Animated.View
-      style={[{ position: "absolute", left: taille / 2 - r, top: taille / 2 - r }, style]}
-    >
-      <Svg width={r * 2} height={r * 2}>
-        <Defs>
-          <RadialGradient id={`nappe-${couleur}`} cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor={couleur} stopOpacity={0.95} />
-            <Stop offset="1" stopColor={couleur} stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-        <Circle cx={r} cy={r} r={r} fill={`url(#nappe-${couleur})`} />
-      </Svg>
-    </Animated.View>
+      [0, 0.4, 1],
+      TileMode.Clamp,
+    ),
   );
+  toile.drawCircle(SPRITE / 2, SPRITE / 2, SPRITE / 2, pinceau);
+  grainPartage = drawAsImageFromPicture(enregistreur.finishRecordingAsPicture(), {
+    width: SPRITE,
+    height: SPRITE,
+  });
+  return grainPartage;
 }
 
-function Particule({
-  temps,
-  rayonOrbe,
-  centre,
-  particule,
-}: {
-  temps: SharedValue<number>;
-  rayonOrbe: number;
-  centre: number;
-  particule: (typeof PARTICULES)[number];
-}) {
-  const style = useAnimatedStyle(() => {
-    const angle = (temps.value * particule.tours + particule.phase) * DEUX_PI;
-    // Le rayon respire un peu : la particule ne trace pas un cercle parfait.
-    const rayon = rayonOrbe * particule.rayon * (1 + 0.08 * Math.sin(angle * 2));
-    return {
-      opacity: 0.25 + 0.75 * Math.max(0, Math.sin(angle * 1.5 + particule.phase * 7)),
-      transform: [
-        { translateX: centre + Math.cos(angle) * rayon - particule.taille / 2 },
-        { translateY: centre + Math.sin(angle) * rayon - particule.taille / 2 },
-      ],
-    };
-  });
-  return (
-    <Animated.View
-      style={[
-        {
-          position: "absolute",
-          left: 0,
-          top: 0,
-          width: particule.taille,
-          height: particule.taille,
-          borderRadius: particule.taille / 2,
-          backgroundColor: particule.couleur,
-        },
-        style,
-      ]}
-    />
-  );
+function borner(valeur: number): number {
+  "worklet";
+  return Math.min(1, Math.max(0, valeur));
+}
+
+/** Un garde à nous : celui de Reanimated accepte `unknown` et ne
+ *  restreint donc pas l'union `number | SharedValue<number>`. */
+function estPartagee(v: number | SharedValue<number>): v is SharedValue<number> {
+  return typeof v !== "number";
 }
 
 interface Props {
-  /** Diamètre de la sphère, en points. */
+  /** Diamètre de la sphère, en points. La boîte fait le double : le
+   *  tourbillon et les grains satellites débordent de moitié. */
   taille?: number;
   /** Ce qui est posé au centre : le K, une flèche… */
   children?: ReactNode;
-  /** Karria réfléchit : l'horloge passe de 12 s à 4 s — tout s'accélère. */
+  /** Karria réfléchit : la matière s'accélère et ondule davantage. */
   active?: boolean;
+  /** Karria écoute : plus vive qu'au repos, et sensible au niveau audio. */
+  ecoute?: boolean;
+  /** Le niveau du micro, de 0 à 1 : gonfle l'ondulation et l'éclat. Une
+   *  valeur partagée évite un rendu React par mesure du micro. */
+  niveauAudio?: number | SharedValue<number>;
 }
 
-export function OrbeVivante({ taille = 60, children, active = false }: Props) {
+export function OrbeVivante({
+  taille = 60,
+  children,
+  active = false,
+  ecoute = false,
+  niveauAudio = 0,
+}: Props) {
   const reduit = useReducedMotion();
-  const temps = useSharedValue(0);
-  // La boîte déborde de la sphère : place pour les particules et le halo.
+  const auPremierPlan = useIsFocused();
+  const [appActive, setAppActive] = useState(AppState.currentState === "active");
+  useEffect(() => {
+    const abonnement = AppState.addEventListener("change", (etat) =>
+      setAppActive(etat === "active"),
+    );
+    return () => abonnement.remove();
+  }, []);
+
   const boite = taille * 2;
   const centre = boite / 2;
+  const rayon = taille / 2;
+  /** Le diamètre d'un grain, en points : fin, mais jamais sous le pixel. */
+  const taillePoint = Math.min(3.2, Math.max(1.2, taille * 0.028));
+
+  const nombre = useMemo(
+    () => nombreDeParticules(taille, Platform.OS, PixelRatio.get()),
+    [taille],
+  );
+  const graine = useMemo(() => semerLesParticules(nombre), [nombre]);
+  const grain = useMemo(() => leGrain(), []);
+  // Le même rectangle pour chaque grain : l'atlas exige une entrée par
+  // estampe, et un seul objet suffit.
+  const sprites = useMemo(
+    () => Array.from({ length: nombre }, () => RECT_GRAIN),
+    [nombre],
+  );
+
+  // ── L'horloge et les réglages, sur le fil d'interface ──
+  const temps = useSharedValue(0);
+  const vitesse = useSharedValue<number>(ETATS.repos.vitesse);
+  const amplitude = useSharedValue<number>(ETATS.repos.amplitude);
+  const intensite = useSharedValue<number>(ETATS.repos.intensite);
+  const niveauInterne = useSharedValue(0);
+  const niveau = estPartagee(niveauAudio) ? niveauAudio : niveauInterne;
 
   useEffect(() => {
-    if (reduit) return;
-    temps.set(
-      withRepeat(withTiming(1, { duration: PERIODE_MS, easing: Easing.linear }), -1),
-    );
-  }, [reduit, temps]);
+    if (estPartagee(niveauAudio)) return;
+    // 80 ms : le temps d'une mesure de micro, pour lisser sans traîner.
+    niveauInterne.set(withTiming(borner(niveauAudio), { duration: 80 }));
+  }, [niveauAudio, niveauInterne]);
 
-  const styleSphere = useAnimatedStyle(() => {
-    const a = temps.value * DEUX_PI;
-    return {
-      transform: [
-        { translateX: Math.sin(a * 2) * 1.8 },
-        { translateY: Math.cos(a * 3) * 2.4 },
-        { scaleX: 1 + Math.sin(a * 4) * 0.025 },
-        { scaleY: 1 + Math.cos(a * 4) * 0.025 },
-      ],
-    };
+  useEffect(() => {
+    const cible = active ? ETATS.reflexion : ecoute ? ETATS.ecoute : ETATS.repos;
+    vitesse.set(withTiming(cible.vitesse, TRANSITION));
+    amplitude.set(withTiming(cible.amplitude, TRANSITION));
+    intensite.set(withTiming(cible.intensite, TRANSITION));
+  }, [active, ecoute, vitesse, amplitude, intensite]);
+
+  const avancer = useCallback(
+    (image: { timeSincePreviousFrame: number | null }) => {
+      "worklet";
+      // Bornée : au retour d'une pause, un pas d'une seconde ferait
+      // sauter la matière au lieu de la laisser repartir.
+      const dt = Math.min((image.timeSincePreviousFrame ?? 0) / 1000, 0.05);
+      temps.set(temps.get() + dt * vitesse.get());
+    },
+    [temps, vitesse],
+  );
+  const horloge = useFrameCallback(avancer, false);
+  const tourne = !reduit && appActive && auPremierPlan;
+  useEffect(() => {
+    horloge.setActive(tourne);
+  }, [tourne, horloge]);
+
+  // ── Les grains ──
+  // Deux tampons, deux passes par image : la position calcule le
+  // déplacement, la couleur le recalcule. Le doublon est voulu — écrire
+  // les teintes depuis la passe des positions reviendrait à modifier un
+  // tampon qui n'est pas le nôtre —, et il coûte moins d'une
+  // milliseconde pour 2 600 grains sur le fil d'interface.
+  const transformations = useRSXformBuffer(nombre, (val, i) => {
+    "worklet";
+    const p = deplacer(graine, i, temps.get(), amplitude.get() + niveau.get() * 0.16);
+    const proche = (p.profondeur + 1) / 2;
+    const satellite = (graine.rayon[i] ?? 1) > 1;
+    const echelle =
+      (taillePoint * (satellite ? 0.7 : 1) * (0.55 + 0.6 * proche)) / SPRITE;
+    const demi = (echelle * SPRITE) / 2;
+    val.set(echelle, 0, centre + p.x * rayon - demi, centre + p.y * rayon - demi);
+  });
+  const couleurs = useColorBuffer(nombre, (val, i) => {
+    "worklet";
+    const p = deplacer(graine, i, temps.get(), amplitude.get() + niveau.get() * 0.16);
+    const proche = (p.profondeur + 1) / 2;
+    const satellite = (graine.rayon[i] ?? 1) > 1;
+    // Glacier en haut et devant, violet en bas et derrière, bleu entre.
+    const haut = 1 - (p.y / (graine.rayon[i] ?? 1) + 1) / 2;
+    const u = borner(0.5 * haut + 0.5 * proche);
+    const bas = u < 0.5;
+    const k = bas ? u * 2 : (u - 0.5) * 2;
+    const de = bas ? VIOLET : BLEU;
+    const vers = bas ? BLEU : GLACIER;
+    const eclat = 1 + 0.5 * niveau.get() + 0.15 * intensite.get();
+    const lumiere = Math.min(eclat, 1.2);
+    const alpha = (satellite ? 0.5 : 0.9) * (0.15 + 0.85 * proche) * eclat;
+    val[0] = (de[0] + (vers[0] - de[0]) * k) * lumiere;
+    val[1] = (de[1] + (vers[1] - de[1]) * k) * lumiere;
+    val[2] = (de[2] + (vers[2] - de[2]) * k) * lumiere;
+    val[3] = Math.min(1, alpha);
   });
 
-  const styleHalo = useAnimatedStyle(() => {
-    const souffle = (Math.sin(temps.value * DEUX_PI * 3) + 1) / 2;
-    return {
-      opacity: 0.55 + souffle * 0.35,
-      transform: [{ scale: 0.92 + souffle * 0.14 }],
-    };
-  });
+  // ── Le tourbillon ──
+  const rotation = useDerivedValue(() => [{ rotate: temps.get() * 0.6 }]);
+  const contreRotation = useDerivedValue(() => [{ rotate: 1.2 - temps.get() * 0.45 }]);
+  const opaciteTourbillon = useDerivedValue(() =>
+    borner(0.5 + 0.4 * intensite.get() + 0.3 * niveau.get()),
+  );
+  const origine = { x: centre, y: centre };
+  const flou = taille * 0.14;
+
+  // ── Le cœur ──
+  // Une lueur de l'aura sous les grains : elle rend le K lisible sur un
+  // fond clair comme sur un fond sombre, et donne du volume à la sphère.
+  const coeur = useMemo(
+    () => [
+      [...GLACIER, 0.55],
+      [...BLEU, 0.78],
+      [...VIOLET, 0.42],
+      [...VIOLET, 0],
+    ],
+    [],
+  );
 
   return (
     <Box style={{ width: boite, height: boite }} pointerEvents="box-none">
-      <Animated.View
+      <Canvas
+        style={{ position: "absolute", width: boite, height: boite }}
         pointerEvents="none"
-        style={[{ position: "absolute", width: boite, height: boite }, styleHalo]}
       >
-        <Svg width={boite} height={boite}>
-          <Defs>
-            <RadialGradient id="halo-vivant" cx="50%" cy="50%" r="50%">
-              <Stop offset="0.3" stopColor={AURA.bleu} stopOpacity={0.5} />
-              <Stop offset="0.62" stopColor={AURA.violet} stopOpacity={0.16} />
-              <Stop offset="1" stopColor={AURA.violet} stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
-          <Circle cx={centre} cy={centre} r={centre} fill="url(#halo-vivant)" />
-        </Svg>
-      </Animated.View>
+        <Group
+          opacity={opaciteTourbillon}
+          layer={
+            <Paint>
+              <Blur blur={flou} />
+            </Paint>
+          }
+        >
+          <Group transform={rotation} origin={origine}>
+            <Circle cx={centre + rayon * 0.1} cy={centre} r={rayon * 1.3}>
+              <SweepGradient c={{ x: centre + rayon * 0.1, y: centre }} colors={ROUE} />
+            </Circle>
+          </Group>
+          <Group transform={contreRotation} origin={origine}>
+            <Circle cx={centre - rayon * 0.15} cy={centre + rayon * 0.1} r={rayon * 0.95}>
+              <SweepGradient
+                c={{ x: centre - rayon * 0.15, y: centre + rayon * 0.1 }}
+                colors={ROUE}
+                start={180}
+                end={540}
+              />
+            </Circle>
+          </Group>
+        </Group>
 
-      {reduit
-        ? null
-        : PARTICULES.map((p) => (
-            <Particule
-              key={`${p.phase}`}
-              temps={temps}
-              rayonOrbe={taille / 2}
-              centre={centre}
-              particule={p}
-            />
-          ))}
+        <Circle cx={centre} cy={centre} r={rayon * 0.92}>
+          <RadialGradient
+            c={{ x: centre - rayon * 0.25, y: centre - rayon * 0.3 }}
+            r={rayon * 1.25}
+            colors={coeur}
+            positions={[0, 0.35, 0.82, 1]}
+          />
+        </Circle>
 
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          {
-            position: "absolute",
-            left: centre - taille / 2,
-            top: centre - taille / 2,
-            width: taille,
-            height: taille,
-            borderRadius: taille / 2,
-            overflow: "hidden",
-            backgroundColor: AURA.bleu,
-          },
-          styleSphere,
-        ]}
-      >
-        <Nappe temps={temps} taille={taille} couleur={AURA.violet} frequences={[1, 2]} />
-        <Nappe
-          temps={temps}
-          taille={taille}
-          couleur={AURA.glacier}
-          frequences={[-2, 1]}
+        <Atlas
+          image={grain}
+          sprites={sprites}
+          transforms={transformations}
+          colors={couleurs}
+          colorBlendMode="modulate"
         />
-        <Box className="absolute inset-0 items-center justify-center">{children}</Box>
-      </Animated.View>
+      </Canvas>
+      <Box
+        className="absolute inset-0 items-center justify-center"
+        pointerEvents="box-none"
+      >
+        {children}
+      </Box>
     </Box>
   );
 }
