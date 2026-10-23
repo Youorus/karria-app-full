@@ -276,10 +276,13 @@ export function OrbeVivante({
     const eclat = 1 + 0.5 * niveau.get() + 0.15 * intensite.get();
     const lumiere = Math.min(eclat, 1.2);
     const alpha = (satellite ? 0.5 : 0.9) * (0.15 + 0.85 * proche) * eclat;
-    val[0] = (de[0] + (vers[0] - de[0]) * k) * lumiere;
-    val[1] = (de[1] + (vers[1] - de[1]) * k) * lumiere;
-    val[2] = (de[2] + (vers[2] - de[2]) * k) * lumiere;
-    val[3] = Math.min(1, alpha);
+    // Skia convertit chaque composante en octet et s'arrête net (abort
+    // natif, l'application se ferme) au-delà de 1 : l'éclat peut monter à
+    // 1,2, d'où les bornes.
+    val[0] = borner((de[0] + (vers[0] - de[0]) * k) * lumiere);
+    val[1] = borner((de[1] + (vers[1] - de[1]) * k) * lumiere);
+    val[2] = borner((de[2] + (vers[2] - de[2]) * k) * lumiere);
+    val[3] = borner(alpha);
   });
 
   // ── Le tourbillon ──
