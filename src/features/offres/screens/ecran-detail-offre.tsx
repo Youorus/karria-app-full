@@ -7,11 +7,13 @@
  * - le bloc d'identité : tuile 68 (rayon 20) et, à sa droite,
  *   l'entreprise en capitales puis le titre très gras ; dessous, les
  *   étiquettes lieu / contrat / salaire (vert) ;
- * - « Description — Analyse par Karria », avec son chargeur ;
+ * - « Description — L'annonce », avec son chargeur ;
  * - « Voir l'annonce d'origine », dans le pied flottant.
  *
  * Le pied « Créer mon CV / Créer ma lettre » de la V1 arrive avec le
- * Studio (onglet CV) ; d'ici là, l'action est l'annonce d'origine.
+ * Studio (onglet CV) ; d'ici là, l'action est l'annonce d'origine. Les
+ * étiquettes disent tout ce que l'API type : lieu, contrat, télétravail,
+ * horaires, expérience, salaire, et la source de l'annonce.
  *
  * ═══ L'entrée ═══
  *
@@ -42,6 +44,7 @@ import { useDetailOffre } from "../hooks/use-detail-offre";
 import {
   contratCourt,
   initiales,
+  libelleSource,
   salaireLisible,
   teinteDeTuile,
 } from "../services/presentation";
@@ -78,12 +81,12 @@ export function EcranDetailOffre() {
     offre,
     chargement,
     erreur,
-    etatAnalyse,
-    analyse,
+    etatDescription,
     enregistrement,
     basculerSignet,
     partager,
     postuler,
+    ecarter,
     recharger,
     retour,
   } = useDetailOffre();
@@ -112,6 +115,7 @@ export function EcranDetailOffre() {
                     active: offre.enregistree,
                     desactivee: enregistrement,
                   },
+                  { icone: "fermer", libelle: "Écarter cette offre", onPress: ecarter },
                 ]
           }
         />
@@ -173,25 +177,40 @@ export function EcranDetailOffre() {
             </Animated.View>
 
             <Animated.View entering={entree(1)}>
-              <HStack className="flex-wrap gap-2">
-                {offre.ville !== null ? (
-                  <Etiquette icone="lieu" libelle={offre.ville} />
-                ) : null}
-                {offre.contrats.map((c) => (
-                  <Etiquette key={c} icone="contrat" libelle={contratCourt(c)} />
-                ))}
-                {salaireLisible(offre.salaire) !== null ? (
-                  <Etiquette
-                    icone="salaire"
-                    libelle={salaireLisible(offre.salaire) ?? ""}
-                    vert
-                  />
-                ) : null}
-              </HStack>
+              <VStack space="sm">
+                <HStack className="flex-wrap gap-2">
+                  {offre.lieu !== null ? (
+                    <Etiquette icone="lieu" libelle={offre.lieu} />
+                  ) : null}
+                  {offre.contrat !== null ? (
+                    <Etiquette icone="contrat" libelle={contratCourt(offre.contrat)} />
+                  ) : null}
+                  {offre.teletravail !== null && offre.teletravail !== "sur site" ? (
+                    <Etiquette icone="appareil" libelle={offre.teletravail} />
+                  ) : null}
+                  {offre.horaires === "temps partiel" ? (
+                    <Etiquette icone="calendrier" libelle={offre.horaires} />
+                  ) : null}
+                  {offre.experience !== null ? (
+                    <Etiquette icone="tendance" libelle={offre.experience} />
+                  ) : null}
+                  {salaireLisible(offre.salaire) !== null ? (
+                    <Etiquette
+                      icone="salaire"
+                      libelle={salaireLisible(offre.salaire) ?? ""}
+                      vert
+                    />
+                  ) : null}
+                </HStack>
+                <Texte className="px-1 text-caption text-foreground-faint">
+                  {offre.active ? "Publiée sur" : "Expirée · publiée sur"}{" "}
+                  {libelleSource(offre.source)}
+                </Texte>
+              </VStack>
             </Animated.View>
 
             <Animated.View entering={entree(2)}>
-              <BlocAnalyse etat={etatAnalyse} analyse={analyse} />
+              <BlocAnalyse etat={etatDescription} texte={offre.description} />
             </Animated.View>
           </ScrollView>
         )}

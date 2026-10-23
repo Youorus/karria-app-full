@@ -1,21 +1,18 @@
 /**
- * Le détail d'une offre : l'offre, son analyse, et les actions.
+ * Le détail d'une offre : l'offre, son texte, et les actions.
  *
- * ═══ L'analyse se génère à la demande, comme dans la V1 ═══
+ * ═══ La fiche part de la mémoire du fil, puis se complète ═══
  *
- * L'API ne résume pas toutes les offres d'avance — ce serait payer une
- * génération pour des offres que personne n'ouvre. À l'ouverture :
+ * Le fil a déjà tout ce qu'il faut pour afficher l'en-tête de l'offre ;
+ * seule la description manque (`GET /job-matches/{id}` est la seule
+ * route qui la porte). On affiche donc l'offre connue tout de suite et
+ * on charge le texte derrière — pas d'écran blanc entre la carte et la
+ * fiche. Ouverte par un lien ou une notification, l'offre est inconnue :
+ * tout vient du serveur.
  *
- * 1. on lit `summary-status` ;
- * 2. pas encore d'analyse (`missing`, ou `not_available` à la première
- *    lecture : c'est ainsi que la V1 dit « personne ne l'a demandée ») →
- *    on demande la génération (`POST …/summary`), comme la V1 ;
- * 3. tant que c'est `pending`, on relit toutes les 2,5 secondes, comme
- *    la V1 ;
- * 4. `ready` → l'analyse s'affiche, découpée en sections comme la V1 ;
- *    `not_available` **après** la demande → « Analyse non disponible »
- *    (la génération a échoué) ; une panne → l'état
- *    d'erreur de la V1.
+ * L'analyse de Karria par offre de la V1 n'existe pas dans la V2
+ * (`docs/contrat-api-offres.md`) : il n'y a plus rien à générer ni à
+ * sonder.
  *
  * ═══ Le signet attend le serveur ═══
  *
@@ -30,42 +27,30 @@ import { Linking, Platform, Share } from "react-native";
 
 import { ErreurApi } from "@/lib/http";
 import {
-  demanderResume,
+  ecarterOffre,
   garderOffre,
   lireOffre,
-  lireResume,
   noterCandidatureOuverte,
 } from "../api/offres.api";
 import { messageDePartage } from "../services/presentation";
 import type { Offre } from "../types/offres.types";
-import { offreConnue } from "./memoire-offres";
+import { memoriser, offreConnue } from "./memoire-offres";
 
-/** Le rythme de sondage de la V1 (`summary-status` toutes les 2,5 s). */
-const INTERVALLE_SONDAGE_MS = 2_500;
-
-/** Le gras Markdown de l'IA, retiré comme dans la V1. */
-function nettoyer(texte: string): string {
-  return texte
-    .replace(/\*\*(.*?)\*\*/g, "$1")
-    .replace(/\*(.*?)\*/g, "$1")
-    .trim();
-}
-
-/** Les quatre états de la V1 : en génération, prête, en erreur, ou
- *  indisponible (l'API dit qu'il n'y en aura pas). */
-export type EtatAnalyse = "generation" | "prete" | "erreur" | "indisponible";
+/** Le texte de l'annonce : en lecture, lu, ou en échec. */
+export type EtatDescription = "chargement" | "prete" | "erreur";
 
 export interface DetailOffre {
   offre: Offre | null;
   chargement: boolean;
   erreur: string | null;
-  etatAnalyse: EtatAnalyse;
-  analyse: string;
+  etatDescription: EtatDescription;
   enregistrement: boolean;
   basculerSignet: () => void;
   partager: () => void;
   postuler: () => void;
   ouvrirCarte: () => void;
+  /** Écarte l'offre du fil, et revient au fil. */
+  ecarter: () => void;
   recharger: () => void;
   /** Revient au fil — ou y mène, si l'offre a été ouverte par un lien. */
   retour: () => void;
@@ -81,34 +66,37 @@ function messageDErreur(cause: unknown): string {
 }
 
 export function useDetailOffre(): DetailOffre {
-  const params = useLocalSearchParams<{ id: string }>();
-  const id = Number(params.id);
+  const { id } = useLocalSearchParams<{ id: string }>();
   const connue = offreConnue(id);
 
   const [offre, setOffre] = useState<Offre | null>(connue ?? null);
   const [chargement, setChargement] = useState(connue === undefined);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [tentative, setTentative] = useState(0);
-  const [analyse, setAnalyse] = useState(connue?.resume ? nettoyer(connue.resume) : "");
-  const [etatAnalyse, setEtatAnalyse] = useState<EtatAnalyse>(
-    connue?.resume ? "prete" : "generation",
+  const [etatDescription, setEtatDescription] = useState<EtatDescription>(
+    connue?.description ? "prete" : "chargement",
   );
+  const [tentative, setTentative] = useState(0);
   const [enregistrement, setEnregistrement] = useState(false);
 
-  // L'offre, si la mémoire du fil ne l'a pas.
+  // L'offre complète : toujours lue, sauf si la mémoire a déjà son texte.
   useEffect(() => {
-    if (offreConnue(id) !== undefined && tentative === 0) return;
+    if (offreConnue(id)?.description && tentative === 0) return;
     let vivant = true;
     lireOffre(id)
       .then(
         (resultat) => {
           if (!vivant) return;
+          memoriser([resultat]);
           setOffre(resultat);
           setErreur(null);
+          setEtatDescription("prete");
         },
         (cause: unknown) => {
           console.warn("[karria] offre indisponible", cause);
-          if (vivant) setErreur(messageDErreur(cause));
+          if (!vivant) return;
+          // L'en-tête connu reste ; seul le texte manque.
+          if (offreConnue(id) === undefined) setErreur(messageDErreur(cause));
+          setEtatDescription("erreur");
         },
       )
       .finally(() => {
@@ -118,44 +106,6 @@ export function useDetailOffre(): DetailOffre {
       vivant = false;
     };
   }, [id, tentative]);
-
-  // L'analyse : lecture, génération si besoin, sondage jusqu'à « ready ».
-  useEffect(() => {
-    if (etatAnalyse !== "generation") return;
-    let vivant = true;
-    let minuteur: ReturnType<typeof setTimeout> | undefined;
-
-    const sonder = (dejaDemandee: boolean) => {
-      lireResume(id)
-        .then(async (lu) => {
-          if (!vivant) return;
-          const aDemander =
-            !dejaDemandee && (lu.status === "missing" || lu.status === "not_available");
-          const statut = aDemander ? await demanderResume(id) : lu;
-          if (!vivant) return;
-          if (statut.status === "ready" && statut.summary) {
-            setAnalyse(nettoyer(statut.summary));
-            setEtatAnalyse("prete");
-            return;
-          }
-          if (statut.status === "not_available") {
-            setEtatAnalyse("indisponible");
-            return;
-          }
-          minuteur = setTimeout(() => sonder(true), INTERVALLE_SONDAGE_MS);
-        })
-        .catch((cause: unknown) => {
-          console.warn("[karria] analyse en échec", cause);
-          if (vivant) setEtatAnalyse("erreur");
-        });
-    };
-
-    sonder(false);
-    return () => {
-      vivant = false;
-      if (minuteur !== undefined) clearTimeout(minuteur);
-    };
-  }, [id, etatAnalyse]);
 
   const basculerSignet = useCallback(() => {
     if (offre === null || enregistrement) return;
@@ -201,22 +151,33 @@ export function useDetailOffre(): DetailOffre {
     else router.replace("/offres");
   }, [router]);
 
+  const ecarter = useCallback(() => {
+    if (offre === null) return;
+    // On repart tout de suite : l'offre quitte le fil côté serveur, et le
+    // fil se relit à la prochaine actualisation.
+    ecarterOffre(offre.id).catch((cause: unknown) =>
+      console.warn("[karria] offre non écartée", cause),
+    );
+    retour();
+  }, [offre, retour]);
+
   const recharger = useCallback(() => {
-    setChargement(true);
+    setChargement(offreConnue(id) === undefined);
+    setEtatDescription("chargement");
     setTentative((t) => t + 1);
-  }, []);
+  }, [id]);
 
   return {
     offre,
     chargement,
     erreur,
-    etatAnalyse,
-    analyse,
+    etatDescription,
     enregistrement,
     basculerSignet,
     partager,
     postuler,
     ouvrirCarte,
+    ecarter,
     recharger,
     retour,
   };

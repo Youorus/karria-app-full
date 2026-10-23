@@ -3,70 +3,66 @@
  *
  * Source : `Karria-Frontend`, `src/features/jobs/utils/job-offer-display.ts`
  * et les cartes du fil. On reprend les mêmes règles — pas des règles
- * « inspirées » — parce que l'API renvoie les mêmes données et que
- * l'utilisateur doit retrouver les mêmes libellés. Seule différence : ici
- * elles sont pures, testées, et hors des écrans.
+ * « inspirées » — parce que l'utilisateur doit retrouver les mêmes
+ * libellés. Seule différence : ici elles sont pures, testées, et hors des
+ * écrans. La V2 typant tout (`docs/contrat-api-offres.md`), les replis
+ * sur la donnée source de la V1 ont disparu avec elle.
  */
 
 // ─────────────────────────────────────────────────────────────────────
-// Lire la donnée source quand les champs normalisés manquent
+// Les champs typés de l'API, en français
 // ─────────────────────────────────────────────────────────────────────
 
-type Brut = Record<string, unknown> | null | undefined;
+import type {
+  ExperienceBrute,
+  HorairesBrut,
+  Offre,
+  TeletravailBrut,
+} from "../types/offres.types";
 
-function chaine(...valeurs: unknown[]): string | null {
-  for (const v of valeurs) {
-    if (typeof v === "string" && v.trim().length > 0) return v.trim();
-  }
-  return null;
+const TELETRAVAIL: Record<TeletravailBrut, Offre["teletravail"]> = {
+  sur_site: "sur site",
+  hybride: "hybride",
+  teletravail: "télétravail",
+};
+
+export function libelleTeletravail(brut: TeletravailBrut | null): Offre["teletravail"] {
+  return brut === null ? null : TELETRAVAIL[brut];
 }
 
-function imbrique(source: Brut, chemin: string[]): unknown {
-  let courant: unknown = source;
-  for (const cle of chemin) {
-    if (typeof courant !== "object" || courant === null || !(cle in courant)) return null;
-    courant = (courant as Record<string, unknown>)[cle];
-  }
-  return courant;
+export function libelleHoraires(brut: HorairesBrut | null): Offre["horaires"] {
+  return brut === null ? null : brut === "temps_plein" ? "temps plein" : "temps partiel";
 }
 
-/** Le lieu : la ville normalisée, sinon ce que la source en dit. */
-export function lieuDeLOffre(ville: string | null, brut: Brut): string | null {
-  return chaine(
-    ville,
-    imbrique(brut, ["lieuTravail", "libelle"]),
-    imbrique(brut, ["address", "city"]),
-    imbrique(brut, ["location", "city"]),
-    brut?.city,
-    brut?.city_name,
-    brut?.commune,
-    brut?.ville,
-  );
+const EXPERIENCE: Record<ExperienceBrute, NonNullable<Offre["experience"]>> = {
+  debutant: "débutant",
+  junior: "junior",
+  confirme: "confirmé",
+  senior: "senior",
+};
+
+export function libelleExperience(brut: ExperienceBrute | null): Offre["experience"] {
+  return brut === null ? null : EXPERIENCE[brut];
 }
 
-/** Le contrat : le libellé normalisé, sinon celui de la source. */
-export function contratDeLOffre(contrat: string | null, brut: Brut): string | null {
-  return chaine(
-    contrat,
-    imbrique(brut, ["contract_type", "label"]),
-    brut?.typeContratLibelle,
-    brut?.typeContrat,
-    brut?.contract_label,
-    brut?.natureContrat,
-  );
+/** « france_travail » → « France Travail » : d'où vient l'annonce. */
+const SOURCES: Record<string, string> = {
+  france_travail: "France Travail",
+  indeed: "Indeed",
+  hellowork: "HelloWork",
+  linkedin: "LinkedIn",
+  glassdoor: "Glassdoor",
+  google: "Google",
+};
+
+export function libelleSource(source: string): string {
+  return SOURCES[source] ?? source;
 }
 
-/** Le texte de l'annonce, nettoyé du Markdown — comme la V1. */
-export function descriptionDeLOffre(resume: string | null, brut: Brut): string | null {
-  const texte = chaine(
-    resume,
-    imbrique(brut, ["description"]),
-    imbrique(brut, ["descriptionOffre"]),
-    imbrique(brut, ["offer_description"]),
-  );
-  if (texte === null) return null;
+/** Le texte de l'annonce, nettoyé du Markdown — comme la V1. Les titres
+ *  en gras restent : `bloc-analyse.tsx` les découpe en sections. */
+export function nettoyerDescription(texte: string): string {
   return texte
-    .replace(/\*\*/g, "")
     .replace(/^-{3,}\s*$/gm, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -123,9 +119,21 @@ const ANGLE_D_OR = 137.508;
  * C'est une couleur **calculée** à partir de la donnée, pas une valeur de
  * charte : elle n'a pas sa place dans `tokens.css`.
  */
-export function teinteDeTuile(rang: number): string {
-  const sur = Number.isFinite(rang) && rang >= 0 ? Math.floor(rang) : 0;
+export function teinteDeTuile(rang: number | string): string {
+  const sur =
+    typeof rang === "string"
+      ? empreinte(rang)
+      : Number.isFinite(rang) && rang >= 0
+        ? Math.floor(rang)
+        : 0;
   return `hsl(${(sur * ANGLE_D_OR) % 360}, 65%, 55%)`;
+}
+
+/** Un identifiant (UUID) → un entier stable, pour en tirer une teinte. */
+function empreinte(texte: string): number {
+  let h = 0;
+  for (let i = 0; i < texte.length; i += 1) h = (h * 31 + texte.charCodeAt(i)) % 100_003;
+  return h;
 }
 
 // ─────────────────────────────────────────────────────────────────────

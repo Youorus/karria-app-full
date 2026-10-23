@@ -1,6 +1,9 @@
 /**
- * « Description — Analyse par Karria » : `KarriaSummaryBlock` de la V1,
- * reproduit à l'identique (`detail-components.tsx`).
+ * « Description — L'annonce » : `KarriaSummaryBlock` de la V1, reproduit
+ * à l'identique (`detail-components.tsx`), mais il porte le **texte de
+ * l'annonce** : la V2 ne génère pas (encore) d'analyse par offre
+ * (`docs/contrat-api-offres.md`). Le jour où elle arrivera, c'est ce bloc
+ * qui l'accueillera, avec le même chargeur.
  *
  * ═══ Le chargeur : `AIVortexLoader` ═══
  *
@@ -45,7 +48,7 @@ import { VStack } from "@/components/ui/vstack";
 import { PRIMAIRE } from "@/theme";
 import { useCouleurs } from "@/theme/use-couleurs";
 
-import type { EtatAnalyse } from "../hooks/use-detail-offre";
+import type { EtatDescription } from "../hooks/use-detail-offre";
 import { decouperAnalyse } from "../services/analyse";
 
 /** La courbe de la V1 (`Easing.bezier(0.4, 0, 0.2, 1)`). */
@@ -142,13 +145,13 @@ function Sections({ texte }: { texte: string }) {
 }
 
 interface Props {
-  etat: EtatAnalyse;
-  analyse: string;
+  etat: EtatDescription;
+  texte: string | null;
 }
 
-export function BlocAnalyse({ etat, analyse }: Props) {
+export function BlocAnalyse({ etat, texte }: Props) {
   const couleurs = useCouleurs();
-  const enCours = etat === "generation" && analyse === "";
+  const enCours = etat === "chargement" && texte === null;
 
   return (
     <VStack className="gap-3">
@@ -157,7 +160,7 @@ export function BlocAnalyse({ etat, analyse }: Props) {
           Description
         </Texte>
         <Texte className="font-bold text-caption uppercase tracking-[0.8px] text-foreground-faint">
-          Analyse par Karria
+          L&apos;annonce
         </Texte>
       </VStack>
       <Box
@@ -174,20 +177,20 @@ export function BlocAnalyse({ etat, analyse }: Props) {
       >
         {enCours ? (
           <Vortex />
+        ) : texte !== null && texte !== "" ? (
+          <Sections texte={texte} />
         ) : etat === "erreur" ? (
           <VStack className="items-center gap-3 py-2">
             <Icone nom="alerte" couleur={couleurs.destructif} taille={24} />
             <Texte className="text-center text-footnote text-muted-foreground">
-              Karria n&apos;a pas pu traiter cette offre. Réessaie plus tard.
+              Le texte de l&apos;annonce n&apos;a pas pu être chargé. Réessaie plus tard.
             </Texte>
           </VStack>
-        ) : analyse !== "" ? (
-          <Sections texte={analyse} />
         ) : (
           <HStack className="items-center justify-center gap-2.5 py-2">
             <Icone nom="info" couleur={couleurs.estompe} taille={16} />
             <Texte className="text-footnote italic text-foreground-faint">
-              Analyse non disponible.
+              Cette annonce n&apos;a pas de texte.
             </Texte>
           </HStack>
         )}

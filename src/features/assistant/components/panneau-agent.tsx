@@ -18,7 +18,8 @@
  * - **vierge** : l'orbe au centre, une salutation, quatre suggestions. Le
  *   champ vide n'intimide pas : on sait quoi dire.
  * - **en conversation** : le fil, la réponse qui se déroule, l'aura qui
- *   s'anime quand Karria réfléchit et parle.
+ *   s'anime quand Karria réfléchit et parle, puis ce que Karria propose
+ *   (voir les offres, élargir, répondre vite).
  *
  * ═══ La liste est inversée ═══
  *
@@ -46,6 +47,7 @@ import { BulleMessage } from "./bulle-message";
 import { Compositeur } from "./compositeur";
 import { Reflexion } from "./reflexion";
 import { Suggestions } from "./suggestions";
+import { Suites } from "./suites";
 import { useEcranAssistant } from "../hooks/use-ecran-assistant";
 
 function IconeFermer({ couleur }: { couleur: string }) {
@@ -62,7 +64,13 @@ function IconeFermer({ couleur }: { couleur: string }) {
   );
 }
 
-export function PanneauAgent({ onFermer }: { onFermer: () => void }) {
+interface Props {
+  onFermer: () => void;
+  /** Karria a lancé une recherche : le fil, derrière, doit se recharger. */
+  onRecherche?: (resultats: number) => void;
+}
+
+export function PanneauAgent({ onFermer, onRecherche }: Props) {
   const couleurs = useCouleurs();
   const {
     fil,
@@ -77,7 +85,8 @@ export function PanneauAgent({ onFermer }: { onFermer: () => void }) {
     vierge,
     active,
     fermer,
-  } = useEcranAssistant(onFermer);
+    suite,
+  } = useEcranAssistant(onFermer, onRecherche);
 
   return (
     <Box style={{ flex: 1 }} className="bg-background">
@@ -127,8 +136,14 @@ export function PanneauAgent({ onFermer }: { onFermer: () => void }) {
               keyExtractor={(message) => message.id}
               renderItem={({ item }) => <BulleMessage message={item} />}
               // Inversée, la liste rend son en-tête… en bas : c'est là que
-              // la réponse va apparaître.
-              ListHeaderComponent={reflechit ? <Reflexion /> : null}
+              // la réponse va apparaître — et, une fois lue, ses suites.
+              ListHeaderComponent={
+                reflechit ? (
+                  <Reflexion />
+                ) : suite !== null ? (
+                  <Suites suite={suite} onEnvoyer={envoyer} onVoirLesOffres={fermer} />
+                ) : null
+              }
               contentContainerClassName="gap-5 px-5 py-4"
               keyboardDismissMode="interactive"
               keyboardShouldPersistTaps="handled"

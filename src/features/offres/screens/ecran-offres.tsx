@@ -12,7 +12,12 @@
  *
  * L'aura derrière le fil, et l'agent : le ✦ ne pousse pas un écran de chat
  * comme la V1 — il balaie le fil pour faire apparaître Karria
- * (`RideauAgent`), et le fil revient exactement où on l'avait laissé.
+ * (`RideauAgent`), et le fil revient exactement où on l'avait laissé —
+ * rechargé si Karria a cherché entre-temps, avec la recherche en badge
+ * sous le titre.
+ *
+ * Les cartes qui passent à l'écran sont signalées au hook (`viewability`
+ * de la liste) : c'est ce qui fait tomber « Nouvelle ».
  */
 
 import { useRef } from "react";
@@ -46,6 +51,8 @@ export function EcranOffres() {
     elements,
     maintenant,
     sousTitre,
+    badgeRecherche,
+    mode,
     chargement,
     actualisation,
     chargementSuite,
@@ -63,8 +70,10 @@ export function EcranOffres() {
     agentOuvert,
     ouvrirAgent,
     fermerAgent,
+    surRecherche,
     defile,
     signalerDefilement,
+    visibilite,
     ouvrirOffre,
     voirLesAutres,
   } = useEcranOffres();
@@ -73,13 +82,14 @@ export function EcranOffres() {
 
   return (
     <Box style={{ flex: 1 }} className="bg-background">
-      <RideauAgent ouvert={agentOuvert} onFermer={fermerAgent}>
+      <RideauAgent ouvert={agentOuvert} onFermer={fermerAgent} onRecherche={surRecherche}>
         <Box style={{ flex: 1 }} className="bg-background">
           <Aura />
           <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
             <EnTeteKarria
               titre="Pour toi"
               sousTitre={sousTitre}
+              badge={badgeRecherche}
               droite={
                 <BoutonEnTeteRond
                   onPress={ouvrirFiltres}
@@ -158,8 +168,9 @@ export function EcranOffres() {
                         Aucune offre pour le moment
                       </Texte>
                       <Texte className="text-center text-body text-muted-foreground">
-                        Ajuste tes filtres, ou demande à Karria d&apos;élargir ta
-                        recherche.
+                        {mode === "recherche"
+                          ? "Ajuste tes filtres, ou demande à Karria d'élargir ta recherche."
+                          : "Ajuste tes filtres, ou dis à Karria ce que tu cherches."}
                       </Texte>
                     </VStack>
                   ) : null
@@ -167,6 +178,7 @@ export function EcranOffres() {
                 ListFooterComponent={chargementSuite ? <SqueletteFil cartes={1} /> : null}
                 onEndReached={chargerLaSuite}
                 onEndReachedThreshold={0.5}
+                viewabilityConfigCallbackPairs={visibilite}
                 onScroll={(e) => signalerDefilement(e.nativeEvent.contentOffset.y)}
                 scrollEventThrottle={64}
                 contentContainerClassName="gap-3 px-5 pt-3"

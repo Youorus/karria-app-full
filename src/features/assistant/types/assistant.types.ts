@@ -1,5 +1,5 @@
 /**
- * Les types de la conversation avec Karria.
+ * Les types de la conversation avec Karria — `docs/contrat-api-recherche.md`.
  *
  * `…Brut` décrit ce que le serveur envoie ; le reste, ce que l'application
  * manipule. La traduction se fait dans `api/`.
@@ -16,6 +16,47 @@ export interface Message {
   visible: number;
 }
 
+/** Ce que le tour a produit : une recherche lancée, une question, ou
+ *  une simple réponse. */
+export type StatutReponse = "recherche" | "question" | "discussion";
+
+/** Un élargissement que Karria propose, avec un gain réellement compté. */
+export interface Elargissement {
+  id: string;
+  libelle: string;
+  /** Offres en plus dans le fil si on accepte. */
+  gain: number;
+  /** Le texte à envoyer pour accepter. */
+  message: string;
+}
+
+export interface Criteres {
+  /** La recherche en une ligne (« cuisinier · Lyon (30 km) · CDI »). */
+  resume: string;
+  metiers: string[];
+  lieu: string | null;
+  rayonKm: number | null;
+  touteLaFrance: boolean;
+  contrats: string[];
+  alertes: boolean;
+}
+
+export interface Reponse {
+  conversationId: string;
+  message: { id: string; texte: string };
+  statut: StatutReponse;
+  /** Offres placées dans le fil, si une recherche a tourné. */
+  resultats: number | null;
+  criteres: Criteres | null;
+  /** 0 à 4 réponses rapides ; un toucher envoie le texte tel quel. */
+  suggestions: string[];
+  elargissements: Elargissement[];
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// La forme réseau
+// ─────────────────────────────────────────────────────────────────────
+
 export interface MessageBrut {
   id: string;
   role: "user" | "assistant";
@@ -23,12 +64,44 @@ export interface MessageBrut {
   created_at: string;
 }
 
+export interface CriteresBruts {
+  query: string;
+  summary: string;
+  job_titles: string[];
+  keywords: string[];
+  location: {
+    label: string;
+    latitude: number | null;
+    longitude: number | null;
+    radius_km: number;
+    department_codes: string[];
+  } | null;
+  whole_france: boolean;
+  contract_types: string[];
+  remote: string[];
+  schedule: string | null;
+  max_experience: string | null;
+  salary_min_monthly: number | null;
+  alerts_enabled: boolean;
+  updated_at: string;
+}
+
+export interface ElargissementBrut {
+  id: string;
+  kind: string;
+  label: string;
+  gain: number;
+  message: string;
+}
+
 export interface ReponseBrute {
   conversation_id: string;
   message: MessageBrut;
-}
-
-export interface Reponse {
-  conversationId: string;
-  message: { id: string; texte: string };
+  status: "search" | "clarify" | "chat";
+  intent: string;
+  results_count: number | null;
+  criteria: CriteresBruts | null;
+  suggestions: string[];
+  /** En cours de livraison côté API : absent tant qu'il n'est pas servi. */
+  widenings?: ElargissementBrut[];
 }

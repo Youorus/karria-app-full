@@ -3,19 +3,27 @@
  *
  * ═══ Le repli des offres « à explorer » ═══
  *
- * Comme la V1 : les matchs de faible qualité ne sont pas mêlés au fil.
- * Ils attendent derrière « Voir N offres supplémentaires », puis sous un
- * séparateur « Autres opportunités ». Le fil reste ainsi d'abord une
- * sélection, pas un catalogue.
+ * Comme la V1 : en mode recherche, les offres de faible pertinence ne sont
+ * pas mêlées au fil. Elles attendent derrière « Voir N offres
+ * supplémentaires », puis sous un séparateur « Autres opportunités ». Le
+ * fil reste ainsi d'abord une sélection, pas un catalogue. Sans
+ * recherche, il n'y a pas de pertinence : tout s'affiche, du plus récent.
  *
  * ═══ Le bouton ✦ change de rôle au défilement ═══
  *
  * En haut du fil, il ouvre Karria ; une fois la liste défilée, il ramène
  * en haut (V1). `defile` le dit à l'écran.
+ *
+ * ═══ Karria et le fil se répondent ═══
+ *
+ * Quand Karria lance une recherche dans le rideau, le fil se recharge
+ * derrière ; quand on referme le rideau, les offres sont déjà là. Le
+ * badge sous le titre résume la recherche et permet de l'oublier.
  */
 
 import { useNavigation } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ViewabilityConfigCallbackPairs, ViewToken } from "react-native";
 
 import { useMenuCompte } from "@/features/auth/hooks/use-menu-compte";
 import { useNavigationUnique } from "@/lib/navigation";
@@ -34,6 +42,8 @@ export interface EcranOffres extends FilOffres {
   /** Le fil prêt à afficher : offres, bouton « voir plus », séparateur. */
   elements: ElementDuFil[];
   sousTitre: string;
+  /** La recherche en cours, à afficher sous le titre — ou rien. */
+  badgeRecherche: { libelle: string; onFermer: () => void } | undefined;
   filtresActifs: number;
   feuilleFiltres: boolean;
   ouvrirFiltres: () => void;
@@ -41,12 +51,20 @@ export interface EcranOffres extends FilOffres {
   agentOuvert: boolean;
   ouvrirAgent: () => void;
   fermerAgent: () => void;
+  /** Karria a cherché : le fil se recharge derrière le rideau. */
+  surRecherche: (resultats: number) => void;
+  /** Ce que la liste appelle quand des cartes passent à l'écran. Une
+   *  seule référence pour toute la vie de l'écran : la liste refuse
+   *  qu'elle change en cours de route. */
+  visibilite: ViewabilityConfigCallbackPairs;
   defile: boolean;
   signalerDefilement: (y: number) => void;
   ouvrirMenu: () => void;
   ouvrirOffre: (offre: Offre) => void;
   voirLesAutres: () => void;
 }
+
+const nombre = (n: number) => n.toLocaleString("fr-FR");
 
 export function useEcranOffres(): EcranOffres {
   const fil = useFilOffres();
@@ -65,7 +83,17 @@ export function useEcranOffres(): EcranOffres {
     navigation.setOptions({ tabBarStyle: agentOuvert ? { display: "none" } : undefined });
   }, [navigation, agentOuvert]);
 
-  const { offres, total, chargement, filtres, marquerOuverte } = fil;
+  const {
+    offres,
+    total,
+    mode,
+    resumeRecherche,
+    chargement,
+    filtres,
+    marquerOuverte,
+    rechargerApresRecherche,
+    oublierLaRecherche,
+  } = fil;
 
   const elements = useMemo<ElementDuFil[]>(() => {
     const principales = offres.filter((o) => o.qualite !== "basse");
@@ -92,7 +120,14 @@ export function useEcranOffres(): EcranOffres {
     ? "Recherche en cours…"
     : total === 0
       ? "Aucune offre pour le moment"
-      : `${total} opportunité${total > 1 ? "s" : ""} sélectionnée${total > 1 ? "s" : ""} par Karria`;
+      : mode === "recherche"
+        ? `${nombre(total)} offre${total > 1 ? "s" : ""} pour toi`
+        : `${nombre(total)} offres, les plus récentes d'abord`;
+
+  const badgeRecherche =
+    mode === "recherche" && resumeRecherche !== null
+      ? { libelle: resumeRecherche, onFermer: oublierLaRecherche }
+      : undefined;
 
   const filtresActifs =
     filtres.contrats.length +
@@ -109,18 +144,44 @@ export function useEcranOffres(): EcranOffres {
         marquerOuverte(offre);
         noterDetailOuvert(offre.id);
       }
-      pousser({ pathname: "/offre/[id]", params: { id: String(offre.id) } });
+      pousser({ pathname: "/offre/[id]", params: { id: offre.id } });
     },
     [pousser, marquerOuverte],
   );
 
   const signalerDefilement = useCallback((y: number) => setDefile(y > 0), []);
 
+  const { signalerVisibles } = fil;
+  const visibilite = useMemo<ViewabilityConfigCallbackPairs>(
+    () => [
+      {
+        viewabilityConfig: { itemVisiblePercentThreshold: 60, minimumViewTime: 400 },
+        onViewableItemsChanged: ({
+          viewableItems,
+        }: {
+          viewableItems: ViewToken<ElementDuFil>[];
+        }) =>
+          signalerVisibles(
+            viewableItems.flatMap((v) =>
+              v.item.type === "offre" ? [v.item.offre.id] : [],
+            ),
+          ),
+      },
+    ],
+    [signalerVisibles],
+  );
+
+  const surRecherche = useCallback(() => {
+    setAutresVisibles(false);
+    rechargerApresRecherche();
+  }, [rechargerApresRecherche]);
+
   return {
     ...fil,
     maintenant,
     elements,
     sousTitre,
+    badgeRecherche,
     filtresActifs,
     feuilleFiltres,
     ouvrirFiltres: useCallback(() => setFeuilleFiltres(true), []),
@@ -128,6 +189,8 @@ export function useEcranOffres(): EcranOffres {
     agentOuvert,
     ouvrirAgent: useCallback(() => setAgentOuvert(true), []),
     fermerAgent: useCallback(() => setAgentOuvert(false), []),
+    surRecherche,
+    visibilite,
     defile,
     signalerDefilement,
     ouvrirMenu,

@@ -66,11 +66,13 @@ const PLEIN_ECRAN = {
 interface Props {
   ouvert: boolean;
   onFermer: () => void;
+  /** Karria a lancé une recherche : le fil, derrière, se recharge. */
+  onRecherche?: (resultats: number) => void;
   /** Le fil des offres, que le rideau écarte. */
   children: ReactNode;
 }
 
-export function RideauAgent({ ouvert, onFermer, children }: Props) {
+export function RideauAgent({ ouvert, onFermer, onRecherche, children }: Props) {
   const { width: L, height: H } = useWindowDimensions();
   const { bottom } = useSafeAreaInsets();
   const { mode } = useCouleurs();
@@ -160,7 +162,7 @@ export function RideauAgent({ ouvert, onFermer, children }: Props) {
         accessibilityElementsHidden={!ouvert}
         importantForAccessibility={ouvert ? "auto" : "no-hide-descendants"}
       >
-        <PanneauAgent onFermer={onFermer} />
+        <PanneauAgent onFermer={onFermer} onRecherche={onRecherche} />
       </Animated.View>
     </View>
   );

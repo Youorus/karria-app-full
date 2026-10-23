@@ -2,7 +2,8 @@
  * Tout ce dont l'écran de l'assistant a besoin, derrière un seul hook.
  *
  * `fermer` vient du rideau qui porte le panneau : c'est lui qui joue la
- * transition de retour vers le fil.
+ * transition de retour vers le fil. `onRecherche` vient du fil lui-même :
+ * quand Karria a cherché, il doit se recharger derrière le rideau.
  */
 
 import { useMemo } from "react";
@@ -23,8 +24,11 @@ export interface EcranAssistant extends Conversation {
   fermer: () => void;
 }
 
-export function useEcranAssistant(fermer: () => void): EcranAssistant {
-  const conversation = useConversation();
+export function useEcranAssistant(
+  fermer: () => void,
+  onRecherche?: (resultats: number) => void,
+): EcranAssistant {
+  const conversation = useConversation(onRecherche);
 
   // Calculée une fois à l'ouverture : une salutation qui changerait sous
   // les yeux à 18 h pile serait une curiosité, pas un service.

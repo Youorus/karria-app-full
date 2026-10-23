@@ -10,11 +10,13 @@ import { describe, expect, it } from "@jest/globals";
 
 import {
   contratCourt,
-  contratDeLOffre,
-  descriptionDeLOffre,
   ilYa,
   initiales,
-  lieuDeLOffre,
+  libelleExperience,
+  libelleHoraires,
+  libelleSource,
+  libelleTeletravail,
+  nettoyerDescription,
   messageDePartage,
   qualite,
   salaireLisible,
@@ -66,21 +68,26 @@ describe("Le temps écoulé (date-fns, fr)", () => {
   });
 });
 
-describe("Les replis sur la donnée source", () => {
-  it("lit le lieu et le contrat de France Travail quand les champs normalisés manquent", () => {
-    const brut = {
-      lieuTravail: { libelle: "75 - PARIS 09" },
-      typeContratLibelle: "Contrat à durée indéterminée",
-    };
-    expect(lieuDeLOffre(null, brut)).toBe("75 - PARIS 09");
-    expect(contratDeLOffre(null, brut)).toBe("Contrat à durée indéterminée");
-    expect(lieuDeLOffre("Paris", brut)).toBe("Paris");
+describe("Les champs typés de l'API", () => {
+  it("traduit le télétravail, les horaires, l'expérience et la source", () => {
+    expect(libelleTeletravail("teletravail")).toBe("télétravail");
+    expect(libelleTeletravail(null)).toBeNull();
+    expect(libelleHoraires("temps_partiel")).toBe("temps partiel");
+    expect(libelleExperience("confirme")).toBe("confirmé");
+    expect(libelleSource("france_travail")).toBe("France Travail");
+    expect(libelleSource("inconnue")).toBe("inconnue");
   });
 
-  it("nettoie la description du Markdown", () => {
-    expect(
-      descriptionDeLOffre(null, { description: "**Missions**\n\n\n\n- coder" }),
-    ).toBe("Missions\n\n- coder");
+  it("nettoie la description des filets et des sauts de ligne en trop", () => {
+    expect(nettoyerDescription("**Missions**\n\n\n\n---\n- coder")).toBe(
+      "**Missions**\n\n- coder",
+    );
+  });
+
+  it("tire une teinte stable d'un identifiant UUID", () => {
+    const id = "0f1e2d3c-0000-4000-8000-000000000001";
+    expect(teinteDeTuile(id)).toBe(teinteDeTuile(id));
+    expect(teinteDeTuile(id)).toMatch(/^hsl\(\d+(\.\d+)?, 65%, 55%\)$/);
   });
 });
 

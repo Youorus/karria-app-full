@@ -9,7 +9,9 @@
  *    offres jamais ouvertes, le titre sur deux lignes, et le signet.
  * 2. Le lieu, et le temps écoulé à droite.
  * 3. Les pastilles : « Très alignée » / « À explorer », le contrat, le
- *    salaire en vert sur vert pâle.
+ *    télétravail quand l'annonce le dit, le salaire en vert sur vert pâle.
+ * 4. En mode recherche, ce que l'offre confirme de la demande
+ *    (« CDI · Lyon · 4 km ») : la raison d'être là, en une ligne.
  *
  * Le liseré bleu signale une offre dont le détail n'a jamais été ouvert ;
  * il disparaît à la première ouverture.
@@ -193,7 +195,7 @@ export function CarteOffre({ offre, rang, maintenant, onOuvrir, onGarder }: Prop
                   className="flex-1 text-footnote text-muted-foreground"
                   numberOfLines={1}
                 >
-                  {offre.ville ?? "Lieu non précisé"}
+                  {offre.lieu ?? "Lieu non précisé"}
                 </Texte>
               </HStack>
               <Texte className="text-footnote text-foreground-faint">{temps}</Texte>
@@ -214,16 +216,23 @@ export function CarteOffre({ offre, rang, maintenant, onOuvrir, onGarder }: Prop
                   texte="text-on-scrim"
                 />
               ) : null}
-              {offre.contrats.map((contrat) => (
+              {offre.contrat !== null ? (
                 <Pastille
-                  key={contrat}
                   icone={<Icone nom="contrat" couleur={couleurs.estompe} taille={12} />}
-                  libelle={contratCourt(contrat)}
-                  libelleComplet={contrat}
+                  libelle={contratCourt(offre.contrat)}
+                  libelleComplet={offre.contrat}
                   fond="bg-remplissage"
                   texte="text-muted-foreground"
                 />
-              ))}
+              ) : null}
+              {offre.teletravail !== null && offre.teletravail !== "sur site" ? (
+                <Pastille
+                  icone={<Icone nom="appareil" couleur={couleurs.estompe} taille={12} />}
+                  libelle={offre.teletravail}
+                  fond="bg-remplissage"
+                  texte="text-muted-foreground"
+                />
+              ) : null}
               {salaire !== null ? (
                 <Pastille
                   icone={<Icone nom="salaire" couleur={SALAIRE} taille={12} />}
@@ -233,6 +242,13 @@ export function CarteOffre({ offre, rang, maintenant, onOuvrir, onGarder }: Prop
                 />
               ) : null}
             </HStack>
+
+            {/* 4. Pourquoi elle est là */}
+            {offre.raisons.length > 0 ? (
+              <Texte className="mt-2 text-caption text-primary" numberOfLines={1}>
+                {offre.raisons.join(" · ")}
+              </Texte>
+            ) : null}
           </VStack>
         </Pressable>
       </Animated.View>
