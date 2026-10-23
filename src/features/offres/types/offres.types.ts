@@ -179,7 +179,7 @@ export interface OptionsDeFiltre {
 }
 
 /** La fraîcheur de la V1 : 24 h, 3, 7 ou 30 jours. Traduite en
- *  `published_within` par la couche `api/`. */
+ *  `published_after` par la couche `api/`. */
 export type Periode = 1 | 3 | 7 | 30 | null;
 
 /** Les filtres de la V1 (`feed-filter-sheet.tsx`). */

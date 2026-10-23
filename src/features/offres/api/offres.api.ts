@@ -8,7 +8,7 @@
  *   offres actives, les plus récentes d'abord ; avec une recherche, les
  *   offres retenues, par pertinence. Les filtres de la V1 (`saved_only`,
  *   `unseen_only`, `unapplied_only`, `contract_types`, `cities`,
- *   `published_within`) s'appliquent par-dessus.
+ *   `published_after`) s'appliquent par-dessus.
  * - `GET /job-matches/me/filter-options` : contrats et villes du fil,
  *   avec leurs effectifs.
  * - `GET /job-matches/{id}` : l'offre complète (`description`).
@@ -39,7 +39,6 @@ import type {
   Offre,
   OptionsDeFiltre,
   OptionsDeFiltreBrutes,
-  Periode,
 } from "../types/offres.types";
 
 export function versOffre(brut: MatchBrut): Offre {
@@ -78,24 +77,26 @@ export function versOffre(brut: MatchBrut): Offre {
   };
 }
 
-/** `published_within` : la période de la V1 dans le vocabulaire de l'API. */
-const PERIODES: Record<Exclude<Periode, null>, string> = {
-  1: "24h",
-  3: "3d",
-  7: "7d",
-  30: "30d",
-};
-
-/** La requête du fil. Le tri n'est envoyé que pour une recherche : sans
- *  recherche, l'API trie toujours par fraîcheur. */
-export function parametresDuFil(filtres: Filtres, offset: number, limit: number): string {
+/** La requête du fil. Le tri n'est pas envoyé : sans recherche, l'API trie
+ *  toujours par fraîcheur, et avec une recherche par pertinence — ce qu'on
+ *  veut dans les deux cas. `maintenant` est passé pour garder la fonction
+ *  pure : la période de la V1 devient un instant `published_after`. */
+export function parametresDuFil(
+  filtres: Filtres,
+  offset: number,
+  limit: number,
+  maintenant: Date,
+): string {
   const p = new URLSearchParams({ limit: String(limit), offset: String(offset) });
   if (filtres.sauvegardees) p.set("saved_only", "true");
   if (filtres.nonVues) p.set("unseen_only", "true");
   if (filtres.nonPostulees) p.set("unapplied_only", "true");
   if (filtres.contrats.length > 0) p.set("contract_types", filtres.contrats.join(","));
   if (filtres.villes.length > 0) p.set("cities", filtres.villes.join(","));
-  if (filtres.periode !== null) p.set("published_within", PERIODES[filtres.periode]);
+  if (filtres.periode !== null) {
+    const depuis = new Date(maintenant.getTime() - filtres.periode * 86_400_000);
+    p.set("published_after", depuis.toISOString());
+  }
   return p.toString();
 }
 
@@ -105,7 +106,7 @@ export async function lireFil(
   limit = 20,
 ): Promise<Fil> {
   const brut = await http.get<FilBrut>(
-    `/job-matches/me?${parametresDuFil(filtres, offset, limit)}`,
+    `/job-matches/me?${parametresDuFil(filtres, offset, limit, new Date())}`,
   );
   return {
     offres: brut.items.map(versOffre),
