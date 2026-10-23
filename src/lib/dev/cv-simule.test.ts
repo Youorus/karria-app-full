@@ -53,6 +53,60 @@ describe("L'interprétation simulée", () => {
   });
 });
 
+describe("L'import d'un CV existant", () => {
+  const fichier = (type: string) => ({
+    getParts: () => [{ fieldName: "file", uri: "file:///cv.pdf", type }],
+  });
+
+  it("refuse un type de fichier hors contrat avec la raison attendue", async () => {
+    const refus = await appeler("POST", "/cv/import", fichier("application/zip"));
+    expect(refus.statut).toBe(422);
+    expect((refus.corps.error as { details: { reason: string } }).details.reason).toBe(
+      "document_type_unsupported",
+    );
+  });
+
+  it("pose des propositions, jamais des validations, et garde ce qui l'était", async () => {
+    await appeler("POST", "/cv/draft");
+    await appeler("PUT", "/cv/draft/chapters/identity", {
+      data: { first_name: "Moussa", last_name: "KANE", headline: null },
+    });
+    const importe = await appeler("POST", "/cv/import", fichier("application/pdf"));
+    expect(importe.statut).toBe(201);
+    const chapitres = importe.corps.chapters as Record<
+      string,
+      { status: string; data?: unknown; items?: unknown[] }
+    >;
+    expect(chapitres.identity).toMatchObject({
+      status: "validated",
+      data: { first_name: "Moussa" },
+    });
+    expect(chapitres.contact.status).toBe("in_progress");
+    expect(chapitres.experiences).toMatchObject({ status: "in_progress" });
+    expect(chapitres.experiences.items).toHaveLength(2);
+    expect(chapitres.photo).toBeUndefined();
+    expect(importe.corps.current_chapter).toBe("contact");
+    // Rien n'est validé à la place de l'utilisateur : le CV ne se crée pas.
+    expect((await appeler("POST", "/cv/draft/finalize")).statut).toBe(409);
+    // On range derrière soi : le brouillon simulé est partagé entre les
+    // tests, et finaliser est la seule façon de le vider.
+    for (const c of ORDRE_RESTANT) {
+      await appeler("PUT", `/cv/draft/chapters/${c}`, { skipped: true });
+    }
+    expect((await appeler("POST", "/cv/draft/finalize")).statut).toBe(201);
+  });
+});
+
+const ORDRE_RESTANT = [
+  "contact",
+  "summary",
+  "experiences",
+  "educations",
+  "skills",
+  "interests",
+  "photo",
+];
+
 describe("Le brouillon", () => {
   it("ne devient un CV qu'une fois chaque chapitre validé ou passé", async () => {
     await appeler("POST", "/cv/draft");

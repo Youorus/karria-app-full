@@ -9,6 +9,10 @@
  * seule phrase, une seule action : le reste (durée, voix, pause) tient en
  * une ligne, parce que c'est ce qui rassure.
  *
+ * « J'ai déjà un CV » est la seconde porte, en retrait : Karria lit le
+ * fichier et pré-remplit la conversation, mais c'est toujours la même
+ * conversation qui suit — rien n'est validé sans qu'on l'ait relu.
+ *
  * Mouvement réduit : les pages restent immobiles.
  */
 
@@ -71,9 +75,20 @@ function Page({
 interface Props {
   reprendre: boolean;
   onCreer: () => void;
+  onImporter: () => void;
+  /** Le fichier est en route vers Karria. */
+  importation: boolean;
+  /** Pourquoi l'import a échoué, et quoi faire. */
+  probleme: string | null;
 }
 
-export function InvitationCv({ reprendre, onCreer }: Props) {
+export function InvitationCv({
+  reprendre,
+  onCreer,
+  onImporter,
+  importation,
+  probleme,
+}: Props) {
   const couleurs = useCouleurs();
   const reduit = useReducedMotion();
   const temps = useSharedValue(0);
@@ -117,11 +132,24 @@ export function InvitationCv({ reprendre, onCreer }: Props) {
         <BoutonAction
           libelle={reprendre ? "Reprendre mon CV" : "Créer mon CV avec Karria"}
           onPress={onCreer}
+          desactive={importation}
           icone={<Icone nom="micro" couleur={couleurs.surPrimaire} taille={16} />}
         />
-        <Texte className="text-center text-caption text-foreground-faint">
-          À l&apos;écrit ou à la voix · tu peux t&apos;arrêter quand tu veux
-        </Texte>
+        <BoutonAction
+          libelle="J'ai déjà un CV"
+          libelleEnCours="Je lis ton CV…"
+          ton="secondaire"
+          onPress={onImporter}
+          enCours={importation}
+          icone={<Icone nom="importer" couleur={couleurs.texte} taille={16} />}
+        />
+        {probleme !== null ? (
+          <Texte className="text-center text-footnote text-destructive">{probleme}</Texte>
+        ) : (
+          <Texte className="text-center text-caption text-foreground-faint">
+            À l&apos;écrit ou à la voix · tu peux t&apos;arrêter quand tu veux
+          </Texte>
+        )}
       </Animated.View>
     </VStack>
   );

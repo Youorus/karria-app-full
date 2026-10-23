@@ -156,6 +156,22 @@ export function EcranCreationCv() {
                     />
                   ) : null}
 
+                  {c.importation.possible ? (
+                    <Pressable
+                      onPress={c.importation.importer}
+                      disabled={c.importation.enCours}
+                      className="min-h-touch flex-row items-center justify-center gap-2"
+                      accessibilityRole="button"
+                      accessibilityHint="Karria lit ton CV et pré-remplit la conversation"
+                      accessibilityState={{ busy: c.importation.enCours }}
+                    >
+                      <Icone nom="importer" couleur={couleurs.primaire} taille={14} />
+                      <Texte className="font-bold text-footnote text-primary">
+                        {c.importation.enCours ? "Je lis ton CV…" : "J'ai déjà un CV"}
+                      </Texte>
+                    </Pressable>
+                  ) : null}
+
                   {phase.nom === "envoi" ? (
                     <Animated.View entering={FadeIn.duration(200)}>
                       <Texte className="text-center text-footnote text-muted-foreground">

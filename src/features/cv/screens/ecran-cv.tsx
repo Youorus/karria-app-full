@@ -20,7 +20,17 @@ import { InvitationCv } from "../components/invitation-cv";
 import { useEcranCv } from "../hooks/use-ecran-cv";
 
 export function EcranCv() {
-  const { cv, brouillonEnCours, chargement, erreur, creer, recharger } = useEcranCv();
+  const {
+    cv,
+    brouillonEnCours,
+    chargement,
+    erreur,
+    creer,
+    importer,
+    importation,
+    problemeImport,
+    recharger,
+  } = useEcranCv();
   const rempli = cv !== null && !cv.vide;
 
   return (
@@ -46,7 +56,13 @@ export function EcranCv() {
         ) : rempli ? (
           <CvRempli cv={cv} />
         ) : (
-          <InvitationCv reprendre={brouillonEnCours} onCreer={creer} />
+          <InvitationCv
+            reprendre={brouillonEnCours}
+            onCreer={creer}
+            onImporter={importer}
+            importation={importation}
+            probleme={problemeImport}
+          />
         )}
       </SafeAreaView>
     </Box>

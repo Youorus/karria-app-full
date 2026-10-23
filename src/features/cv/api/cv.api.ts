@@ -7,6 +7,9 @@
  * - `POST /cv/draft/interpret` : une réponse libre → un premier jet.
  * - `PUT /cv/draft/chapters/{c}` : valider (ou passer) un chapitre.
  * - `POST /cv/draft/finalize` : le brouillon devient le CV.
+ * - `POST /cv/import` : un CV existant (PDF, Word, photo) devient un
+ *   brouillon pré-rempli de **propositions**, à valider chapitre par
+ *   chapitre — rien n'est validé à la place de l'utilisateur.
  * - `POST /voice/transcribe` : la voix devient du texte.
  *
  * La traduction va dans les deux sens : ce qui part au serveur repasse en
@@ -287,6 +290,32 @@ export async function validerChapitre(
 
 export async function finaliser(): Promise<Cv> {
   return versCv(await http.post<CvBrut>("/cv/draft/finalize", {}));
+}
+
+/** Un fichier choisi sur le téléphone, tel que le sélecteur le rend. */
+export interface FichierCv {
+  uri: string;
+  nom: string;
+  /** Le type MIME, s'il est connu ; sinon le serveur le déduira. */
+  type: string | null;
+}
+
+/**
+ * Importe un CV existant dans le brouillon. Les chapitres extraits
+ * reviennent `in_progress` avec leurs données : des propositions, que le
+ * parcours de création fait valider une à une.
+ */
+export async function importerCv(fichier: FichierCv): Promise<Brouillon> {
+  const brut = await http.postFormulaire<BrouillonBrut>("/cv/import", () => {
+    const formulaire = new FormData();
+    formulaire.append("file", {
+      uri: fichier.uri,
+      name: fichier.nom,
+      type: fichier.type ?? "application/octet-stream",
+    } as unknown as Blob);
+    return formulaire;
+  });
+  return versBrouillon(brut);
 }
 
 export async function transcrire(uri: string): Promise<string> {

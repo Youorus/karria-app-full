@@ -17,6 +17,17 @@
  * « Une autre ? ». La photo a son propre petit parcours (oui/non, source,
  * amélioration proposée, choix).
  *
+ * ═══ Les propositions d'un CV importé ═══
+ *
+ * Après « J'ai déjà un CV », le serveur pose dans le brouillon des
+ * chapitres `en-cours` **avec** des données : ce que Karria a lu, pas
+ * encore ce que l'utilisateur a dit. Un tel chapitre s'ouvre directement
+ * sur son jet (« Voici ce que j'ai lu… »), à valider ou corriger comme
+ * n'importe quelle réponse. Un chapitre en boucle fait défiler ses
+ * propositions une à une (`aVenir`), puis demande « Une autre ? ». Rien
+ * n'est compté comme fait tant que ce n'est pas validé : seule la
+ * validation écrit dans le brouillon.
+ *
  * ═══ Rien ne se perd ═══
  *
  * Le brouillon vit sur le serveur, chapitre validé par chapitre validé :
@@ -39,7 +50,11 @@ import {
 import { DEFINITIONS, veutPasser, type DefinitionChapitre } from "../services/chapitres";
 import { CHAPITRES, type Brouillon, type CleChapitre, type Jet } from "../types/cv.types";
 import { useChoixPhoto } from "./use-choix-photo";
+import { useImportCv } from "./use-import-cv";
 import { useMicro } from "./use-micro";
+
+const PAROLE_PROPOSITION = "Voici ce que j'ai lu dans ton CV. C'est bon, ou je corrige ?";
+const PAROLE_PROPOSITION_SUIVANTE = "Et celle-ci, c'est bon ?";
 
 export type Phase =
   | { nom: "chargement" }
@@ -97,6 +112,12 @@ export interface CreationCv {
     ameliorer: (oui: boolean) => void;
     garder: (image: string) => void;
   };
+  /** « J'ai déjà un CV » : proposé tant que rien n'est validé. */
+  importation: {
+    possible: boolean;
+    importer: () => void;
+    enCours: boolean;
+  };
   fermer: () => void;
   recommencer: () => void;
 }
@@ -113,6 +134,21 @@ function jetsValides(brouillon: Brouillon): Jet[] {
   });
 }
 
+/** Les propositions du chapitre courant — ce qu'un import y a posé sans
+ *  le valider. Vide pour un chapitre qui attend une réponse. */
+function propositions(brouillon: Brouillon): Jet[] {
+  const ch = brouillon.chapitres[brouillon.chapitreCourant];
+  if (ch.statut !== "en-cours") return [];
+  return ch.donnees !== null ? [ch.donnees] : ch.elements;
+}
+
+function rienDeValide(brouillon: Brouillon | null): boolean {
+  return (
+    brouillon === null ||
+    CHAPITRES.every((c) => !["valide", "passe"].includes(brouillon.chapitres[c].statut))
+  );
+}
+
 export function useCreationCv(): CreationCv {
   const router = useRouter();
   const micro = useMicro();
@@ -123,11 +159,29 @@ export function useCreationCv(): CreationCv {
   const [parole, setParole] = useState<string | null>(null);
   const [correctionDe, setCorrectionDe] = useState<Jet | null>(null);
   const [elements, setElements] = useState<Jet[]>([]);
+  /** Les propositions d'un import qui attendent encore leur tour. */
+  const [aVenir, setAVenir] = useState<Jet[]>([]);
   const [probleme, setProbleme] = useState<string | null>(null);
   const [tentative, setTentative] = useState(0);
   // Une réponse qui revient après qu'on a quitté l'écran ne doit plus
   // rien écrire.
   const vivant = useRef(true);
+
+  /** Ouvre le chapitre courant d'un brouillon : sur sa question, sur la
+   *  photo, ou sur la première proposition qu'un import y a laissée. */
+  const ouvrirChapitre = useCallback((b: Brouillon) => {
+    const [premiere, ...reste] = propositions(b);
+    if (premiere !== undefined) {
+      setAVenir(reste);
+      setParole(PAROLE_PROPOSITION);
+      setPhase({ nom: "jet", jet: premiere, relance: null });
+      return;
+    }
+    setAVenir([]);
+    setPhase(
+      b.chapitreCourant === "photo" ? { nom: "photo-choix" } : { nom: "question" },
+    );
+  }, []);
 
   useEffect(() => {
     vivant.current = true;
@@ -135,9 +189,7 @@ export function useCreationCv(): CreationCv {
       .then((b) => {
         if (!vivant.current) return;
         setBrouillon(b);
-        setPhase(
-          b.chapitreCourant === "photo" ? { nom: "photo-choix" } : { nom: "question" },
-        );
+        ouvrirChapitre(b);
       })
       .catch((cause: unknown) => {
         console.warn("[karria] brouillon de CV introuvable", cause);
@@ -151,42 +203,47 @@ export function useCreationCv(): CreationCv {
     return () => {
       vivant.current = false;
     };
-  }, [tentative]);
+  }, [tentative, ouvrirChapitre]);
 
   const cle: CleChapitre = brouillon?.chapitreCourant ?? "identity";
   const chapitre = DEFINITIONS[cle];
 
   /** Le brouillon a avancé : on passe au chapitre suivant, ou on finit. */
-  const avancer = useCallback((b: Brouillon) => {
-    setBrouillon(b);
-    setElements([]);
-    setCorrectionDe(null);
-    setParole(null);
-    setTexte("");
-    const fini = CHAPITRES.every((c) =>
-      ["valide", "passe"].includes(b.chapitres[c].statut),
-    );
-    if (!fini) {
-      setPhase(
-        b.chapitreCourant === "photo" ? { nom: "photo-choix" } : { nom: "question" },
+  const avancer = useCallback(
+    (b: Brouillon) => {
+      setBrouillon(b);
+      setElements([]);
+      setCorrectionDe(null);
+      setParole(null);
+      setTexte("");
+      const fini = CHAPITRES.every((c) =>
+        ["valide", "passe"].includes(b.chapitres[c].statut),
       );
-      return;
-    }
-    setPhase({ nom: "finalisation" });
-    finaliser()
-      .then(() => {
-        if (vivant.current) setPhase({ nom: "termine" });
-      })
-      .catch((cause: unknown) => {
-        console.warn("[karria] finalisation du CV en échec", cause);
-        if (vivant.current) {
-          setPhase({
-            nom: "erreur",
-            message: lisible(cause, "Ton CV n'a pas pu être enregistré."),
-          });
-        }
-      });
-  }, []);
+      if (!fini) {
+        ouvrirChapitre(b);
+        return;
+      }
+      setPhase({ nom: "finalisation" });
+      finaliser()
+        .then(() => {
+          if (vivant.current) setPhase({ nom: "termine" });
+        })
+        .catch((cause: unknown) => {
+          console.warn("[karria] finalisation du CV en échec", cause);
+          if (vivant.current) {
+            setPhase({
+              nom: "erreur",
+              message: lisible(cause, "Ton CV n'a pas pu être enregistré."),
+            });
+          }
+        });
+    },
+    [ouvrirChapitre],
+  );
+
+  // Un CV importé depuis le parcours : le brouillon revient pré-rempli,
+  // on le rouvre là où il en est — sur sa première proposition.
+  const importCv = useImportCv(avancer);
 
   const enregistrer = useCallback(
     (contenu: Jet | Jet[] | null) => {
@@ -275,11 +332,20 @@ export function useCreationCv(): CreationCv {
     if (phase.nom !== "jet") return;
     if (chapitre.boucle) {
       setElements((e) => [...e, phase.jet]);
+      const [suivante, ...reste] = aVenir;
+      if (suivante !== undefined) {
+        // Une proposition de l'import attend encore : on la montre avant
+        // de demander « Une autre ? ».
+        setAVenir(reste);
+        setParole(PAROLE_PROPOSITION_SUIVANTE);
+        setPhase({ nom: "jet", jet: suivante, relance: null });
+        return;
+      }
       setPhase({ nom: "encore" });
       return;
     }
     enregistrer(phase.jet);
-  }, [phase, chapitre.boucle, enregistrer]);
+  }, [phase, chapitre.boucle, aVenir, enregistrer]);
 
   const corriger = useCallback(() => {
     if (phase.nom !== "jet") return;
@@ -360,7 +426,7 @@ export function useCreationCv(): CreationCv {
     elements,
     valides: brouillon === null ? [] : [...jetsValides(brouillon), ...elements],
     niveauMicro: micro.niveau,
-    probleme: probleme ?? micro.probleme ?? photo.probleme,
+    probleme: probleme ?? micro.probleme ?? photo.probleme ?? importCv.probleme,
     texte,
     setTexte,
     envoyer: () => repondre(texte),
@@ -403,6 +469,12 @@ export function useCreationCv(): CreationCv {
           envoyerPhoto(image, false);
         }
       },
+    },
+    importation: {
+      possible:
+        phase.nom === "question" && correctionDe === null && rienDeValide(brouillon),
+      importer: importCv.importer,
+      enCours: importCv.enCours,
     },
     fermer: () => router.back(),
     recommencer: () => {

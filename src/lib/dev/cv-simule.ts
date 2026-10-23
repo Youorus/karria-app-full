@@ -9,6 +9,13 @@
  * le domaine CV avec elles, pour que le CV créé soit celui qu'on relit.
  * Le jour où le backend les sert, on retire le préfixe de la liste.
  *
+ * ═══ L'import ne lit pas le fichier ═══
+ *
+ * `POST /cv/import` vérifie le type du fichier comme le vrai serveur,
+ * puis pose toujours le même CV d'exemple en propositions : ce qu'on
+ * éprouve ici, c'est le parcours de validation chapitre par chapitre,
+ * pas l'extraction — qui est l'affaire de Gemini, côté serveur.
+ *
  * ═══ L'interprète n'est pas Karria ═══
  *
  * Il tire un premier jet de la réponse par quelques motifs simples
@@ -418,6 +425,144 @@ const ENTENDU: Record<Chapitre, string> = {
 };
 
 // ─────────────────────────────────────────────────────────────────────
+// L'import d'un CV existant
+// ─────────────────────────────────────────────────────────────────────
+
+/** Les types que `POST /cv/import` accepte (`docs/contrat-api-cv.md`). */
+const TYPES_DE_DOCUMENT = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+];
+
+/** Ce que la fausse lecture « trouve » dans n'importe quel document : un
+ *  CV plausible, au format V1, posé en propositions. */
+const CV_LU: Partial<Record<Chapitre, ChapitreSimule>> = {
+  identity: {
+    status: "in_progress",
+    data: { first_name: "Awa", last_name: "DIALLO", headline: "Conseillère de vente" },
+  },
+  contact: {
+    status: "in_progress",
+    data: {
+      email: "awa.diallo@gmail.com",
+      phone: "06 12 34 56 78",
+      city: "Montreuil",
+      links: [{ label: "LinkedIn", url: "https://linkedin.com/in/awa-diallo" }],
+    },
+  },
+  summary: {
+    status: "in_progress",
+    data: {
+      summary:
+        "Conseillère de vente depuis trois ans, j'aime le contact client et le travail en équipe. Je cherche un poste où apprendre et évoluer.",
+    },
+  },
+  experiences: {
+    status: "in_progress",
+    items: [
+      {
+        position: "Vendeuse",
+        company: "Zara",
+        location: "Paris",
+        start_date: "2022-09",
+        end_date: null,
+        is_current: true,
+        missions: ["Conseiller les clients", "Tenir la caisse", "Ranger la réserve"],
+      },
+      {
+        position: "Hôtesse de caisse",
+        company: "Carrefour",
+        location: "Montreuil",
+        start_date: "2021-06",
+        end_date: "2022-08",
+        is_current: false,
+        missions: ["Encaisser", "Accueillir les clients"],
+      },
+    ],
+  },
+  educations: {
+    status: "in_progress",
+    items: [
+      {
+        degree: "BTS Management commercial opérationnel",
+        school: "Lycée Jean Jaurès",
+        location: "Montreuil",
+        start_date: "2019-09",
+        end_date: "2021-06",
+        is_in_progress: false,
+      },
+    ],
+  },
+  skills: {
+    status: "in_progress",
+    data: {
+      skills: [
+        { name: "Vente", level: "Avancé" },
+        { name: "Encaissement", level: "Avancé" },
+        { name: "Travail en équipe", level: "Intermédiaire" },
+      ],
+      languages: [
+        { language: "Anglais", level: "B2" },
+        { language: "Espagnol", level: "A2" },
+      ],
+    },
+  },
+  interests: {
+    status: "in_progress",
+    data: {
+      interests: [
+        { name: "Danse", category: "Sport" },
+        { name: "Bénévolat aux Restos du cœur", category: "Associatif" },
+      ],
+    },
+  },
+};
+
+/** Les parties d'un `FormData` de React Native. */
+function parties(corps: unknown): { fieldName: string; uri?: string; type?: string }[] {
+  return (
+    (
+      corps as {
+        getParts?: () => { fieldName: string; uri?: string; type?: string }[];
+      }
+    ).getParts?.() ?? []
+  );
+}
+
+function importerCv(corps: unknown): Response {
+  const fichier = parties(corps).find((p) => p.fieldName === "file");
+  if (fichier === undefined) {
+    return erreur(422, "document_empty", "Le fichier est vide.", { field: "file" });
+  }
+  const type = (fichier.type ?? "").split(";")[0].trim().toLowerCase();
+  if (!TYPES_DE_DOCUMENT.includes(type) && !type.startsWith("image/")) {
+    return erreur(
+      422,
+      "document_type_unsupported",
+      "Ce type de fichier n'est pas accepté : envoie un PDF, un DOCX ou une image.",
+      { field: "file" },
+    );
+  }
+  etat.brouillon ??= brouillonNeuf();
+  const brouillon = etat.brouillon;
+  // Les chapitres déjà validés ne sont pas touchés ; les autres reçoivent
+  // une proposition — jamais une validation.
+  for (const [chapitre, lu] of Object.entries(CV_LU) as [Chapitre, ChapitreSimule][]) {
+    if (brouillon.chapters[chapitre]?.status !== "validated") {
+      brouillon.chapters[chapitre] = { ...lu };
+    }
+  }
+  brouillon.current_chapter =
+    ORDRE.find(
+      (c) =>
+        !["validated", "skipped"].includes(brouillon.chapters[c]?.status ?? "pending"),
+    ) ?? "photo";
+  brouillon.updated_at = new Date().toISOString();
+  return json(201, brouillon);
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // Le routage
 // ─────────────────────────────────────────────────────────────────────
 
@@ -445,6 +590,8 @@ export function repondreCv(methode: string, chemin: string, corps: unknown): Res
     etat.brouillon ??= brouillonNeuf();
     return json(201, etat.brouillon);
   }
+
+  if (route === "POST /cv/import") return importerCv(corps);
 
   if (route === "POST /voice/transcribe") {
     return json(200, { text: ENTENDU[etat.brouillon?.current_chapter ?? "identity"] });
