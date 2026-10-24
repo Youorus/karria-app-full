@@ -77,6 +77,8 @@ export const ICONES = {
   diplome: { ios: "graduationcap", android: "school" },
   langue: { ios: "globe", android: "language" },
   coeur: { ios: "heart", android: "favorite" },
+  coeurPlein: { ios: "heart.fill", android: "favorite" },
+  tasse: { ios: "cup.and.saucer.fill", android: "coffee" },
   camera: { ios: "camera", android: "photo_camera" },
   galerie: { ios: "photo.on.rectangle", android: "photo_library" },
   importer: { ios: "square.and.arrow.down", android: "download" },

@@ -1,5 +1,5 @@
 /**
- * Le profil : la personne, son CV, son abonnement — et la porte des
+ * Le profil : la personne, son CV, le café pour l'équipe — et la porte des
  * paramètres.
  *
  * ═══ Ce qui n'est plus ici ═══
@@ -22,11 +22,10 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 
-import { useAbonnement } from "@/features/abonnement/hooks/use-abonnement";
-import type { Abonnement } from "@/features/abonnement/types/abonnement.types";
 import { lireMoi } from "@/features/auth/api/auth.api";
 import { lireBrouillon, lireMonCv } from "@/features/cv/api/cv.api";
 import type { Cv } from "@/features/cv/types/cv.types";
+import { useSoutien, type Soutien } from "@/features/soutien/hooks/use-soutien";
 import { useNavigationUnique } from "@/lib/navigation";
 
 import {
@@ -42,7 +41,8 @@ export interface Profil {
   identite: Identite | null;
   email: string | null;
   cv: { etat: EtatDuCv; resume: string } | null;
-  abonnement: Abonnement | null;
+  /** La carte « offrir un café » (`features/soutien`). */
+  soutien: Soutien;
   ouvrirParametres: () => void;
   /** Vers le CV : la création s'il n'y en a pas, l'onglet sinon. */
   ouvrirCv: () => void;
@@ -50,7 +50,7 @@ export interface Profil {
 
 export function useProfil(): Profil {
   const { pousser } = useNavigationUnique();
-  const abonnement = useAbonnement();
+  const soutien = useSoutien();
   const [email, setEmail] = useState<string | null>(null);
   const [cvLu, setCvLu] = useState<{ cv: Cv | null; brouillon: boolean } | null>(null);
 
@@ -91,7 +91,7 @@ export function useProfil(): Profil {
     email,
     cv:
       etat === null || cvLu === null ? null : { etat, resume: resumeDuCv(etat, cvLu.cv) },
-    abonnement,
+    soutien,
     ouvrirParametres: useCallback(() => pousser("/parametres"), [pousser]),
     ouvrirCv,
   };

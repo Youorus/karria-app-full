@@ -5,7 +5,7 @@
  *
  * Trois cartes, du plus intime au plus lointain : qui je suis (nom,
  * métier, e-mail, photo), mon CV (son état, et le geste pour y aller),
- * mon abonnement (la carte Premium). L'apparence, les notifications, la
+ * un café pour l'équipe (Karria reste gratuit). L'apparence, les notifications, la
  * déconnexion et la suppression sont derrière la roue, dans les
  * paramètres : ce sont des réglages de l'application, pas des faits sur
  * la personne.
@@ -26,7 +26,7 @@ import { BoutonEnTeteRond, EnTeteKarria } from "@/components/en-tete-karria";
 import { Icone } from "@/components/icone";
 import { Box } from "@/components/ui/box";
 import { VStack } from "@/components/ui/vstack";
-import { CarteAbonnement } from "@/features/abonnement/components/carte-abonnement";
+import { CarteCafe } from "@/features/soutien/components/carte-cafe";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import { CarteCv } from "../components/carte-cv";
@@ -36,7 +36,7 @@ import { useProfil } from "../hooks/use-profil";
 export function EcranProfil() {
   const couleurs = useCouleurs();
   const reduit = useReducedMotion();
-  const { identite, email, cv, abonnement, ouvrirParametres, ouvrirCv } = useProfil();
+  const { identite, email, cv, soutien, ouvrirParametres, ouvrirCv } = useProfil();
 
   const entree = (rang: number) =>
     reduit ? undefined : FadeInDown.duration(380).delay(80 + rang * 70);
@@ -70,7 +70,7 @@ export function EcranProfil() {
 
           <Animated.View entering={entree(2)}>
             <VStack className="gap-2 pt-2">
-              <CarteAbonnement abonnement={abonnement} />
+              <CarteCafe soutien={soutien} />
             </VStack>
           </Animated.View>
         </ScrollView>
