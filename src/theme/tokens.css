@@ -131,6 +131,15 @@
     --color-border-warning: #f973164d;
     --color-surface-destructive: #ef44441a;
     --color-border-destructive: #ef44444d;
+    /* L'or des modèles Premium : le texte d'or foncé lisible sur un CV
+       blanc (contraste ≥ 4,5), son contour et sa surface. */
+    --color-premium-texte: #8a6414;
+    --color-border-premium: #d4a63a73;
+    --color-surface-premium: #fbf5e6;
+    /* La chaleur du profil et du café : un brun caramel, une crème. */
+    --color-chaleur: #9a5b2e;
+    --color-surface-chaleur: #fbf3ea;
+    --color-border-chaleur: #9a5b2e24;
 
     --color-scrim: #0f172a59;
     --color-scrim-fort: #0f172abf;
@@ -214,6 +223,12 @@
     --color-border-warning: #fb923c66;
     --color-surface-destructive: #f8717124;
     --color-border-destructive: #f8717166;
+    --color-premium-texte: #f2c46d;
+    --color-border-premium: #f2c46d59;
+    --color-surface-premium: #2a2316;
+    --color-chaleur: #e0a872;
+    --color-surface-chaleur: #221b15;
+    --color-border-chaleur: #e0a87229;
 
     --color-scrim: #00000073;
     --color-scrim-fort: #000000bf;

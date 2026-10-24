@@ -54,8 +54,14 @@ export const SECONDAIRE = { light: "#a855f7", dark: "#c084fc" } as const;
 /** `--color-onglet-inactif` : les icônes au repos de la barre d'onglets. */
 export const ONGLET_INACTIF = { light: "#00000061", dark: "#ffffff6b" } as const;
 
-/** `--color-premium` : l'or des modèles Pro et des étoiles (V1). */
+/** `--color-premium` : l'or des modèles Premium et des étoiles (V1). */
 export const PREMIUM = { light: "#d4a63a", dark: "#f2c46d" } as const;
+
+/** `--color-premium-texte` : l'icône posée dans la pastille Premium. */
+export const PREMIUM_TEXTE = { light: "#8a6414", dark: "#f2c46d" } as const;
+
+/** `--color-chaleur` : l'icône du café et du mot de l'équipe. */
+export const CHALEUR = { light: "#9a5b2e", dark: "#e0a872" } as const;
 
 /** `--color-salaire-foreground` : l'icône du salaire, identique dans les
  *  deux modes comme dans la V1. */
