@@ -16,6 +16,14 @@
  * `resumeRecherche` dit laquelle. Le fil ne décide rien : il affiche le
  * `mode` reçu (`docs/contrat-api-offres.md`).
  *
+ * ═══ Deux vues, choisies par la personne ═══
+ *
+ * « Ma recherche » et « Toutes les offres ». Le contrat ne permet pas de
+ * voir tout en gardant sa recherche : passer à « Toutes les offres » met
+ * la recherche **en pause** sur l'appareil puis la retire du serveur ;
+ * revenir la repose (`features/assistant/services/recherche-en-pause.ts`).
+ * Une nouvelle recherche de Karria rend la pause caduque.
+ *
  * ═══ Les offres vues partent par lots ═══
  *
  * Chaque carte qui passe à l'écran est notée ; les identifiants partent
@@ -31,7 +39,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { oublierRecherche } from "@/features/assistant/api/recherche.api";
+import {
+  lireRechercheBrute,
+  oublierRecherche,
+  poserRecherche,
+  versCorpsDeRecherche,
+} from "@/features/assistant/api/recherche.api";
+import {
+  lireRechercheEnPause,
+  mettreEnPause,
+  oublierRechercheEnPause,
+} from "@/features/assistant/services/recherche-en-pause";
 import { ErreurApi } from "@/lib/http";
 import {
   garderOffre,
@@ -52,10 +70,17 @@ import { memoriser } from "./memoire-offres";
  *  défilement, assez court pour qu'une fermeture n'en perde presque rien. */
 const DELAI_VUES_MS = 2_000;
 
+/** La vue choisie : la recherche en cours, ou tout le corpus. */
+export type VueDuFil = "pour_toi" | "toutes";
+
 export interface FilOffres {
   offres: Offre[];
   total: number;
   mode: ModeDuFil;
+  /** Découle du `mode` : « Ma recherche » quand le serveur cherche. */
+  vue: VueDuFil;
+  /** Une recherche attend sur l'appareil : « Ma recherche » reste proposée. */
+  rechercheEnPause: boolean;
   resumeRecherche: string | null;
   chargement: boolean;
   actualisation: boolean;
@@ -74,8 +99,9 @@ export interface FilOffres {
   signalerVisibles: (ids: string[]) => void;
   /** Karria vient de lancer une recherche : le fil se recharge. */
   rechargerApresRecherche: () => void;
-  /** Oublie la recherche : le fil redevient « toutes les offres ». */
-  oublierLaRecherche: () => void;
+  /** Passe à l'autre vue ; sans effet si elle est déjà affichée ou
+   *  qu'aucune recherche n'attend. */
+  changerDeVue: (vue: VueDuFil) => void;
 }
 
 function messageDErreur(cause: unknown): string {
@@ -96,6 +122,13 @@ export function useFilOffres(): FilOffres {
   const [erreur, setErreur] = useState<string | null>(null);
   const [filtres, setFiltres] = useState<Filtres>(FILTRES_PAR_DEFAUT);
   const [options, setOptions] = useState<OptionsDeFiltre>({ contrats: [], villes: [] });
+  const [rechercheEnPause, setRechercheEnPause] = useState(false);
+  // Le même fait, lisible depuis `chargerDebut` sans le recréer.
+  const enPause = useRef(false);
+  const noterLaPause = useCallback((valeur: boolean) => {
+    enPause.current = valeur;
+    setRechercheEnPause(valeur);
+  }, []);
   const jeton = useRef(0);
   // Les offres vues et pas encore envoyées, et celles déjà envoyées (pour
   // ne pas renvoyer dix fois la même en remontant le fil).
@@ -106,26 +139,37 @@ export function useFilOffres(): FilOffres {
   /** Charge la première page pour ces filtres. Aucun `setState` avant la
    *  réponse : appelé depuis un effet, il ne déclenche pas de rendu en
    *  cascade. */
-  const chargerDebut = useCallback((pour: Filtres) => {
-    const numero = ++jeton.current;
-    return lireFil(pour, 0).then(
-      (fil) => {
-        if (numero !== jeton.current) return;
-        memoriser(fil.offres);
-        setOffres(fil.offres);
-        setTotal(fil.total);
-        setMode(fil.mode);
-        setResumeRecherche(fil.resumeRecherche);
-        setSuivantes(fil.suivantes);
-        setErreur(null);
-      },
-      (cause: unknown) => {
-        if (numero !== jeton.current) return;
-        console.warn("[karria] fil indisponible", cause);
-        setErreur(messageDErreur(cause));
-      },
-    );
-  }, []);
+  const chargerDebut = useCallback(
+    (pour: Filtres) => {
+      const numero = ++jeton.current;
+      return lireFil(pour, 0).then(
+        (fil) => {
+          if (numero !== jeton.current) return;
+          memoriser(fil.offres);
+          setOffres(fil.offres);
+          setTotal(fil.total);
+          setMode(fil.mode);
+          setResumeRecherche(fil.resumeRecherche);
+          setSuivantes(fil.suivantes);
+          setErreur(null);
+          // Le serveur cherche (Karria, ou le retour à « Ma recherche ») :
+          // la recherche en pause est dépassée, on la jette.
+          if (fil.mode === "recherche" && enPause.current) {
+            noterLaPause(false);
+            oublierRechercheEnPause().catch((cause: unknown) =>
+              console.warn("[karria] recherche en pause non effacée", cause),
+            );
+          }
+        },
+        (cause: unknown) => {
+          if (numero !== jeton.current) return;
+          console.warn("[karria] fil indisponible", cause);
+          setErreur(messageDErreur(cause));
+        },
+      );
+    },
+    [noterLaPause],
+  );
 
   const chargerOptions = useCallback(() => {
     lireOptionsDeFiltre().then(setOptions, (cause: unknown) =>
@@ -140,6 +184,17 @@ export function useFilOffres(): FilOffres {
   }, [chargerDebut, filtres]);
 
   useEffect(chargerOptions, [chargerOptions]);
+
+  // La pause survit à un redémarrage : on la relit à l'ouverture.
+  useEffect(() => {
+    let vivant = true;
+    void lireRechercheEnPause().then((corps) => {
+      if (vivant && corps !== null) noterLaPause(true);
+    });
+    return () => {
+      vivant = false;
+    };
+  }, [noterLaPause]);
 
   const envoyerLesVues = useCallback(() => {
     minuteurVues.current = null;
@@ -240,17 +295,62 @@ export function useFilOffres(): FilOffres {
     chargerOptions();
   }, [chargerOptions]);
 
-  const oublierLaRecherche = useCallback(() => {
+  // « Toutes les offres » : la recherche est d'abord gardée sur l'appareil,
+  // puis retirée du serveur. Si on ne peut pas la garder, on ne la retire
+  // pas : perdre la recherche serait pire que rester sur la vue courante.
+  const voirToutesLesOffres = useCallback(() => {
     setChargement(true);
-    oublierRecherche()
-      .catch((cause: unknown) => console.warn("[karria] recherche non oubliée", cause))
-      .finally(rechargerApresRecherche);
+    lireRechercheBrute()
+      .then(async (brut) => {
+        if (brut !== null) {
+          await mettreEnPause(versCorpsDeRecherche(brut));
+          noterLaPause(true);
+        }
+        await oublierRecherche();
+      })
+      .then(rechargerApresRecherche, (cause: unknown) => {
+        console.warn("[karria] passage à toutes les offres impossible", cause);
+        setChargement(false);
+        setErreur(
+          "Impossible de changer de vue pour l'instant. Réessaie dans un instant.",
+        );
+      });
+  }, [rechargerApresRecherche, noterLaPause]);
+
+  // « Ma recherche » : la recherche en pause est reposée telle quelle ; le
+  // serveur recalcule le fil, et l'effet ci-dessus efface la pause dès que
+  // le mode « recherche » revient.
+  const revenirAMaRecherche = useCallback(() => {
+    setChargement(true);
+    lireRechercheEnPause()
+      .then((corps) => {
+        if (corps === null) throw new Error("aucune recherche en pause");
+        return poserRecherche(corps);
+      })
+      .then(rechargerApresRecherche, (cause: unknown) => {
+        console.warn("[karria] retour à la recherche impossible", cause);
+        setChargement(false);
+        setErreur("Ta recherche n'a pas pu être remise. Redemande-la à Karria.");
+      });
   }, [rechargerApresRecherche]);
+
+  const vue: VueDuFil = mode === "recherche" ? "pour_toi" : "toutes";
+
+  const changerDeVue = useCallback(
+    (cible: VueDuFil) => {
+      if (cible === vue) return;
+      if (cible === "toutes") voirToutesLesOffres();
+      else if (rechercheEnPause) revenirAMaRecherche();
+    },
+    [vue, rechercheEnPause, voirToutesLesOffres, revenirAMaRecherche],
+  );
 
   return {
     offres,
     total,
     mode,
+    vue,
+    rechercheEnPause,
     resumeRecherche,
     chargement,
     actualisation,
@@ -265,6 +365,6 @@ export function useFilOffres(): FilOffres {
     marquerOuverte,
     signalerVisibles,
     rechargerApresRecherche,
-    oublierLaRecherche,
+    changerDeVue,
   };
 }

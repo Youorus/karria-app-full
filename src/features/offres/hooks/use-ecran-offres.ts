@@ -17,8 +17,9 @@
  * ═══ Karria et le fil se répondent ═══
  *
  * Quand Karria lance une recherche dans le rideau, le fil se recharge
- * derrière ; quand on referme le rideau, les offres sont déjà là. Le
- * badge sous le titre résume la recherche et permet de l'oublier.
+ * derrière ; quand on referme le rideau, les offres sont déjà là. Dès
+ * qu'une recherche existe, le sélecteur « Ma recherche / Toutes les
+ * offres » apparaît sous l'en-tête et permet d'aller et venir.
  */
 
 import { useNavigation } from "expo-router";
@@ -30,7 +31,7 @@ import { useNavigationUnique } from "@/lib/navigation";
 import { noterDetailOuvert } from "../api/offres.api";
 import type { Offre } from "../types/offres.types";
 import { memoriser } from "./memoire-offres";
-import { useFilOffres, type FilOffres } from "./use-fil-offres";
+import { useFilOffres, type FilOffres, type VueDuFil } from "./use-fil-offres";
 
 export type ElementDuFil =
   | { type: "offre"; offre: Offre; rang: number }
@@ -42,8 +43,14 @@ export interface EcranOffres extends FilOffres {
   /** Le fil prêt à afficher : offres, bouton « voir plus », séparateur. */
   elements: ElementDuFil[];
   sousTitre: string;
-  /** La recherche en cours, à afficher sous le titre — ou rien. */
-  badgeRecherche: { libelle: string; onFermer: () => void } | undefined;
+  /** Le sélecteur « Ma recherche / Toutes les offres », ou rien tant
+   *  qu'aucune recherche n'existe. */
+  selecteur: {
+    vue: VueDuFil;
+    resume: string | null;
+    desactive: boolean;
+    onChanger: (vue: VueDuFil) => void;
+  } | null;
   filtresActifs: number;
   feuilleFiltres: boolean;
   ouvrirFiltres: () => void;
@@ -92,7 +99,9 @@ export function useEcranOffres(): EcranOffres {
     filtres,
     marquerOuverte,
     rechargerApresRecherche,
-    oublierLaRecherche,
+    vue,
+    rechercheEnPause,
+    changerDeVue,
   } = fil;
 
   const elements = useMemo<ElementDuFil[]>(() => {
@@ -124,10 +133,10 @@ export function useEcranOffres(): EcranOffres {
         ? `${nombre(total)} offre${total > 1 ? "s" : ""} pour toi`
         : `${nombre(total)} offres, les plus récentes d'abord`;
 
-  const badgeRecherche =
-    mode === "recherche" && resumeRecherche !== null
-      ? { libelle: resumeRecherche, onFermer: oublierLaRecherche }
-      : undefined;
+  const selecteur =
+    mode === "recherche" || rechercheEnPause
+      ? { vue, resume: resumeRecherche, desactive: chargement, onChanger: changerDeVue }
+      : null;
 
   const filtresActifs =
     filtres.contrats.length +
@@ -181,7 +190,7 @@ export function useEcranOffres(): EcranOffres {
     maintenant,
     elements,
     sousTitre,
-    badgeRecherche,
+    selecteur,
     filtresActifs,
     feuilleFiltres,
     ouvrirFiltres: useCallback(() => setFeuilleFiltres(true), []),

@@ -86,6 +86,22 @@ export interface CriteresBruts {
   updated_at: string;
 }
 
+/** Le corps de `PUT /search/criteria` : les critères tels que le serveur
+ *  les a rendus, sans ce qu'il calcule lui-même (`query`, `summary`,
+ *  `alerts_enabled`, `updated_at`) — il refuse tout champ en trop. */
+export type CorpsDeRecherche = Pick<
+  CriteresBruts,
+  | "job_titles"
+  | "keywords"
+  | "location"
+  | "whole_france"
+  | "contract_types"
+  | "remote"
+  | "schedule"
+  | "max_experience"
+  | "salary_min_monthly"
+>;
+
 export interface ElargissementBrut {
   id: string;
   kind: string;

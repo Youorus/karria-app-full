@@ -13,8 +13,8 @@
  * L'aura derrière le fil, et l'agent : le ✦ ne pousse pas un écran de chat
  * comme la V1 — il balaie le fil pour faire apparaître Karria
  * (`RideauAgent`), et le fil revient exactement où on l'avait laissé —
- * rechargé si Karria a cherché entre-temps, avec la recherche en badge
- * sous le titre.
+ * rechargé si Karria a cherché entre-temps, avec le sélecteur « Ma
+ * recherche / Toutes les offres » sous l'en-tête.
  *
  * Les cartes qui passent à l'écran sont signalées au hook (`viewability`
  * de la liste) : c'est ce qui fait tomber « Nouvelle ».
@@ -39,6 +39,7 @@ import { useCouleurs } from "@/theme/use-couleurs";
 import { BoutonKarria } from "../components/bouton-karria";
 import { CarteOffre } from "../components/carte-offre";
 import { FeuilleFiltres } from "../components/feuille-filtres";
+import { SelecteurVue } from "../components/selecteur-vue";
 import { SqueletteFil } from "../components/squelette-fil";
 import { useEcranOffres, type ElementDuFil } from "../hooks/use-ecran-offres";
 
@@ -51,7 +52,7 @@ export function EcranOffres() {
     elements,
     maintenant,
     sousTitre,
-    badgeRecherche,
+    selecteur,
     mode,
     chargement,
     actualisation,
@@ -89,7 +90,6 @@ export function EcranOffres() {
             <EnTeteKarria
               titre="Pour toi"
               sousTitre={sousTitre}
-              badge={badgeRecherche}
               droite={
                 <BoutonEnTeteRond
                   onPress={ouvrirFiltres}
@@ -109,6 +109,11 @@ export function EcranOffres() {
                 </BoutonEnTeteRond>
               }
             />
+            {selecteur !== null ? (
+              <Box className="px-5 pb-1 pt-1">
+                <SelecteurVue {...selecteur} />
+              </Box>
+            ) : null}
 
             {chargement ? (
               <Box className="px-5 pt-3">
