@@ -35,6 +35,7 @@ import { CIBLE_V2 } from "@/lib/config";
 
 import { estUneRouteAppareil, repondreAppareils } from "./appareils-simule";
 import { estUneRouteCv, repondreCv } from "./cv-simule";
+import { estUneRouteModele, repondreModeles } from "./modeles-simule";
 import { estUneRouteOffres, repondreOffres } from "./offres-simule";
 
 /** Ce que `karria_api_v2` sert déjà — en production depuis 2026-10-23 :
@@ -177,6 +178,9 @@ export async function repondreEnSimulation(requete: RequeteSimulee): Promise<Res
 
   // Le fil, Karria et la recherche : le contrat du module `offers`.
   if (estUneRouteOffres(chemin)) return repondreOffres(methode, chemin, corps);
+
+  // Les modèles de CV : les routes de la V1, en attendant leur module v2.
+  if (estUneRouteModele(chemin)) return repondreModeles(methode, chemin, corps);
 
   switch (route) {
     case "POST /auth/email/start": {
