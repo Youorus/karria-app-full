@@ -50,7 +50,10 @@ Seuls les modèles **publiés** (passés par la porte de qualité de l'ADR-0020)
     "signed_thumbnail_url": "https://…/vignette.webp?…",
     "signed_preview_url": "https://…/apercu.png?…",
     "signed_full_url": "https://…/apercu_pleine_page.png?…",
-    "views_count": 0, "uses_count": 0, "rating_avg": 0, "rating_count": 0,
+    "views_count": 0,
+    "uses_count": 0,
+    "rating_avg": 0,
+    "rating_count": 0,
     "primary_color": "#000000",
     "font_family": "Raleway",
     "has_photo": true,
@@ -77,13 +80,31 @@ Seuls les modèles **publiés** (passés par la porte de qualité de l'ADR-0020)
 - `ats_safe_available` : le modèle a une variante « optimisée ATS » (interlettrage
   resserré), proposée par le score quand elle aide.
 
+### Proposé par l'app (2026-10-24) — à valider par le backend
+
+- **`thumbnail_blurhash`** (`string | null`) : le [BlurHash](https://blurha.sh) de la
+  vignette (composantes 4 × 5), calculé une fois à la publication du modèle. L'app
+  l'affiche, flou, le temps que la vignette signée arrive (`expo-image`, `placeholder`).
+  Facultatif : absent ou `null`, la carte montre une surface neutre. Le faux serveur
+  le sert déjà.
+- **Payant** : `is_premium` (+ `price`) suffit ; aucun champ de palier n'est
+  nécessaire. L'app affiche ces modèles sous le nom **« Premium »** (pastille dorée,
+  puce de filtre « Premium ») ; « Pro » n'apparaît plus nulle part dans l'interface.
+- L'app met les images en cache sous la clé `modele-<id>-v<version>` : `version` doit
+  changer à chaque nouveau dessin, sans quoi l'ancien aperçu resterait affiché.
+
 ## `GET /templates/{id}` → `200 Modele`
 
 Le même objet, plus `pages` : les images du carrousel (le CV d'exemple, puis les
 lettres assorties). `404 template_not_found`.
 
 ```json
-{ "…": "…", "pages": [ { "kind": "cv", "label": "CV", "signed_thumbnail_url": "…", "signed_full_url": "…" } ] }
+{
+  "…": "…",
+  "pages": [
+    { "kind": "cv", "label": "CV", "signed_thumbnail_url": "…", "signed_full_url": "…" }
+  ]
+}
 ```
 
 `POST /templates/{id}/view` → `204` (compteur de vues, inchangé). Les avis
@@ -93,15 +114,19 @@ lettres assorties). `404 template_not_found`.
 
 - `GET /user-templates/me` → `200 Possession[]` (forme V1, `id` UUID).
 - `POST /user-templates/me` `{ "template_id": "…" }` → `201 Possession` ;
-  `404 template_not_found`, `422 template_not_free` (un modèle Pro s'achète par l'achat
+  `404 template_not_found`, `422 template_not_free` (un modèle Premium s'achète par l'achat
   intégré, hors de ce contrat).
 - **Nouveau** — `GET /user-templates/me/selected` → `200 Selection` | `204` (aucun choix) ;
   `PUT /user-templates/me/selected` `{ "template_id": "…", "ats_safe": false }` →
-  `200 Selection`. `403 template_locked` (`details.reason`) si le modèle est Pro et non
+  `200 Selection`. `403 template_locked` (`details.reason`) si le modèle est Premium et non
   possédé. Le choix sert de modèle par défaut aux exports.
 
 ```json
-{ "template": { "id": "6f1c…", "label": "Meridian", "version": 1 }, "ats_safe": false, "updated_at": "2026-10-24T10:00:00Z" }
+{
+  "template": { "id": "6f1c…", "label": "Meridian", "version": 1 },
+  "ats_safe": false,
+  "updated_at": "2026-10-24T10:00:00Z"
+}
 ```
 
 ## `POST /templates/{id}/preview` → `200 Apercu`
@@ -112,7 +137,7 @@ tant que ni le CV ni la version du modèle ne changent.
 
 ```json
 {
-  "pages": [ { "signed_url": "https://…/page-1.png?…", "width": 1240, "height": 1754 } ],
+  "pages": [{ "signed_url": "https://…/page-1.png?…", "width": 1240, "height": 1754 }],
   "fit": { "spacing": 0.8, "font_scale": 1.0, "pages": 1 }
 }
 ```
@@ -123,7 +148,12 @@ tant que ni le CV ni la version du modèle ne changent.
 ## Exporter son CV : `POST /cv/me/generated-cvs` → `201 GeneratedCv`
 
 ```json
-{ "template_id": "6f1c…", "formats": ["pdf", "docx"], "ats_safe": false, "offer_id": null }
+{
+  "template_id": "6f1c…",
+  "formats": ["pdf", "docx"],
+  "ats_safe": false,
+  "offer_id": null
+}
 ```
 
 - `template_id` facultatif : le modèle choisi (`/user-templates/me/selected`) sinon.
@@ -149,9 +179,14 @@ Réponse (synchrone, 1 à 3 s) :
     "level": "good",
     "format": "pdf",
     "checks": [
-      { "key": "fonts", "label": "Polices exploitables", "points": 4.0, "max_points": 8,
+      {
+        "key": "fonts",
+        "label": "Polices exploitables",
+        "points": 4.0,
+        "max_points": 8,
         "finding": "2 intitulé(s) lu(s) lettre à lettre (« C A M I L L E… »)",
-        "tip": "Des intitulés très espacés se lisent lettre à lettre par les ATS : active la variante « optimisée ATS » du modèle." }
+        "tip": "Des intitulés très espacés se lisent lettre à lettre par les ATS : active la variante « optimisée ATS » du modèle."
+      }
     ],
     "keywords": null,
     "explanation": null,

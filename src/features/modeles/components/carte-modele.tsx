@@ -5,17 +5,24 @@
  *
  * - la miniature du CV, au format de la page (hauteur = largeur / 0,72),
  *   avec sur elle : un voile bas, **la barre de couleur du modèle** (3 pt),
- *   la pastille **PRO**, la coche verte des modèles possédés, le badge
- *   « photo » et la puce « LM » quand une lettre est assortie ;
+ *   la pastille dorée **Premium** (l'ancien « PRO »), la coche verte des
+ *   modèles possédés, le badge « photo » et la puce « LM » quand une
+ *   lettre est assortie ;
  * - dessous : le nom, la catégorie, un filet, la note et le nombre
  *   d'utilisations.
  *
  * ═══ Le passage au détail ═══
  *
- * Sur iOS 18+, la miniature **se déplie** en plein écran jusqu'au
- * carrousel du détail (zoom natif, `Link.AppleZoom`) et s'y replie au
- * retour : on ne quitte pas le modèle des yeux. Ailleurs, le détail monte
- * en fondu. L'entrée dans la grille est décalée de 55 ms par carte (V1).
+ * La miniature **se déplie** jusqu'au carrousel du détail : zoom natif
+ * sur iOS 18+, zoom Reanimated sur Android (`use-ouverture-modele.ts`).
+ * L'entrée dans la grille est décalée de 55 ms par carte (V1).
+ *
+ * ═══ L'image ═══
+ *
+ * `expo-image`, cache mémoire et disque, clé stable (`modele-<id>-v<version>`)
+ * : les URL signées changent toutes les heures, l'image, elle, ne change
+ * qu'avec la version du modèle. Le flou (`flou`) occupe la place pendant
+ * le chargement ; sans lui, le symbole Karria.
  */
 
 import { Image } from "expo-image";
@@ -38,6 +45,8 @@ import { VStack } from "@/components/ui/vstack";
 import { AURA, PREMIUM } from "@/theme";
 import { useCouleurs } from "@/theme/use-couleurs";
 
+import { PastillePremium } from "./pastille-premium";
+import { useDepartDeCarte } from "../hooks/use-ouverture-modele";
 import { capitaliser, compteCompact, noteLisible } from "../services/presentation";
 import type { Modele } from "../types/modeles.types";
 
@@ -56,6 +65,32 @@ export function CarteModele({ modele, rang, largeur, possede }: Props) {
   const echelle = useSharedValue(1);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: echelle.value }] }));
   const hauteur = Math.round(largeur / 0.72);
+  const { ref: refVignette, retenir } = useDepartDeCarte(modele.id);
+
+  const vignette =
+    modele.miniature !== null ? (
+      <Image
+        source={{
+          uri: modele.miniature,
+          cacheKey: `modele-${modele.id}-v${modele.version}`,
+        }}
+        placeholder={modele.flou === null ? undefined : { blurhash: modele.flou }}
+        cachePolicy="memory-disk"
+        recyclingKey={modele.id}
+        style={{ width: largeur, height: hauteur }}
+        contentFit="cover"
+        contentPosition="top"
+        transition={250}
+        accessible={false}
+      />
+    ) : (
+      <Box
+        style={{ width: largeur, height: hauteur }}
+        className="items-center justify-center"
+      >
+        <SymboleKarria taille={28} />
+      </Box>
+    );
 
   return (
     // Deux couches, comme la carte d'offre : l'entrée et la pression ne
@@ -72,33 +107,24 @@ export function CarteModele({ modele, rang, largeur, possede }: Props) {
           asChild
         >
           <Pressable
-            onPressIn={() => echelle.set(withSpring(0.96, RESSORT))}
+            onPressIn={() => {
+              retenir();
+              echelle.set(withSpring(0.96, RESSORT));
+            }}
             onPressOut={() => echelle.set(withSpring(1, RESSORT))}
             accessibilityRole="button"
             accessibilityLabel={`${modele.libelle}, ${capitaliser(modele.categorie)}${
               possede ? ", déjà à toi" : ""
-            }${modele.premium ? ", modèle Pro" : ""}`}
+            }${modele.premium ? ", modèle Premium" : ""}`}
           >
             <VStack className="overflow-hidden rounded-tuile border border-border-subtle bg-card">
-              <Box style={{ height: hauteur }} className="overflow-hidden bg-remplissage">
-                <Link.AppleZoom>
-                  {modele.miniature !== null ? (
-                    <Image
-                      source={{ uri: modele.miniature }}
-                      style={{ width: largeur, height: hauteur }}
-                      contentFit="cover"
-                      transition={250}
-                      accessible={false}
-                    />
-                  ) : (
-                    <Box
-                      style={{ width: largeur, height: hauteur }}
-                      className="items-center justify-center"
-                    >
-                      <SymboleKarria taille={28} />
-                    </Box>
-                  )}
-                </Link.AppleZoom>
+              <Box
+                ref={refVignette}
+                collapsable={false}
+                style={{ height: hauteur }}
+                className="overflow-hidden bg-remplissage"
+              >
+                {reduit ? vignette : <Link.AppleZoom>{vignette}</Link.AppleZoom>}
 
                 {/* Le voile bas et la barre de couleur du modèle. */}
                 <Box className="absolute bottom-0 left-0 right-0 h-[35%] bg-scrim opacity-40" />
@@ -116,12 +142,9 @@ export function CarteModele({ modele, rang, largeur, possede }: Props) {
                   </Box>
                 ) : null}
                 {modele.premium ? (
-                  <HStack className="absolute right-2 top-2 items-center gap-1 rounded-full bg-inverse px-[7px] py-[3px]">
-                    <SymboleKarria taille={10} couleur={couleurs.fond} />
-                    <Texte className="font-display text-[10px] text-inverse-foreground">
-                      PRO
-                    </Texte>
-                  </HStack>
+                  <Box className="absolute right-2 top-2">
+                    <PastillePremium />
+                  </Box>
                 ) : null}
                 {modele.avecPhoto ? (
                   <Box className="absolute bottom-2 left-2 h-5 w-5 items-center justify-center rounded-full bg-scrim-fort">

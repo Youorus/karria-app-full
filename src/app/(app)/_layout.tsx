@@ -12,9 +12,11 @@
  * tout l'écran, le retour ramène au fil. Sur Android et sur les iOS
  * antérieurs à 18, il monte en fondu (`fade_from_bottom`, celui de la
  * V1) ; sur iOS 18+, la carte touchée s'y déplie (zoom natif, posé par la
- * carte elle-même).
+ * carte elle-même). Le modèle fait exception sur Android : fondu simple,
+ * sous le zoom Reanimated de sa vignette.
  */
 
+import { Platform } from "react-native";
 import { Redirect, Stack } from "expo-router";
 
 import { useSession } from "@/features/auth/hooks/use-session";
@@ -52,9 +54,16 @@ export default function LayoutApp() {
           name="offre/[id]"
           options={{ animation: "fade_from_bottom", animationDuration: 240 }}
         />
+        {/* Le modèle, lui, s'ouvre en fondu simple sur Android : le zoom
+            Reanimated de la vignette (`use-ouverture-modele.ts`) porte le
+            mouvement, un glissement vertical le contredirait. Sur iOS, le
+            zoom natif remplace de toute façon l'animation de la pile. */}
         <Stack.Screen
           name="modele/[id]"
-          options={{ animation: "fade_from_bottom", animationDuration: 240 }}
+          options={{
+            animation: Platform.OS === "android" ? "fade" : "fade_from_bottom",
+            animationDuration: 240,
+          }}
         />
         {/* La création du CV ne « s'empile » pas comme un détail : Karria
             prend tout l'écran, en fondu, et on ne la quitte pas d'un

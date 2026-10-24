@@ -9,7 +9,7 @@
  *   déjà à toi » au-dessus ;
  * - gratuit → « Obtenir ce modèle », puis « Ajout en cours… », puis
  *   « Ajouté à ta collection ! » ;
- * - Pro → « Obtenir ce modèle · 4,99 € » en or, avec le cadenas — désactivé
+ * - Premium → « Obtenir ce modèle · 4,99 € » en or, avec le cadenas — désactivé
  *   tant que l'achat intégré n'est pas branché, et il le dit.
  *
  * La génération d'un CV avec ce modèle (« Créer mon CV avec ce modèle »)
@@ -57,7 +57,7 @@ export function BarreActionModele({
     : acquisition === "erreur"
       ? "L'ajout n'a pas abouti. Réessaie dans un instant."
       : modele.premium
-        ? "L'achat des modèles Pro arrive bientôt dans l'application."
+        ? "L'achat des modèles Premium arrive bientôt dans l'application."
         : null;
 
   const fond = possede ? "bg-success" : modele.premium ? "bg-premium" : "bg-primary";

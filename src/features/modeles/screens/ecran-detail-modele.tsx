@@ -5,7 +5,7 @@
  *
  * - « ‹ Modèles » et Partager (le même en-tête que le détail d'une offre) ;
  * - le carrousel : le CV puis ses lettres, plein écran au toucher ;
- * - la catégorie en capitales bleues, le nom, la ligne de statistiques
+ * - la catégorie en capitales bleues (et la pastille Premium), le nom, la ligne de statistiques
  *   (vues, utilisations, note), les étiquettes (avec la couleur et la
  *   police du modèle), la description, « Lettre de motivation incluse »,
  *   puis « Avis et notes » ;
@@ -37,6 +37,7 @@ import { useCouleurs } from "@/theme/use-couleurs";
 
 import { BarreActionModele } from "../components/barre-action-modele";
 import { CarrouselApercus } from "../components/carrousel-apercus";
+import { PastillePremium } from "../components/pastille-premium";
 import { useDetailModele } from "../hooks/use-detail-modele";
 import { capitaliser, compteCompact, noteLisible } from "../services/presentation";
 
@@ -64,6 +65,7 @@ export function EcranDetailModele() {
     modele,
     avis,
     chargement,
+    complet,
     erreur,
     acquisition,
     obtenir,
@@ -90,7 +92,7 @@ export function EcranDetailModele() {
           }
         />
 
-        {chargement ? (
+        {chargement && modele === null ? (
           <Box className="flex-1 items-center justify-center">
             <ChargeurKarria />
           </Box>
@@ -110,14 +112,22 @@ export function EcranDetailModele() {
               contentContainerStyle={{ paddingBottom: HAUTEUR_PIED_FLOTTANT }}
               showsVerticalScrollIndicator={false}
             >
-              <CarrouselApercus apercus={modele.apercus} />
+              <CarrouselApercus
+                idModele={modele.id}
+                version={modele.version}
+                apercus={modele.apercus}
+                flou={modele.flou}
+              />
 
               <VStack className="gap-5 px-5 pt-5">
                 <Animated.View entering={entree(0)}>
                   <VStack className="gap-1">
-                    <Texte className="font-bold text-footnote uppercase tracking-widest text-primary">
-                      {capitaliser(modele.categorie)}
-                    </Texte>
+                    <HStack className="items-center justify-between gap-3">
+                      <Texte className="font-bold text-footnote uppercase tracking-widest text-primary">
+                        {capitaliser(modele.categorie)}
+                      </Texte>
+                      {modele.premium ? <PastillePremium grande /> : null}
+                    </HStack>
                     <Texte
                       accessibilityRole="header"
                       className="font-display text-title leading-[34px] tracking-tight text-foreground"
@@ -269,7 +279,7 @@ export function EcranDetailModele() {
 
       {/* Hors de la zone sûre : le pied flottant calcule lui-même sa
           distance au bord, au-dessus de l'indicateur d'accueil. */}
-      {modele !== null && !chargement ? (
+      {modele !== null && complet ? (
         <BarreActionModele
           modele={modele}
           acquisition={acquisition}

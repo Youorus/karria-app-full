@@ -4,9 +4,14 @@
  * Les deux lectures — les modèles et « les miens » — partent ensemble ;
  * la seconde peut échouer sans priver la galerie : on affiche alors les
  * modèles sans coche plutôt que pas de modèles du tout.
+ *
+ * Un lien peut ouvrir la galerie sur une catégorie
+ * (`karria://modeles?categorie=étudiant`) : une notification « de nouveaux
+ * modèles pour ton premier emploi » mène droit à eux.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
 import { useWindowDimensions } from "react-native";
 
 import { ErreurApi } from "@/lib/http";
@@ -28,7 +33,7 @@ export interface Galerie {
   modeles: Modele[];
   /** Largeur d'une carte : deux colonnes dans la largeur de l'écran. */
   largeurCarte: number;
-  possedes: Set<number>;
+  possedes: Set<string>;
   puces: (Puce & { active: boolean })[];
   choisirFiltre: (filtre: FiltreGalerie) => void;
   sousTitre: string;
@@ -48,8 +53,11 @@ function messageDErreur(cause: unknown): string {
 export function useGalerie(): Galerie {
   const { width } = useWindowDimensions();
   const [tous, setTous] = useState<Modele[]>([]);
-  const [possedes, setPossedes] = useState<Set<number>>(new Set());
-  const [filtre, setFiltre] = useState<FiltreGalerie>({ type: "tous" });
+  const [possedes, setPossedes] = useState<Set<string>>(new Set());
+  const { categorie } = useLocalSearchParams<{ categorie?: string }>();
+  const [filtre, setFiltre] = useState<FiltreGalerie>(
+    categorie ? { type: "categorie", valeur: categorie } : { type: "tous" },
+  );
   const [chargement, setChargement] = useState(true);
   const [actualisation, setActualisation] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -61,7 +69,7 @@ export function useGalerie(): Galerie {
       lireModeles(),
       lireMesModeles().catch((cause: unknown) => {
         console.warn("[karria] modèles possédés indisponibles", cause);
-        return new Set<number>();
+        return new Set<string>();
       }),
     ])
       .then(

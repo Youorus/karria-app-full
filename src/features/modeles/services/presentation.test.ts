@@ -15,7 +15,7 @@ import {
 
 function modele(id: number, categorie: string, premium = false): Modele {
   return {
-    id,
+    id: String(id),
     libelle: `M${id}`,
     categorie,
     description: null,
@@ -23,6 +23,8 @@ function modele(id: number, categorie: string, premium = false): Modele {
     prix: premium ? "4.99" : null,
     etiquettes: [],
     miniature: null,
+    flou: null,
+    version: 1,
     vues: 0,
     utilisations: 0,
     note: 0,
@@ -36,7 +38,7 @@ function modele(id: number, categorie: string, premium = false): Modele {
 }
 
 describe("Les puces de la galerie", () => {
-  it("propose Tous, Pro s'il y a un premium, puis les catégories triées", () => {
+  it("propose Tous, Premium s'il y a un modèle payant, puis les catégories triées", () => {
     const puces = pucesDeLaGalerie([
       modele(1, "professional"),
       modele(2, "elegant", true),
@@ -44,13 +46,13 @@ describe("Les puces de la galerie", () => {
     ]);
     expect(puces.map((p) => p.libelle)).toEqual([
       "Tous",
-      "Pro",
+      "Premium",
       "Elegant",
       "Professional",
     ]);
   });
 
-  it("n'affiche pas Pro sans modèle premium", () => {
+  it("n'affiche pas Premium sans modèle payant", () => {
     expect(pucesDeLaGalerie([modele(1, "elegant")]).map((p) => p.libelle)).toEqual([
       "Tous",
       "Elegant",
@@ -62,10 +64,10 @@ describe("Le filtre", () => {
   const modeles = [modele(1, "elegant"), modele(2, "elegant", true), modele(3, "pro")];
   it("filtre par catégorie et par premium", () => {
     expect(filtrer(modeles, { type: "tous" })).toHaveLength(3);
-    expect(filtrer(modeles, { type: "pro" }).map((m) => m.id)).toEqual([2]);
+    expect(filtrer(modeles, { type: "premium" }).map((m) => m.id)).toEqual(["2"]);
     expect(
       filtrer(modeles, { type: "categorie", valeur: "elegant" }).map((m) => m.id),
-    ).toEqual([1, 2]);
+    ).toEqual(["1", "2"]);
   });
 });
 

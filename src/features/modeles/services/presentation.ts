@@ -18,12 +18,12 @@ export interface Puce {
   filtre: FiltreGalerie;
 }
 
-/** Les puces de la V1 : « Tous », « Pro » s'il existe un modèle premium,
+/** Les puces de la V1 : « Tous », « Premium » s'il existe un modèle payant,
  *  puis une puce par catégorie, dans l'ordre alphabétique. */
 export function pucesDeLaGalerie(modeles: Modele[]): Puce[] {
   const puces: Puce[] = [{ cle: "tous", libelle: "Tous", filtre: { type: "tous" } }];
   if (modeles.some((m) => m.premium)) {
-    puces.push({ cle: "pro", libelle: "Pro", filtre: { type: "pro" } });
+    puces.push({ cle: "premium", libelle: "Premium", filtre: { type: "premium" } });
   }
   const categories = [...new Set(modeles.map((m) => m.categorie))].sort((a, b) =>
     a.localeCompare(b, "fr"),
@@ -45,7 +45,7 @@ export function memeFiltre(a: FiltreGalerie, b: FiltreGalerie): boolean {
 
 export function filtrer(modeles: Modele[], filtre: FiltreGalerie): Modele[] {
   if (filtre.type === "tous") return modeles;
-  if (filtre.type === "pro") return modeles.filter((m) => m.premium);
+  if (filtre.type === "premium") return modeles.filter((m) => m.premium);
   return modeles.filter((m) => m.categorie === filtre.valeur);
 }
 

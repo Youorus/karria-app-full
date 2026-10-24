@@ -6,6 +6,13 @@
  * Comme la V1 : un aller-retour accidentel ne gonfle pas le compteur de
  * vues que voient les autres.
  *
+ * ═══ Affiché tout de suite ═══
+ *
+ * Venu de la galerie, le modèle est déjà connu (`modeleConnu`) : le détail
+ * s'affiche aussitôt — c'est sur son aperçu que la vignette vient se
+ * déplier — et se complète quand le serveur répond (pages, avis, « à
+ * toi »). `chargement` ne couvre donc que le cas d'un lien profond.
+ *
  * ═══ L'acquisition attend le serveur ═══
  *
  * « Obtenir ce modèle » passe par « Ajout en cours… » puis « Ajouté à ta
@@ -23,6 +30,7 @@ import {
   lireAvis,
   lireMesModeles,
   lireModele,
+  modeleConnu,
   noterVue,
   obtenirModele,
 } from "../api/modeles.api";
@@ -34,6 +42,7 @@ export interface DetailModele {
   modele: Modele | null;
   avis: AvisDuModele | null;
   chargement: boolean;
+  complet: boolean;
   erreur: string | null;
   acquisition: EtatAcquisition;
   obtenir: () => void;
@@ -45,11 +54,14 @@ export interface DetailModele {
 
 export function useDetailModele(): DetailModele {
   const params = useLocalSearchParams<{ id: string }>();
-  const id = Number(params.id);
+  const id = params.id;
   const router = useRouter();
-  const [modele, setModele] = useState<Modele | null>(null);
+  const [modele, setModele] = useState<Modele | null>(() => modeleConnu(id));
   const [avis, setAvis] = useState<AvisDuModele | null>(null);
-  const [chargement, setChargement] = useState(true);
+  const [chargement, setChargement] = useState(() => modeleConnu(id) === null);
+  /** Vrai quand le serveur a répondu : avant, on ne sait pas si le modèle
+   *  est déjà à la personne, et le pied d'action attend. */
+  const [complet, setComplet] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [acquisition, setAcquisition] = useState<EtatAcquisition>("libre");
   const [tentative, setTentative] = useState(0);
@@ -58,7 +70,7 @@ export function useDetailModele(): DetailModele {
     let vivant = true;
     Promise.all([
       lireModele(id),
-      lireMesModeles().catch(() => new Set<number>()),
+      lireMesModeles().catch(() => new Set<string>()),
       lireAvis(id).catch(() => null),
     ])
       .then(
@@ -80,7 +92,9 @@ export function useDetailModele(): DetailModele {
         },
       )
       .finally(() => {
-        if (vivant) setChargement(false);
+        if (!vivant) return;
+        setChargement(false);
+        setComplet(true);
       });
     return () => {
       vivant = false;
@@ -128,6 +142,7 @@ export function useDetailModele(): DetailModele {
     modele,
     avis,
     chargement,
+    complet,
     erreur,
     acquisition,
     obtenir,

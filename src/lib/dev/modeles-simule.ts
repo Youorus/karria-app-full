@@ -1,177 +1,169 @@
 /**
  * Le faux serveur des modèles de CV : les routes `/templates/` et
- * `/user-templates/` de la V1, que `karria_api_v2` ne sert pas encore.
+ * `/user-templates/` de `docs/contrat-api-modeles.md`, que `karria_api_v2`
+ * ne sert pas encore (vérifié le 2026-10-24 : 404 en production).
  *
  * ═══ Pourquoi ce fichier existe ═══
  *
  * Avec la cible `v2`, tout ce que la v2 ne sert pas part au faux serveur
- * (`enAvanceSurLeBackend`). Les modèles en faisaient partie **sans
- * qu'aucune route ne les simule** : l'onglet Modèles affichait « Les
- * modèles n'ont pas pu être chargés » sur un 404 `simulation_route_inconnue`.
- * Ce fichier est la forme exacte que l'application attend du futur module
- * — `features/modeles/types/modeles.types.ts` la décrit du côté de l'app.
+ * (`enAvanceSurLeBackend`). Ce fichier est la forme exacte que l'application
+ * attend du futur module : identifiants UUID, `is_premium`, `pages` du
+ * détail, URL d'aperçus. Le jour où la v2 sert `/templates/`, on ajoute
+ * `"/templates/"` et `"/user-templates/"` à `SERVI_PAR_LA_V2`
+ * (`serveur-simule.ts`) — rien d'autre ne change.
  *
- * ═══ Ce qu'il ne simule pas ═══
+ * ═══ Les aperçus ═══
  *
- * Les images. Les URL de miniatures sont **signées** et viennent du stockage
- * de la V1 ; ici elles valent `null`, et la carte montre le symbole Karria.
- * L'achat d'un modèle Pro passe par l'achat intégré, hors de ce contrat :
- * `POST /user-templates/me` ne sert que les modèles gratuits.
+ * Les trois modèles du PoC de l'ADR-0020 (Meridian, Marketing,
+ * Minimalist), avec leurs vrais rendus : vignette 480 px et page 900 px en
+ * WebP, rangés dans `lib/dev/modeles/` — donc **absents du paquet de
+ * production** (`metro.config.js` écarte `lib/dev/`). Metro les sert en
+ * développement ; `resolveAssetSource` en donne l'URL, une vraie chaîne,
+ * comme le serait une URL signée. `thumbnail_blurhash` est un champ
+ * **proposé** au contrat : le flou qui précède l'image.
+ *
+ * L'achat d'un modèle Premium passe par l'achat intégré, hors de ce
+ * contrat : `POST /user-templates/me` ne sert que les modèles gratuits.
  */
 
-interface ModeleSimule {
-  id: number;
-  name: string;
+import { Image } from "react-native";
+
+/** L'URL d'une image du dépôt, servie par Metro en développement. Sous
+ *  Jest, aucune URL n'existe : `null`, comme un modèle sans aperçu. */
+function url(module: number): string | null {
+  return Image.resolveAssetSource(module)?.uri ?? null;
+}
+
+const IMAGES = {
+  meridian: {
+    vignette: url(require("./modeles/meridian-vignette.webp")),
+    page: url(require("./modeles/meridian-page.webp")),
+    flou: "dBR{#?~q-;%M-;t7M{j[xuxuIUWCxuxuWBR*xuofWBay",
+  },
+  marketing: {
+    vignette: url(require("./modeles/marketing-vignette.webp")),
+    page: url(require("./modeles/marketing-page.webp")),
+    flou: "dASY{q-;t7~q-;s;WBWBt7fQWBj[?bWVWBoft7WBWBof",
+  },
+  minimalist: {
+    vignette: url(require("./modeles/minimalist-vignette.webp")),
+    page: url(require("./modeles/minimalist-page.webp")),
+    flou: "d8S6Pl~qxu?bxut7IUxuIUt7IU%M-;t7Rjxuoft7WBt7",
+  },
+} as const;
+
+type NomDImage = keyof typeof IMAGES;
+
+/** Les identifiants, des UUID comme ceux de la v2. */
+const ID = {
+  meridian: "6f1c2b0e-8d4a-4c1e-9a57-0b3f1e2d4c01",
+  marketing: "9b2e7c41-3f6d-4a8b-b1c2-5e7f9a0d1b02",
+  minimalist: "c4d81a93-7e25-4f0b-8c6d-2a9e4b7f3c03",
+} as const;
+
+interface ChampsDuModele {
   label: string;
-  category: string | null;
-  description: string | null;
+  category: string;
+  description: string;
   is_premium: boolean;
-  price: string | null;
+  price?: string;
   tags: string[];
-  signed_thumbnail_url: string | null;
-  signed_preview_url: string | null;
-  signed_full_url: string | null;
   views_count: number;
   uses_count: number;
   rating_avg: number;
   rating_count: number;
-  primary_color: string | null;
-  font_family: string | null;
+  primary_color: string;
+  font_family: string;
   has_photo: boolean;
-  cover_letters: {
-    id: number;
-    label: string;
-    signed_thumbnail_url: null;
-    signed_preview_url: null;
-    signed_full_url: null;
-  }[];
+  columns: number;
+  ats: { readiness: "good" | "warning"; warnings: string[] };
 }
 
-const SANS_IMAGE = {
-  signed_thumbnail_url: null,
-  signed_preview_url: null,
-  signed_full_url: null,
-} as const;
-
-function modele(
-  id: number,
-  champs: Pick<
-    ModeleSimule,
-    "name" | "label" | "category" | "description" | "is_premium"
-  > &
-    Partial<ModeleSimule>,
-): ModeleSimule {
+function modele(nom: NomDImage, champs: ChampsDuModele) {
+  const image = IMAGES[nom];
   return {
-    price: champs.is_premium ? "4.99" : null,
-    tags: [],
-    ...SANS_IMAGE,
-    views_count: 0,
-    uses_count: 0,
-    rating_avg: 0,
-    rating_count: 0,
-    primary_color: null,
-    font_family: null,
-    has_photo: false,
-    cover_letters: [],
-    id,
+    id: ID[nom],
+    name: nom,
+    price: null as string | null,
+    signed_thumbnail_url: image.vignette,
+    signed_preview_url: image.page,
+    signed_full_url: image.page,
+    thumbnail_blurhash: image.flou,
+    cover_letters: [] as never[],
+    version: 1,
+    formats: ["pdf", "docx"],
+    fields_added: ["headline"],
+    ats_safe_available: true,
     ...champs,
   };
 }
 
-const MODELES: ModeleSimule[] = [
-  modele(1, {
-    name: "classique",
-    label: "Classique",
-    category: "professionnel",
+const MODELES = [
+  modele("meridian", {
+    label: "Meridian",
+    category: "étudiant",
     description:
-      "Sobre et lisible : le modèle qui passe partout, du cabinet à l'atelier.",
+      "Formation d'abord, une colonne de repères et une frise discrète : quand le parcours commence.",
     is_premium: false,
-    tags: ["sobre", "ATS"],
-    views_count: 12_480,
-    uses_count: 3_215,
+    tags: ["sobre", "frise", "photo ronde"],
+    views_count: 15_030,
+    uses_count: 4_870,
     rating_avg: 4.6,
     rating_count: 418,
-    primary_color: "#1f2937",
-    font_family: "Inter",
+    primary_color: "#000000",
+    font_family: "Raleway",
+    has_photo: true,
+    columns: 2,
+    ats: { readiness: "warning", warnings: ["spaced_titles", "photo"] },
   }),
-  modele(2, {
-    name: "moderne",
-    label: "Moderne",
-    category: "créatif",
+  modele("marketing", {
+    label: "Marketing",
+    category: "professionnel",
     description:
-      "Une colonne de couleur, une photo : pour les métiers où l'on se montre.",
+      "Deux colonnes séparées de filets fins, un nom en grand : l'expérience se lit d'un coup d'œil.",
     is_premium: false,
-    tags: ["photo", "couleur"],
+    tags: ["épuré", "deux colonnes"],
     views_count: 9_870,
     uses_count: 2_104,
     rating_avg: 4.4,
     rating_count: 265,
-    primary_color: "#2563eb",
-    font_family: "Manrope",
-    has_photo: true,
-    cover_letters: [{ id: 21, label: "Lettre moderne", ...SANS_IMAGE }],
+    primary_color: "#3f3f46",
+    font_family: "Aileron",
+    has_photo: false,
+    columns: 2,
+    ats: { readiness: "good", warnings: [] },
   }),
-  modele(3, {
-    name: "elegant",
-    label: "Élégant",
-    category: "professionnel",
-    description: "Serif et marges larges : cadres, juristes, finance.",
+  modele("minimalist", {
+    label: "Minimalist",
+    category: "créatif",
+    description:
+      "Une typographie franche et une photo : pour les profils créatifs et de direction.",
     is_premium: true,
-    tags: ["serif", "cadre"],
+    price: "4.99",
+    tags: ["créatif", "photo", "direction"],
     views_count: 6_320,
     uses_count: 980,
     rating_avg: 4.8,
     rating_count: 142,
-    primary_color: "#7c2d12",
-    font_family: "Playfair Display",
-    cover_letters: [{ id: 31, label: "Lettre élégante", ...SANS_IMAGE }],
-  }),
-  modele(4, {
-    name: "compact",
-    label: "Compact",
-    category: "technique",
-    description:
-      "Tout tient sur une page, compétences en tête : développeurs, techniciens.",
-    is_premium: false,
-    tags: ["une page", "compétences"],
-    views_count: 7_750,
-    uses_count: 1_640,
-    rating_avg: 4.3,
-    rating_count: 201,
-    primary_color: "#0f766e",
-    font_family: "IBM Plex Sans",
-  }),
-  modele(5, {
-    name: "audacieux",
-    label: "Audacieux",
-    category: "créatif",
-    description: "Grands titres, aplats francs : design, communication, événementiel.",
-    is_premium: true,
-    tags: ["design", "photo"],
-    views_count: 4_110,
-    uses_count: 512,
-    rating_avg: 4.5,
-    rating_count: 88,
-    primary_color: "#db2777",
-    font_family: "Space Grotesk",
+    primary_color: "#1f1f1f",
+    font_family: "Montserrat",
     has_photo: true,
-  }),
-  modele(6, {
-    name: "etudiant",
-    label: "Premier emploi",
-    category: "étudiant",
-    description:
-      "Formation d'abord, stages et projets ensuite : quand l'expérience commence.",
-    is_premium: false,
-    tags: ["étudiant", "alternance"],
-    views_count: 15_030,
-    uses_count: 4_870,
-    rating_avg: 4.2,
-    rating_count: 530,
-    primary_color: "#4f46e5",
-    font_family: "Inter",
+    columns: 2,
+    ats: { readiness: "warning", warnings: ["photo", "multi_column"] },
   }),
 ];
+
+/** Les pages du carrousel du détail (`GET /templates/{id}`). */
+function pages(m: (typeof MODELES)[number]) {
+  return [
+    {
+      kind: "cv",
+      label: "CV",
+      signed_thumbnail_url: m.signed_thumbnail_url,
+      signed_full_url: m.signed_full_url,
+    },
+  ];
+}
 
 const AVIS = [
   {
@@ -194,9 +186,10 @@ const AVIS = [
   },
 ];
 
-/** Les modèles acquis par la personne : le « Classique » dès le départ,
- *  comme la V1 l'offrait à l'inscription. */
-const etat = { possedes: new Set<number>([1]) };
+/** Les modèles acquis par la personne : Meridian dès le départ, comme la
+ *  V1 offrait un modèle à l'inscription. */
+const DEPART = [ID.meridian];
+const etat = { possedes: new Set<string>(DEPART) };
 
 export function estUneRouteModele(chemin: string): boolean {
   const sansRequete = chemin.split("?")[0];
@@ -224,8 +217,8 @@ function champ(corps: unknown, nom: string): unknown {
     : undefined;
 }
 
-function possession(id: number) {
-  return { id: 1_000 + id, template: { id }, is_active: true };
+function possession(id: string) {
+  return { id: `possession-${id}`, template: { id }, is_active: true };
 }
 
 export function repondreModeles(
@@ -242,7 +235,7 @@ export function repondreModeles(
   }
 
   if (route === "POST /user-templates/me") {
-    const id = Number(champ(corps, "template_id"));
+    const id = String(champ(corps, "template_id"));
     const trouve = MODELES.find((m) => m.id === id);
     if (trouve === undefined) {
       return erreur(404, "template_not_found", "Modèle introuvable.", {
@@ -256,16 +249,18 @@ export function repondreModeles(
     return json(201, possession(id));
   }
 
-  const detail = /^(GET|POST) \/templates\/(\d+)(\/reviews|\/view)?$/.exec(route);
+  const detail = /^(GET|POST) \/templates\/([0-9a-f-]+)(\/reviews|\/view)?$/.exec(route);
   if (detail !== null) {
-    const id = Number(detail[2]);
+    const id = detail[2];
     const trouve = MODELES.find((m) => m.id === id);
     if (trouve === undefined) {
       return erreur(404, "template_not_found", "Modèle introuvable.", {
         template_id: id,
       });
     }
-    if (detail[1] === "GET" && detail[3] === undefined) return json(200, trouve);
+    if (detail[1] === "GET" && detail[3] === undefined) {
+      return json(200, { ...trouve, pages: pages(trouve) });
+    }
     if (detail[1] === "GET" && detail[3] === "/reviews") {
       return json(200, {
         items: trouve.rating_count > 0 ? AVIS : [],
@@ -283,5 +278,5 @@ export function repondreModeles(
 
 /** Pour les tests seulement : repart des possessions de départ. */
 export function reinitialiserModeles(): void {
-  etat.possedes = new Set([1]);
+  etat.possedes = new Set(DEPART);
 }
