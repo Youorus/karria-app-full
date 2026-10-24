@@ -33,6 +33,7 @@ import {
 } from "../services/presentation";
 import type {
   Fil,
+  ModeDuFil,
   FilBrut,
   Filtres,
   MatchBrut,
@@ -80,14 +81,21 @@ export function versOffre(brut: MatchBrut): Offre {
 /** La requête du fil. Le tri n'est pas envoyé : sans recherche, l'API trie
  *  toujours par fraîcheur, et avec une recherche par pertinence — ce qu'on
  *  veut dans les deux cas. `maintenant` est passé pour garder la fonction
- *  pure : la période de la V1 devient un instant `published_after`. */
+ *  pure : la période de la V1 devient un instant `published_after`.
+ *
+ *  `demande` est le mode voulu par la personne (« Toutes les offres » /
+ *  « Ma recherche ») ; absent, le serveur le déduit des critères.
+ *  `all_offers` garde la recherche et ses alertes : c'est tout ce qu'il
+ *  faut pour « mettre en pause » son affichage. */
 export function parametresDuFil(
   filtres: Filtres,
   offset: number,
   limit: number,
   maintenant: Date,
+  demande: ModeDuFil | null = null,
 ): string {
   const p = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (demande !== null) p.set("mode", demande === "recherche" ? "search" : "all_offers");
   if (filtres.sauvegardees) p.set("saved_only", "true");
   if (filtres.nonVues) p.set("unseen_only", "true");
   if (filtres.nonPostulees) p.set("unapplied_only", "true");
@@ -103,10 +111,11 @@ export function parametresDuFil(
 export async function lireFil(
   filtres: Filtres,
   offset: number,
+  demande: ModeDuFil | null = null,
   limit = 20,
 ): Promise<Fil> {
   const brut = await http.get<FilBrut>(
-    `/job-matches/me?${parametresDuFil(filtres, offset, limit, new Date())}`,
+    `/job-matches/me?${parametresDuFil(filtres, offset, limit, new Date(), demande)}`,
   );
   return {
     offres: brut.items.map(versOffre),

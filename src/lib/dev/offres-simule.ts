@@ -665,10 +665,12 @@ function versCriteres(c: Criteres) {
 
 /** La base du fil : toutes les offres, ou celles de la recherche — sans
  *  les écartées. */
-function baseDuFil(): { offre: OffreSimulee; score: number | null }[] {
+function baseDuFil(
+  parRecherche = etat.criteres !== null,
+): { offre: OffreSimulee; score: number | null }[] {
   const c = etat.criteres;
   const liste =
-    c === null
+    c === null || !parRecherche
       ? [...OFFRES]
           .sort((a, b) => a.heures - b.heures)
           .map((offre) => ({ offre, score: null as number | null }))
@@ -683,6 +685,13 @@ function filDesMatchs(chemin: string): Response {
   if (!(limit >= 1 && limit <= LIMITE_MAX) || offset < 0) {
     return erreur(422, "invalid_input", "Pagination invalide.");
   }
+  const demande = p.get("mode");
+  if (demande !== null && demande !== "all_offers" && demande !== "search") {
+    return erreur(422, "invalid_input", "Mode inconnu.");
+  }
+  // `all_offers` montre tout en gardant les critères (et leurs alertes) ;
+  // `search` sans critères retombe sur `all_offers`, comme le contrat.
+  const parRecherche = etat.criteres !== null && demande !== "all_offers";
   const contrats = p.get("contract_types")?.split(",").filter(Boolean) ?? [];
   const villes = p.get("cities")?.split(",").filter(Boolean) ?? [];
   // `published_within` prime sur `published_after`, comme le contrat le dit.
@@ -692,7 +701,7 @@ function filDesMatchs(chemin: string): Response {
     fenetre !== null && FENETRES[fenetre] !== undefined
       ? ilYa(FENETRES[fenetre]!)
       : p.get("published_after");
-  let liste = baseDuFil().filter(({ offre }) => {
+  let liste = baseDuFil(parRecherche).filter(({ offre }) => {
     const e = etatDe(offre.id);
     return (
       (p.get("saved_only") !== "true" || e.saved) &&
@@ -703,7 +712,7 @@ function filDesMatchs(chemin: string): Response {
       (depuis === null || ilYa(offre.heures) >= depuis)
     );
   });
-  if (p.get("sort") === "fresh" || etat.criteres === null) {
+  if (p.get("sort") === "fresh" || !parRecherche) {
     liste = [...liste].sort((a, b) => a.offre.heures - b.offre.heures);
   }
   const page = liste.slice(offset, offset + limit);
@@ -713,7 +722,7 @@ function filDesMatchs(chemin: string): Response {
     limit,
     offset,
     has_next: offset + page.length < liste.length,
-    mode: etat.criteres === null ? "all_offers" : "search",
+    mode: parRecherche ? "search" : "all_offers",
     criteria_summary: etat.criteres === null ? null : resumeDesCriteres(etat.criteres),
   });
 }

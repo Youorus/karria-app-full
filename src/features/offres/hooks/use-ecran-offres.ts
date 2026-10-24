@@ -100,7 +100,7 @@ export function useEcranOffres(): EcranOffres {
     marquerOuverte,
     rechargerApresRecherche,
     vue,
-    rechercheEnPause,
+    aUneRecherche,
     changerDeVue,
   } = fil;
 
@@ -133,10 +133,9 @@ export function useEcranOffres(): EcranOffres {
         ? `${nombre(total)} offre${total > 1 ? "s" : ""} pour toi`
         : `${nombre(total)} offres, les plus récentes d'abord`;
 
-  const selecteur =
-    mode === "recherche" || rechercheEnPause
-      ? { vue, resume: resumeRecherche, desactive: chargement, onChanger: changerDeVue }
-      : null;
+  const selecteur = aUneRecherche
+    ? { vue, resume: resumeRecherche, desactive: chargement, onChanger: changerDeVue }
+    : null;
 
   const filtresActifs =
     filtres.contrats.length +
