@@ -5,10 +5,10 @@ choix d'un modèle par la personne, l'export de son CV en **PDF** et en **DOCX**
 **score de compatibilité ATS** de chaque CV produit. Préfixe `/api/v1`, session exigée
 (`Authorization: Bearer`), erreurs au format `{ error: { code, message, details } }`.
 
-État : **proposé** (2026-10-24), d'après l'ADR-0020 de l'API — **rien n'est encore servi**
-par la v2 ; le faux serveur (`src/lib/dev/modeles-simule.ts`) reste la référence
-d'exécution jusqu'à la livraison. Le module de l'API qui portera ces routes attend la
-décision de Marc.
+État : **servi en production** depuis le 2026-10-24 (module `documents` de l'API,
+ADR-0020 acceptée). Modèles publiés : Meridian, Minimalist (Marketing est en revue, non
+listé). Les URL signées ne s'ouvrent depuis un téléphone qu'une fois
+`storage.karria.fr` en place (voir « URL signées » en bas).
 
 ## Ce qui change par rapport à la V1
 
@@ -80,18 +80,22 @@ Seuls les modèles **publiés** (passés par la porte de qualité de l'ADR-0020)
 - `ats_safe_available` : le modèle a une variante « optimisée ATS » (interlettrage
   resserré), proposée par le score quand elle aide.
 
-### Proposé par l'app (2026-10-24) — à valider par le backend
+### Proposé par l'app (2026-10-24) — **accepté et servi par le backend**
 
 - **`thumbnail_blurhash`** (`string | null`) : le [BlurHash](https://blurha.sh) de la
   vignette (composantes 4 × 5), calculé une fois à la publication du modèle. L'app
   l'affiche, flou, le temps que la vignette signée arrive (`expo-image`, `placeholder`).
   Facultatif : absent ou `null`, la carte montre une surface neutre. Le faux serveur
-  le sert déjà.
+  le sert déjà. **Backend :** calculé à l'ingestion (4 × 5 composantes, sur l'aperçu
+  pleine page), gardé avec la version publiée.
 - **Payant** : `is_premium` (+ `price`) suffit ; aucun champ de palier n'est
   nécessaire. L'app affiche ces modèles sous le nom **« Premium »** (pastille dorée,
   puce de filtre « Premium ») ; « Pro » n'apparaît plus nulle part dans l'interface.
 - L'app met les images en cache sous la clé `modele-<id>-v<version>` : `version` doit
   changer à chaque nouveau dessin, sans quoi l'ancien aperçu resterait affiché.
+  **Backend :** `version` est le numéro de la version publiée ; toute nouvelle analyse
+  du modèle (nouveau PDF, ou rendu amélioré) crée une version `+1`. Une version publiée
+  ne change jamais.
 
 ## `GET /templates/{id}` → `200 Modele`
 
@@ -204,6 +208,12 @@ Réponse (synchrone, 1 à 3 s) :
   « Karria · Puce »…), colonnes en tableau sans bordure. À cette étape, il n'a pas les
   ornements du PDF (frise, pastilles d'élément).
 
+- `ats.docx` (servi en plus) : `{ score, level, format: "docx", checks }`, le score du DOCX
+  quand il a été demandé ; `ats` lui-même porte le score du PDF (celui du DOCX si seul le
+  DOCX est demandé).
+- Variante « optimisée ATS » : interlettrage plafonné à **0,08 em** (mesuré : pdfminer,
+  que lisent beaucoup d'ATS, coupe les lettres au-delà de 0,1 em).
+
 Erreurs : `409 cv_missing`, `404 template_not_found`, `403 template_locked`,
 `422 invalid_input` (format inconnu), `422 tailoring_not_available`,
 `503 rendering_unavailable`.
@@ -236,3 +246,18 @@ défaut ; `format` dit lequel). `score` sur 100 ; `level` : `good` (≥ 85), `fa
 
 Un export garde la **version** du modèle qui l'a produit : le même document se reproduit
 à l'identique même après une nouvelle version du modèle.
+
+
+## Notes de service (backend, 2026-10-24)
+
+- `Possession` porte aussi `source` (`free`) et `acquired_at`.
+- `GET /templates/{id}/reviews` répond `{ items: [], total: 0, rating_avg, rating_count }` :
+  la v2 ne recueille pas encore d'avis.
+- Codes d'erreur : `details.reason` vaut `template_not_found` (404), `template_locked`
+  (403), `template_not_free` (422), `cv_missing` (409 `rule_violation`),
+  `tailoring_not_available` / `invalid_format` (422), `rendering_unavailable` (503),
+  `generated_cv_not_found` (404).
+- **URL signées** : tant que `storage.karria.fr` n'existe pas, les URL (vignettes,
+  aperçus, exports) sont signées pour l'adresse interne du stockage et ne s'ouvrent pas
+  depuis l'app. Rien à changer côté app : elles deviennent valides dès que le backend
+  pose `STORAGE__PUBLIC_ENDPOINT_URL`.
