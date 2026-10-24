@@ -6,8 +6,9 @@
  * Trois blocs, du plus intime au plus lointain, avec beaucoup d'air
  * entre eux : qui je suis (posé au centre, sans cadre), mon CV (une
  * ligne), un mot de l'équipe et son café (Karria reste gratuit).
- * Minimaliste et chaleureux, à la demande de Marc (2026-10-24) : pas
- * d'aura derrière, pas de dégradé, une seule touche de couleur chaude. L'apparence, les notifications, la
+ * Minimaliste et chaleureux, à la demande de Marc (2026-10-24) : une
+ * seule touche de couleur chaude, sur la même aura que les autres
+ * onglets — le fond fait l'unité de l'application. L'apparence, les notifications, la
  * déconnexion et la suppression sont derrière la roue, dans les
  * paramètres : ce sont des réglages de l'application, pas des faits sur
  * la personne.
@@ -23,6 +24,7 @@ import { ScrollView } from "react-native";
 import Animated, { FadeInDown, useReducedMotion } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { Aura } from "@/components/aura";
 import { BoutonEnTeteRond, EnTeteKarria } from "@/components/en-tete-karria";
 import { Icone } from "@/components/icone";
 import { Box } from "@/components/ui/box";
@@ -45,6 +47,7 @@ export function EcranProfil() {
     // `flex: 1` en style : le conteneur racine d'un écran, seule exception
     // admise à la règle §3.2.
     <Box style={{ flex: 1 }} className="bg-background">
+      <Aura />
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         <EnTeteKarria
           titre="Profil"
