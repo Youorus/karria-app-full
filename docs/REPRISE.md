@@ -33,7 +33,7 @@ vivante, animations.
 - `EXPO_PUBLIC_API_MODE` :
   - `simulation` : le faux serveur `lib/dev/serveur-simule.ts` répond, avec le code `000000` ;
   - `reel` : les requêtes partent vers le vrai serveur.
-- `EXPO_PUBLIC_API_URL` : la **production** `https://api.128-140-80-204.sslip.io/api/v1`
+- `EXPO_PUBLIC_API_URL` : la **production** `https://api.karria.fr/api/v1`
   (≈ 54 000 offres réelles) ; en local, `http://localhost:8001/api/v1`.
 - `EXPO_PUBLIC_API_CIBLE` :
   - `v2` : `karria_api_v2`. Seuls les modèles de CV (`/templates/`) partent
