@@ -5,8 +5,8 @@ recherche en cours, et gérer les alertes. Préfixe `/api/v1`, session exigée,
 erreurs `{ error: { code, message, details } }`. OpenAPI :
 `https://api.128-140-80-204.sslip.io/docs`.
 
-État : **en production** (2026-10-23). « Nouveau » = en cours de livraison ;
-champs absents = `null`/`[]` en attendant.
+État : **en production** (2026-10-23, `widenings` et `results_count` sans plafond
+compris). « Nouveau » = livré ce jour : l'app peut s'y appuyer.
 
 ## Le principe
 

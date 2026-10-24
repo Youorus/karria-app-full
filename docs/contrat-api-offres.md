@@ -7,9 +7,8 @@ La source de vérité exécutable est l'OpenAPI de l'API
 (`https://api.128-140-80-204.sslip.io/docs`) ; ce document dit ce que l'app
 doit en attendre et ce qui change par rapport à la V1.
 
-État : **en production** (2026-10-23). Les parties marquées « nouveau » sont
-en cours de livraison (même journée) ; l'app peut les coder, les champs
-absents valent `null`/`[]` tant qu'ils ne sont pas servis.
+État : **en production** (2026-10-23). Les parties marquées « nouveau »
+(`impressions`, `position`, `dwell_ms`) sont livrées ce jour.
 
 ## Ce qui change par rapport à la V1
 
@@ -39,7 +38,19 @@ absents valent `null`/`[]` tant qu'ils ne sont pas servis.
   relevance`, défaut) ou par fraîcheur (`sort=fresh`). Les mêmes filtres
   s'appliquent par-dessus.
 
-Le passage d'un mode à l'autre se fait en parlant à Karria (contrat
+Par défaut, le mode se **déduit** des critères. L'app peut aussi le
+**demander** par le paramètre `mode` (voir ci-dessous) : `mode=all_offers`
+montre toutes les offres alors que la recherche reste enregistrée et que
+ses **alertes restent actives** — c'est ainsi que l'app « met en pause »
+l'affichage de la recherche. Ne plus faire `DELETE` puis `PUT
+/search/criteria` pour cela : supprimer les critères coupe les alertes.
+`DELETE /search/criteria` ne sert qu'à abandonner vraiment la recherche.
+
+La réponse rend toujours le `mode` **réellement servi** (`search` demandé
+sans critères → `all_offers`) et `criteria_summary` dès que des critères
+existent, même en `all_offers`.
+
+La recherche elle-même se change en parlant à Karria (contrat
 `contrat-api-recherche.md`) ou par `PUT/DELETE /search/criteria`.
 
 ## `GET /job-matches/me` → `200 FeedPage`
@@ -57,6 +68,7 @@ Paramètres de requête, tous facultatifs et combinables (les listes en CSV) :
 | `contract_types` | CSV de `cdi, cdd, interim, alternance, stage, freelance, saisonnier` | |
 | `cities` | CSV de noms de ville (valeurs de `filter-options`) | |
 | `published_after` | ISO 8601 | publiées depuis |
+| `mode` | `all_offers` \| `search` | facultatif ; absent = déduit des critères. `all_offers` garde les critères et les alertes. Valeur inconnue → `422 invalid_input` |
 
 Le filtrage étendu (texte libre, rayon, départements, temps de travail,
 télétravail, expérience, salaire, source) et les facettes avec effectifs ont
@@ -111,6 +123,7 @@ Réponse :
 
 Contrats et villes présents dans le fil courant (mode `all_offers` : tout le
 corpus actif ; mode `search` : les offres retenues), avec leurs effectifs,
+— accepte le même paramètre `mode` que le fil, à passer à l'identique —
 triés par effectif décroissant. `value` se renvoie tel quel dans le paramètre
 du même nom.
 
