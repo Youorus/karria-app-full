@@ -9,29 +9,28 @@
  * **avec** le CV, et le dit quand il manque — « complète ton CV pour
  * voir ton nom ici » plutôt qu'un champ à saisir.
  *
- * ═══ L'avatar ═══
+ * ═══ Calme, au centre ═══
  *
- * Un disque de 76 points, cerné d'un anneau bleu : c'est la seule
- * « personne » de l'écran, et l'anneau la pose comme l'orbe pose Karria.
- * Les initiales viennent du service, jamais vides.
+ * Plus de cadre ni de pastille (2026-10-24, Marc : « minimaliste et très
+ * chaleureux ») : la personne est posée au centre, sur le fond, avec de
+ * l'air autour. Un disque de 84 points cerné d'un anneau caramel, les
+ * initiales sur la crème du café ; le nom, le métier en texte simple,
+ * l'adresse en retrait. Les initiales viennent du service, jamais vides.
  */
 
 import { Image } from "expo-image";
 
-import { Icone } from "@/components/icone";
 import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
-import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
-import { useCouleurs } from "@/theme/use-couleurs";
 
 import type { Identite } from "../services/identite";
 
-const TAILLE_AVATAR = 76;
+const TAILLE_AVATAR = 84;
 
 function Avatar({ identite }: { identite: Identite }) {
   return (
-    <Box className="rounded-full border-2 border-primary p-1">
+    <Box className="rounded-full border border-border-chaleur p-1.5">
       {identite.photo !== null ? (
         <Image
           source={{ uri: identite.photo }}
@@ -46,11 +45,11 @@ function Avatar({ identite }: { identite: Identite }) {
         />
       ) : (
         <Box
-          className="items-center justify-center rounded-full bg-primary"
+          className="items-center justify-center rounded-full bg-surface-chaleur"
           style={{ width: TAILLE_AVATAR, height: TAILLE_AVATAR }}
           accessibilityLabel={`Initiales ${identite.initiales}`}
         >
-          <Texte className="font-display text-title-lg text-primary-foreground">
+          <Texte className="font-display text-title-lg text-chaleur">
             {identite.initiales}
           </Texte>
         </Box>
@@ -66,58 +65,48 @@ interface Props {
 }
 
 export function CarteIdentite({ identite, email }: Props) {
-  const couleurs = useCouleurs();
-
   return (
-    <HStack className="items-center gap-4 rounded-lg border border-border-subtle bg-card p-5">
+    <VStack className="items-center gap-4 py-4">
       {identite === null ? (
         <Box
-          className="rounded-full bg-remplissage"
-          style={{ width: TAILLE_AVATAR + 12, height: TAILLE_AVATAR + 12 }}
+          className="rounded-full bg-remplissage-doux"
+          style={{ width: TAILLE_AVATAR + 14, height: TAILLE_AVATAR + 14 }}
         />
       ) : (
         <Avatar identite={identite} />
       )}
-      <VStack className="flex-1 gap-1">
+      <VStack className="items-center gap-1">
         {identite === null ? (
           <>
-            <Box className="h-6 w-40 rounded-full bg-remplissage" />
-            <Box className="h-4 w-24 rounded-full bg-remplissage-doux" />
+            <Box className="h-6 w-40 rounded-full bg-remplissage-doux" />
+            <Box className="h-4 w-28 rounded-full bg-remplissage-doux" />
           </>
         ) : (
           <>
             <Texte
               accessibilityRole="header"
-              className="font-display text-title-sm tracking-tight text-foreground"
+              className="text-center font-display text-title-sm tracking-tight text-foreground"
               numberOfLines={2}
             >
               {identite.nom}
             </Texte>
-            {identite.titre !== null ? (
-              <Box className="self-start rounded-pastille bg-surface-primary px-2.5 py-1">
-                <Texte className="font-bold text-caption text-primary" numberOfLines={1}>
-                  {identite.titre}
-                </Texte>
-              </Box>
-            ) : (
-              <Texte className="text-footnote text-foreground-faint">
-                Ton nom et ton métier viendront de ton CV.
-              </Texte>
-            )}
+            <Texte
+              className="text-center text-body text-muted-foreground"
+              numberOfLines={1}
+            >
+              {identite.titre ?? "Ton nom et ton métier viendront de ton CV."}
+            </Texte>
           </>
         )}
         {email !== null ? (
-          <HStack className="items-center gap-1.5 pt-1">
-            <Icone nom="arobase" couleur={couleurs.estompe} taille={13} />
-            <Texte
-              className="flex-1 text-footnote text-muted-foreground"
-              numberOfLines={1}
-            >
-              {email}
-            </Texte>
-          </HStack>
+          <Texte
+            className="pt-1 text-center text-footnote text-foreground-faint"
+            numberOfLines={1}
+          >
+            {email}
+          </Texte>
         ) : null}
       </VStack>
-    </HStack>
+    </VStack>
   );
 }

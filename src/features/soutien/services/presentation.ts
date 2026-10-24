@@ -16,15 +16,14 @@
 import type { OffreDeCafe, Tasses } from "../types/soutien.types";
 
 export const TEXTES = {
-  surtitre: "Offrir un café",
-  titre: "Karria reste gratuit. Pour toujours.",
-  invitation:
-    "On est une petite équipe qui construit Karria avec passion, tard le soir et tôt le matin. Si l'app t'aide dans ta recherche, tu peux nous offrir un café : c'est ce qui nous fait tenir, et avancer plus vite.",
-  promesse: "Rien à débloquer, rien à perdre : tout reste gratuit, pour tout le monde.",
+  surtitre: "Un mot de l'équipe",
+  message:
+    "Karria, c'est une toute petite équipe qui y met beaucoup de cœur. L'app restera gratuite, pour tout le monde. Si elle t'aide un peu dans ta recherche, un café nous ferait vraiment plaisir.",
+  signature: "— L'équipe Karria",
   bientot: "Les cafés arrivent avec la prochaine version de l'app.",
-  merciTitre: "Merci, du fond du cœur !",
+  merciTitre: "Merci, vraiment.",
   merciTexte:
-    "Ton café vient d'arriver chez l'équipe. Il va servir à rendre Karria encore meilleur — on file coder. Et bonne chance pour ta recherche.",
+    "Ton café est bien arrivé. Il nous donne de l'élan pour rendre Karria encore meilleur. Bonne chance pour ta recherche.",
   encoreUn: "En offrir un autre",
 } as const;
 
