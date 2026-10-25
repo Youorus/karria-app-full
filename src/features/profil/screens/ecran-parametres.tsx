@@ -56,6 +56,8 @@ export function EcranParametres() {
     changerTheme,
     notifications,
     gererNotifications,
+    choixPublicitaires,
+    gererChoixPublicitaires,
     lire,
     seDeconnecter,
     supprimerLeCompte,
@@ -148,6 +150,14 @@ export function EcranParametres() {
                 titre="Politique de confidentialité"
                 onPress={() => lire("confidentialite")}
               />
+              {choixPublicitaires ? (
+                <LigneReglage
+                  icone="bouclier"
+                  titre="Choix publicitaires"
+                  detail="Ce que les annonces peuvent utiliser."
+                  onPress={gererChoixPublicitaires}
+                />
+              ) : null}
               <LigneReglage icone="info" titre="Version" detail={`Karria v${version}`} />
             </GroupeReglages>
           </Animated.View>

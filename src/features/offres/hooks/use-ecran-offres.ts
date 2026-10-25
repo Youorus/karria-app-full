@@ -22,11 +22,14 @@
  * offres » apparaît sous l'en-tête et permet d'aller et venir.
  */
 
-import { useNavigation } from "expo-router";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ViewabilityConfigCallbackPairs, ViewToken } from "react-native";
 
 import { useMenuCompte } from "@/features/auth/hooks/use-menu-compte";
+import type { NativeAd } from "@/features/publicite/api/publicite.api";
+import { useAnnoncesDeListe } from "@/features/publicite/hooks/use-annonces-de-liste";
+import { entrelacer, REGLE_DU_FIL } from "@/features/publicite/services/regles-publicite";
 import { useNavigationUnique } from "@/lib/navigation";
 import { noterDetailOuvert } from "../api/offres.api";
 import type { Offre } from "../types/offres.types";
@@ -35,6 +38,8 @@ import { useFilOffres, type FilOffres, type VueDuFil } from "./use-fil-offres";
 
 export type ElementDuFil =
   | { type: "offre"; offre: Offre; rang: number }
+  /** Une annonce native déjà chargée (`features/publicite`). */
+  | { type: "annonce"; emplacement: number; annonce: NativeAd }
   | { type: "plus"; nombre: number }
   | { type: "separateur" };
 
@@ -90,6 +95,21 @@ export function useEcranOffres(): EcranOffres {
     navigation.setOptions({ tabBarStyle: agentOuvert ? { display: "none" } : undefined });
   }, [navigation, agentOuvert]);
 
+  // `?karria=1` : une notification de type `assistant` ouvre le rideau.
+  // L'ouverture suit le changement du paramètre pendant le rendu (et non
+  // dans un effet, qui rendrait deux fois) ; le paramètre est ensuite
+  // effacé, sinon Karria se rouvrirait au prochain retour sur l'onglet.
+  const { karria } = useLocalSearchParams<{ karria?: string }>();
+  const routeur = useRouter();
+  const [karriaVu, setKarriaVu] = useState<string | undefined>(undefined);
+  if (karria !== karriaVu) {
+    setKarriaVu(karria);
+    if (karria === "1") setAgentOuvert(true);
+  }
+  useEffect(() => {
+    if (karria === "1") routeur.setParams({ karria: undefined });
+  }, [karria, routeur]);
+
   const {
     offres,
     total,
@@ -104,14 +124,24 @@ export function useEcranOffres(): EcranOffres {
     changerDeVue,
   } = fil;
 
+  // Les annonces se glissent parmi les offres principales seulement, et
+  // n'existent dans la liste qu'une fois chargées (aucun trou).
+  const nombrePrincipales = offres.filter((o) => o.qualite !== "basse").length;
+  const annonces = useAnnoncesDeListe(nombrePrincipales, REGLE_DU_FIL);
+
   const elements = useMemo<ElementDuFil[]>(() => {
     const principales = offres.filter((o) => o.qualite !== "basse");
     const autres = offres.filter((o) => o.qualite === "basse");
-    const liste: ElementDuFil[] = principales.map((offre, rang) => ({
-      type: "offre",
-      offre,
-      rang,
-    }));
+    const liste = entrelacer<ElementDuFil>(
+      principales.map((offre, rang) => ({ type: "offre", offre, rang })),
+      new Map(
+        [...annonces].map(([emplacement, annonce]) => [
+          emplacement,
+          { type: "annonce", emplacement, annonce },
+        ]),
+      ),
+      REGLE_DU_FIL,
+    );
     if (autres.length === 0) return liste;
     if (!autresVisibles) return [...liste, { type: "plus", nombre: autres.length }];
     return [
@@ -123,7 +153,7 @@ export function useEcranOffres(): EcranOffres {
         rang: principales.length + i,
       })),
     ];
-  }, [offres, autresVisibles]);
+  }, [offres, autresVisibles, annonces]);
 
   const sousTitre = chargement
     ? "Recherche en cours…"

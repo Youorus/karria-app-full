@@ -5,6 +5,61 @@
 
 **Dernière mise à jour : 2026-10-25**
 
+## Session du 2026-10-25 (suite) — notifications de niveau « grande app », AdMob, tuile sans logo
+
+- **Tuile d'entreprise** : les initiales sur leur teinte sont toujours dessinées ; le logo se
+  pose par-dessus (tuile blanche) seulement à `onLoad`. Plus de tuile blanche vide pendant le
+  chargement ; cadre fixe, aucun saut.
+- **Notifications** (`features/notifications`, contrat **`docs/contrat-notifications.md`**,
+  partagé avec l'API, commit API `0f96581`) :
+  - charge v1 `{ v, type, id?, count?, campaign?, url }` ; 9 types ; validée par
+    `services/routeur-notifications.ts` (`lireNotification`, `destinationDe` → pile d'écrans,
+    repli `url` puis fil) ;
+  - `services/aiguilleur.ts` (pur, testé) : dédoublonnage (identifiant + issue) du lancement à
+    froid, attente de la session / de la navigation / des écrans d'entrée (`peutNaviguer`),
+    destination la plus récente gardée ;
+  - `hooks/use-centre-notifications.ts`, monté à la **racine** (`CentreDeNotifications` dans
+    `app/_layout.tsx`) : premier plan = bannière interne (6 s, `components/banniere-notification.tsx`,
+    plus de bannière système), arrière-plan, lancement à froid ; pile reconstruite
+    (`dismissAll` → onglet → détail) ; pastille effacée à l'ouverture et au retour au premier plan ;
+  - canaux Android `offres` (haute), `documents`, `compte` (+ `defaut`) ; catégories iOS
+    homonymes à `customDismissAction` ;
+  - mesure : port `services/analytique.ts` (journal en dev) — `received` (premier plan),
+    `opened`, `dismissed` (bannière, iOS) ; aucun fournisseur branché ;
+  - `assistant` ouvre le rideau Karria via `/offres?karria=1` (`use-ecran-offres`).
+  - `use-appareil-connecte` ne fait plus que l'enregistrement de l'appareil.
+- **AdMob** (`features/publicite`, nouveau domaine) — dépendances `react-native-google-mobile-ads`
+  ~17.4.0 et `expo-tracking-transparency` ~57.0.2 (accord de Marc) :
+  - ordre UMP (`gatherConsent`) → ATT (iOS, appareil réel) → configuration → `initialize`,
+    lancé 2,5 s après l'affichage du fil (jamais au premier écran) ; non personnalisées si refus ;
+  - réserve (`hooks/reserve-annonces.ts`) : requêtes une par une (700 ms), un emplacement = une
+    annonce, préchargement de tous les emplacements du fil ;
+  - règles (`services/regles-publicite.ts`) : jamais en tête, une toutes les 7 offres
+    (`EXPO_PUBLIC_ADMOB_FEED_INTERVAL`, borné 4–20), plafond 8 par liste ; une annonce absente
+    n'entre pas dans la liste (aucun trou) ;
+  - `components/carte-annonce.tsx` : carte native au style des offres, « Sponsorisé » visible,
+    AdChoices en haut à droite ; pas de média (vidéo non affichée) ;
+  - blocs : test en dev/`EXPO_PUBLIC_ADMOB_TEST_MODE=true`, réels via
+    `EXPO_PUBLIC_ADMOB_NATIVE_IOS` / `_ANDROID` (posés dans `eas.json` production, IDs V1) ;
+    absents en production → pas de pub ;
+  - Paramètres : ligne « Choix publicitaires » quand UMP l'exige (EEE) ;
+  - IDs d'application V1 dans `app.json` (plugin) ; `prebuild` + `pod install` faits.
+  - Pas d'annonce dans Karria ni le CV ; pas d'interstitiel ni de récompensée. Galerie Modèles :
+    non faite (optionnelle).
+- **Marc doit** : héberger `https://karria.fr/app-ads.txt` =
+  `google.com, pub-3330048630750788, DIRECT, f08c47fec0942fa0` ; publier dans AdMob
+  (Confidentialité et messages) un message **RGPD** (et l'explication IDFA iOS) pour les deux
+  applications ; vérifier que les blocs natifs V1 sont toujours actifs ; renseigner l'URL du
+  développeur (karria.fr) dans les fiches App Store / Play.
+- **Vérifié sur le simulateur iPhone 17** (build natif refait) : l'app démarre, logos et
+  initiales dans le fil, annonces natives de **test** affichées (« Sponsorisé », AdChoices),
+  validateur AdMob « No implementation issues found » — avec un intervalle forcé à 1 le temps de
+  la capture, remis à 7 avant commit. En mode test, un échec d'UMP n'empêche pas les annonces
+  (non personnalisées) ; en production, il les coupe.
+- **Non vérifié** : un vrai toucher de notification (appareil physique requis — pas de jeton sur
+  simulateur), les canaux Android, l'effacement iOS, la bannière interne en conditions réelles,
+  le formulaire UMP (dépend du message publié dans la console), Android en général.
+
 ## Session du 2026-10-25 — logos des entreprises
 
 - `company.logo` (128 px) et `company.logo_large` (256 px) : WebP carrés servis par
@@ -37,7 +92,7 @@ vivante, animations.
 | Zone                       | État                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Connexion                  | Google, Apple, code e-mail ; session à rotation (`lib/http.ts`, `lib/session.ts`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Notifications              | Écran d'activation à la 1re connexion. Enregistrement de l'appareil à chaque ouverture, retrait à la déconnexion. Une notification touchée ouvre son `data.url` (`features/notifications`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Notifications              | Écran d'activation à la 1re connexion. Enregistrement de l'appareil à chaque ouverture, retrait à la déconnexion. Contrat v1 typé (`docs/contrat-notifications.md`), routeur + aiguilleur, bannière interne, canaux, pastille (`features/notifications`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Offres                     | **Branchées sur la production** (`docs/contrat-api-offres.md`) : identifiants UUID, deux modes du fil (toutes les offres récentes / recherche) ; sélecteur « Ma recherche / Toutes les offres » sous l'en-tête dès que le serveur rend un `criteria_summary`. Changer de vue ne change que le paramètre `mode` (`all_offers` / `search`) de `GET /job-matches/me` : les critères restent, **les alertes restent actives** (plus de `DELETE`/`PUT /search/criteria`, plus de stockage sur l'appareil — `recherche-en-pause.ts` supprimé le 2026-10-24). Une nouvelle recherche Karria remet le mode « déduit ». Offres vues envoyées par lots, écarter une offre depuis le détail. Pas d'analyse par offre dans la V2. La feuille de filtres reste celle de la V1.                                                                                                                                                                                                                                                                                                                                                                         |
 | Karria                     | `POST /assistant/messages` au contrat `docs/contrat-api-recherche.md` : statut, réponses rapides et élargissements comptés en capsules sous la réponse, « Voir les N offres » referme le rideau sur un fil rechargé.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Modèles                    | Onglet et détail au contrat `docs/contrat-api-modeles.md` (UUID, `pages`, corps de `POST /user-templates/me` réduit à `template_id`). **Servis par le faux serveur** `lib/dev/modeles-simule.ts` : `/templates/` répond 404 en production (vérifié le 2026-10-24). Il sert les 3 modèles du PoC (Meridian, Marketing, Minimalist) avec leurs **vrais aperçus** (WebP dans `lib/dev/modeles/`, absents du paquet de production) et un `thumbnail_blurhash` (champ **proposé** au contrat). **Bascule** : ajouter `"/templates/"` et `"/user-templates/"` à `SERVI_PAR_LA_V2` (`lib/dev/serveur-simule.ts`), rien d'autre. Images `expo-image` en cache mémoire+disque, clé `modele-<id>-v<version>`. Ouverture : zoom natif sur iOS 18+, zoom Reanimated mesuré (`hooks/use-ouverture-modele.ts`) sur Android, aucun en mouvement réduit ; le détail s'affiche aussitôt depuis la galerie (`modeleConnu`). Pastille et puce « Premium » (or, jetons `premium-texte`, `surface-premium`, `border-premium`). Lien `karria://modeles?categorie=étudiant`. Puces : hauteur fixe, défileur `grow-0 shrink-0` (corrige l'étirement à une carte). |
@@ -85,6 +140,7 @@ npx expo run:ios --device <UDID simulateur>
   - plugin `@react-native-google-signin/google-signin` avec `iosUrlScheme` ;
   - `extra.eas.projectId` (le projet EAS de la V1, même slug `karria`), nécessaire au jeton de notification.
 - Dépendances ajoutées le 2026-10-21 : `expo-audio`, `expo-image-picker`, `expo-notifications`, `expo-device`.
+- Dépendances ajoutées le 2026-10-25 : `react-native-google-mobile-ads`, `expo-tracking-transparency` (natives, plugins dans `app.json`).
 - Dépendances ajoutées le 2026-10-23 : `expo-document-picker` (import de CV), `@shopify/react-native-skia` (orbe). Toutes deux natives : `prebuild` + `pod install` faits, build installé sur le simulateur iPhone 17 (`53F41CC0-710B-40C4-AB4B-8F6942FF60DF`).
 
 ## Ce qui reste (par priorité)

@@ -22,12 +22,20 @@
  * Dans les trois cas : `null`, une ligne de journal, et l'application
  * continue. L'utilisateur n'a rien à faire d'un jeton.
  *
- * ═══ Au premier plan, la bannière s'affiche quand même ═══
+ * ═══ Au premier plan, c'est la bannière de Karria qui s'affiche ═══
  *
- * Par défaut, iOS n'affiche rien si l'application est ouverte. Or une
- * offre qui tombe pendant qu'on relit son CV mérite d'être vue : on
- * demande la bannière, sans son ni badge — Karria prévient, elle ne
- * sonne pas.
+ * Application ouverte, le système ne montre pas sa bannière (elle
+ * couvrirait l'écran avec une mise en forme étrangère et sans retour
+ * possible) : `use-centre-notifications` dessine la sienne, et la
+ * notification reste rangée dans le centre de notifications. Ni son ni
+ * pastille — Karria prévient, elle ne sonne pas.
+ *
+ * ═══ Un canal par famille ═══
+ *
+ * `offres`, `documents`, `compte` (`CANAUX`) : la personne peut couper
+ * les alertes d'offres sans perdre « ton CV est prêt ». Sur iOS, la même
+ * famille est une catégorie, avec `customDismissAction` pour que
+ * l'effacement d'une notification soit signalé (mesure).
  */
 
 import Constants from "expo-constants";
@@ -41,22 +49,79 @@ import {
 } from "@/lib/installation";
 
 import type { PermissionPush } from "../types/appareils.types";
+import type { CanalNotification } from "../types/notifications.types";
 
-/** Le canal Android de tout ce que Karria envoie. Un seul : les offres
- *  du jour et le CV prêt méritent la même attention, ni plus ni moins. Le
- *  nom est celui de `app.json` (`defaultChannel`). */
+/** Le canal des notifications sans `channelId` — anciennes versions de
+ *  l'API, test d'Expo. Le nom est celui de `app.json` (`defaultChannel`). */
 export const CANAL_ANDROID = "defaut";
+
+/** Les familles, telles que la personne les voit dans les réglages
+ *  Android. L'importance haute des offres fait descendre la bannière : une
+ *  offre fraîche part vite. */
+const CANAUX: Record<
+  CanalNotification,
+  { nom: string; description: string; importance: Notifications.AndroidImportance }
+> = {
+  offres: {
+    nom: "Nouvelles offres",
+    description: "Les offres qui correspondent à ta recherche, dès qu'elles paraissent.",
+    importance: Notifications.AndroidImportance.HIGH,
+  },
+  documents: {
+    nom: "CV et modèles",
+    description: "Ton CV ou ton export quand il est prêt, les nouveaux modèles.",
+    importance: Notifications.AndroidImportance.DEFAULT,
+  },
+  compte: {
+    nom: "Compte",
+    description: "Ce qui concerne ton compte Karria.",
+    importance: Notifications.AndroidImportance.DEFAULT,
+  },
+};
+
+/** L'action qu'iOS rapporte quand une notification est effacée sans être
+ *  ouverte (catégorie à `customDismissAction`). Constante d'Apple,
+ *  `UNNotificationDismissActionIdentifier`, qu'Expo transmet telle quelle. */
+const ACTION_EFFACEE = "com.apple.UNNotificationDismissActionIdentifier";
 
 /** À appeler au chargement de la racine, avant toute notification. */
 export function configurerLaReception(): void {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowBanner: true,
+      shouldShowBanner: false,
       shouldShowList: true,
       shouldPlaySound: false,
       shouldSetBadge: false,
     }),
   });
+}
+
+/**
+ * Canaux Android et catégories iOS. Idempotent, donc appelé à chaque
+ * démarrage : un canal ajouté par une mise à jour existe avant la première
+ * notification qui le vise.
+ */
+export async function preparerLesFamilles(): Promise<void> {
+  try {
+    await preparerLeCanalAndroid();
+    for (const famille of Object.keys(CANAUX) as CanalNotification[]) {
+      await Notifications.setNotificationCategoryAsync(famille, [], {
+        customDismissAction: true,
+      });
+    }
+  } catch (cause) {
+    console.warn("[karria] familles de notifications non préparées", cause);
+  }
+}
+
+/** La pastille de l'icône s'efface quand on ouvre l'application : ce
+ *  qu'elle annonçait est désormais sous les yeux. */
+export async function effacerLaPastille(): Promise<void> {
+  try {
+    await Notifications.setBadgeCountAsync(0);
+  } catch (cause) {
+    console.warn("[karria] pastille non effacée", cause);
+  }
 }
 
 function versPermission(
@@ -85,7 +150,7 @@ export async function lirePermission(): Promise<PermissionPush> {
 /** Pose la question au système. Sur Android 13+, c'est la boîte
  *  `POST_NOTIFICATIONS` ; avant, le système accorde d'office. */
 export async function demanderPermission(): Promise<PermissionPush> {
-  await preparerLeCanalAndroid();
+  await preparerLesFamilles();
   return versPermission(
     await Notifications.requestPermissionsAsync({
       ios: { allowAlert: true, allowBadge: true, allowSound: true },
@@ -94,14 +159,21 @@ export async function demanderPermission(): Promise<PermissionPush> {
 }
 
 /** Sans canal, Android 8+ n'affiche rien. Idempotent : le recréer avec
- *  les mêmes réglages ne change rien. */
+ *  les mêmes réglages ne change rien (seuls nom et description se mettent
+ *  à jour ; l'importance appartient à la personne une fois créée). */
 async function preparerLeCanalAndroid(): Promise<void> {
   if (Platform.OS !== "android") return;
   await Notifications.setNotificationChannelAsync(CANAL_ANDROID, {
-    name: "Offres et CV",
-    description: "Les offres qui te correspondent et ton CV quand il est prêt.",
+    name: "Autres notifications",
     importance: Notifications.AndroidImportance.DEFAULT,
   });
+  for (const [id, canal] of Object.entries(CANAUX)) {
+    await Notifications.setNotificationChannelAsync(id, {
+      name: canal.nom,
+      description: canal.description,
+      importance: canal.importance,
+    });
+  }
 }
 
 /** L'identifiant du projet EAS, s'il existe : `eas init` l'écrit dans
@@ -136,20 +208,50 @@ export function surChangementDeJeton(rappel: () => void): () => void {
   return () => abonnement.remove();
 }
 
-/** Les données d'une notification touchée — `data.url`, entre autres. */
-export type DonneesNotification = Record<string, unknown>;
-
-function donneesDe(reponse: Notifications.NotificationResponse): DonneesNotification {
-  return reponse.notification.request.content.data ?? {};
+/** Une réponse du système, dans les termes de l'aiguilleur. */
+export interface ReponseSysteme {
+  identifiant: string;
+  donnees: unknown;
+  issue: "ouverte" | "ecartee";
 }
 
-/** Prévenu quand l'utilisateur touche une notification, application
- *  ouverte ou en arrière-plan. Rend la désinscription. */
-export function surNotificationTouchee(
-  rappel: (donnees: DonneesNotification) => void,
-): () => void {
+function versReponse(reponse: Notifications.NotificationResponse): ReponseSysteme {
+  const requete = reponse.notification.request;
+  return {
+    identifiant: requete.identifier,
+    donnees: requete.content.data ?? {},
+    issue: reponse.actionIdentifier === ACTION_EFFACEE ? "ecartee" : "ouverte",
+  };
+}
+
+/** Une notification reçue **application ouverte**. */
+export interface NotificationRecue {
+  identifiant: string;
+  titre: string | null;
+  corps: string | null;
+  donnees: unknown;
+}
+
+/** Prévenu à chaque notification reçue au premier plan. Rend la
+ *  désinscription. */
+export function surNotificationRecue(rappel: (n: NotificationRecue) => void): () => void {
+  const abonnement = Notifications.addNotificationReceivedListener((notification) => {
+    const { identifier, content } = notification.request;
+    rappel({
+      identifiant: identifier,
+      titre: content.title,
+      corps: content.body,
+      donnees: content.data ?? {},
+    });
+  });
+  return () => abonnement.remove();
+}
+
+/** Prévenu quand l'utilisateur touche (ou, sur iOS, efface) une
+ *  notification, application ouverte ou en arrière-plan. */
+export function surReponse(rappel: (reponse: ReponseSysteme) => void): () => void {
   const abonnement = Notifications.addNotificationResponseReceivedListener((reponse) =>
-    rappel(donneesDe(reponse)),
+    rappel(versReponse(reponse)),
   );
   return () => abonnement.remove();
 }
@@ -157,15 +259,15 @@ export function surNotificationTouchee(
 /**
  * La notification qui a **lancé** l'application, s'il y en a une.
  *
- * Elle est effacée aussitôt lue : sans cela, chaque remontage du garde la
- * relirait, et l'écran de l'offre se rouvrirait tout seul.
+ * Effacée aussitôt lue, pour qu'un remontage ne la relise pas ; et
+ * l'aiguilleur garde sa clé, au cas où l'écouteur la livrerait aussi.
  */
-export async function notificationQuiALance(): Promise<DonneesNotification | null> {
+export async function notificationQuiALance(): Promise<ReponseSysteme | null> {
   try {
     const reponse = await Notifications.getLastNotificationResponseAsync();
     if (reponse === null) return null;
     await Notifications.clearLastNotificationResponseAsync();
-    return donneesDe(reponse);
+    return versReponse(reponse);
   } catch (cause) {
     console.warn("[karria] notification de lancement illisible", cause);
     return null;

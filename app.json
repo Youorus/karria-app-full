@@ -81,6 +81,21 @@
           "cameraPermission": "Karria peut prendre une photo pour ton CV, seulement si tu le choisis.",
           "microphonePermission": false
         }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3330048630750788~4848202843",
+          "iosAppId": "ca-app-pub-3330048630750788~8188149229",
+          "delayAppMeasurementInit": true,
+          "userTrackingUsageDescription": "Karria est gratuite grâce aux annonces. Si tu l'acceptes, elles correspondront mieux à tes centres d'intérêt. Sinon, tu en verras autant, mais moins ciblées."
+        }
+      ],
+      [
+        "expo-tracking-transparency",
+        {
+          "userTrackingPermission": "Karria est gratuite grâce aux annonces. Si tu l'acceptes, elles correspondront mieux à tes centres d'intérêt. Sinon, tu en verras autant, mais moins ciblées."
+        }
       ]
     ],
     "experiments": {

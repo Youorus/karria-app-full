@@ -103,7 +103,7 @@ local. Non simulée côté app.
   reçu en erreur `DeviceNotRegistered`, lu un quart d'heure plus tard, le
   détache aussi. L'appareil reste connu, sans jeton, jusqu'à sa prochaine
   déclaration.
-- Le contenu des notifications (`title`, `body`, `data`) est décidé par le
-  module qui a quelque chose à dire ; `data` ne contient que des chaînes,
-  et c'est ce que l'app lit à l'ouverture (`type`, écran, identifiant).
-  Aucun gabarit n'est fixé par ce contrat.
+- Le titre et le corps sont décidés par le module qui a quelque chose à
+  dire ; **la charge `data`, le canal et la pastille suivent le contrat
+  versionné `docs/contrat-notifications.md`**, produit par un seul
+  constructeur typé côté API.

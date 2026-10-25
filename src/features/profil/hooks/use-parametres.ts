@@ -30,6 +30,10 @@ import { ouvrirDocument, type Document } from "@/features/auth/services/document
 import { synchroniserAppareil } from "@/features/notifications/hooks/synchroniser-appareil";
 import { lirePermission } from "@/features/notifications/services/notifications";
 import type { PermissionPush } from "@/features/notifications/types/appareils.types";
+import {
+  choixDeConfidentialiteRequis,
+  ouvrirLesChoixDeConfidentialite,
+} from "@/features/publicite/api/publicite.api";
 import { useNavigationUnique } from "@/lib/navigation";
 import { VERSION } from "@/lib/version";
 import { useTheme, type Theme } from "@/theme/preference";
@@ -42,6 +46,9 @@ export interface Parametres {
   /** Refusées → les réglages du téléphone ; jamais demandées → l'écran
    *  qui les propose ; accordées → les réglages, pour les ajuster. */
   gererNotifications: () => void;
+  /** UMP exige une entrée « gérer mes choix » (EEE) : la ligne s'affiche. */
+  choixPublicitaires: boolean;
+  gererChoixPublicitaires: () => void;
   lire: (document: Document) => void;
   seDeconnecter: () => void;
   supprimerLeCompte: () => void;
@@ -55,6 +62,19 @@ export function useParametres(): Parametres {
   const { pousser, remplacer } = useNavigationUnique();
   const router = useRouter();
   const [notifications, setNotifications] = useState<PermissionPush | null>(null);
+  const [choixPublicitaires, setChoixPublicitaires] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      let vivant = true;
+      void choixDeConfidentialiteRequis().then((requis) => {
+        if (vivant) setChoixPublicitaires(requis);
+      });
+      return () => {
+        vivant = false;
+      };
+    }, []),
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -101,6 +121,16 @@ export function useParametres(): Parametres {
     changerTheme,
     notifications,
     gererNotifications,
+    choixPublicitaires,
+    gererChoixPublicitaires: useCallback(() => {
+      ouvrirLesChoixDeConfidentialite().catch((cause: unknown) => {
+        console.warn("[karria] choix publicitaires non ouverts", cause);
+        Alert.alert(
+          "Choix publicitaires indisponibles",
+          "Vérifie ta connexion, puis réessaie.",
+        );
+      });
+    }, []),
     lire: useCallback((document: Document) => void ouvrirDocument(document), []),
     seDeconnecter,
     supprimerLeCompte: useCallback(() => pousser("/compte/supprimer"), [pousser]),

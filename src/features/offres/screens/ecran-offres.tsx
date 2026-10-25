@@ -34,6 +34,7 @@ import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
 import { RideauAgent } from "@/features/assistant/components/rideau-agent";
+import { CarteAnnonce } from "@/features/publicite/components/carte-annonce";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import { BoutonKarria } from "../components/bouton-karria";
@@ -124,7 +125,11 @@ export function EcranOffres() {
                 ref={liste}
                 data={elements}
                 keyExtractor={(el, i) =>
-                  el.type === "offre" ? String(el.offre.id) : `${el.type}-${i}`
+                  el.type === "offre"
+                    ? String(el.offre.id)
+                    : el.type === "annonce"
+                      ? `annonce-${el.emplacement}`
+                      : `${el.type}-${i}`
                 }
                 renderItem={({ item }) =>
                   item.type === "offre" ? (
@@ -135,6 +140,8 @@ export function EcranOffres() {
                       onOuvrir={() => ouvrirOffre(item.offre)}
                       onGarder={() => garder(item.offre)}
                     />
+                  ) : item.type === "annonce" ? (
+                    <CarteAnnonce annonce={item.annonce} />
                   ) : item.type === "plus" ? (
                     <Pressable
                       onPress={voirLesAutres}

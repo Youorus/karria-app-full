@@ -7,9 +7,13 @@
  * blanche (`fond-logo`) dans les deux modes : un logo transparent à texte
  * sombre resterait illisible sur le fond de nuit.
  *
- * Le repli sur les initiales couvre deux cas : pas de logo (`null`), et un
- * logo qui ne se charge pas (`onError`) — une tuile vide serait pire que
- * des initiales.
+ * Les initiales sur leur teinte sont **toujours** dessinées, et le logo
+ * se pose par-dessus, sur sa tuile blanche, seulement une fois chargé
+ * (`onLoad`). Trois cas sont ainsi couverts sans trou : pas de logo
+ * (`null`), un logo qui ne se charge pas (`onError`), et un logo **en
+ * cours** de chargement — avant, la tuile restait blanche et vide le temps
+ * du réseau. Le cadre a une taille fixe : l'arrivée du logo ne déplace
+ * rien autour.
  */
 
 import { Image } from "expo-image";
@@ -35,9 +39,12 @@ interface Props {
 }
 
 export function TuileEntreprise({ logo, entreprise, teinte, taille, cle }: Props) {
-  // L'URL qui a échoué : si l'offre affichée change, son nouveau logo est retenté.
-  const [echec, setEchec] = useState<string | null>(null);
-  const afficheLogo = logo !== null && echec !== logo;
+  // L'issue du dernier chargement, liée à son URL : quand la cellule est
+  // recyclée pour une autre offre, l'issue de l'ancienne ne vaut plus rien.
+  const [issue, setIssue] = useState<{ url: string; charge: boolean } | null>(null);
+  const issueActuelle = issue !== null && issue.url === logo ? issue : null;
+  const tenteLogo = logo !== null && issueActuelle?.charge !== false;
+  const logoVisible = issueActuelle?.charge === true;
   const cadre =
     taille === "carte"
       ? "h-[54px] w-[54px] rounded-tuile"
@@ -45,30 +52,35 @@ export function TuileEntreprise({ logo, entreprise, teinte, taille, cle }: Props
 
   return (
     <Box
-      className={`${cadre} shrink-0 items-center justify-center overflow-hidden border border-border-subtle ${
-        afficheLogo ? "bg-fond-logo p-1.5" : ""
-      }`}
+      className={`${cadre} shrink-0 items-center justify-center overflow-hidden border border-border-subtle`}
       // La teinte est calculée : une donnée, pas une valeur de charte.
-      style={afficheLogo ? undefined : { backgroundColor: teinteDeTuile(teinte) }}
+      style={{ backgroundColor: teinteDeTuile(teinte) }}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={entreprise ?? "Entreprise"}
     >
-      {afficheLogo ? (
-        <Image
-          source={{ uri: logo }}
-          style={{ width: "100%", height: "100%" }}
-          contentFit="contain"
-          cachePolicy="memory-disk"
-          transition={FONDU_MS}
-          recyclingKey={cle}
-          onError={() => setEchec(logo)}
-          accessibilityLabel={entreprise ?? "Logo de l'entreprise"}
-        />
-      ) : (
-        <Texte
-          className={`font-display text-on-scrim ${taille === "carte" ? "text-title-sm" : "text-title"}`}
+      <Texte
+        className={`font-display text-on-scrim ${taille === "carte" ? "text-title-sm" : "text-title"}`}
+      >
+        {initiales(entreprise)}
+      </Texte>
+      {tenteLogo ? (
+        <Box
+          className={`absolute inset-0 p-1.5 ${logoVisible ? "bg-fond-logo" : ""}`}
+          pointerEvents="none"
         >
-          {initiales(entreprise)}
-        </Texte>
-      )}
+          <Image
+            source={{ uri: logo }}
+            style={{ width: "100%", height: "100%" }}
+            contentFit="contain"
+            cachePolicy="memory-disk"
+            transition={FONDU_MS}
+            recyclingKey={cle}
+            onLoad={() => setIssue({ url: logo, charge: true })}
+            onError={() => setIssue({ url: logo, charge: false })}
+          />
+        </Box>
+      ) : null}
     </Box>
   );
 }

@@ -40,6 +40,7 @@ import { RenvoiClavier } from "@/components/renvoi-clavier";
 import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
 import { FournisseurDeSession, useSession } from "@/features/auth/hooks/use-session";
 import { EcranChargement } from "@/features/demarrage/screens/ecran-chargement";
+import { CentreDeNotifications } from "@/features/notifications/components/centre-notifications";
 import { configurerLaReception } from "@/features/notifications/services/notifications";
 import { FOND } from "@/theme";
 import { FournisseurDeTheme, useTheme } from "@/theme/preference";
@@ -136,6 +137,9 @@ function Portail() {
             entre dans l'application, on ne « va » pas quelque part. */}
         <Stack.Screen name="(app)" options={{ animation: "fade" }} />
       </Stack>
+      {/* Au-dessus de la navigation : les notifications touchées avant la
+          session y attendent, et la bannière du premier plan s'y pose. */}
+      <CentreDeNotifications />
     </>
   );
 }

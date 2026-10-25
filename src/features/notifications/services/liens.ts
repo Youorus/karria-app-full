@@ -1,9 +1,13 @@
 /**
  * Du lien porté par une notification au chemin de l'application.
  *
- * ═══ Le contrat ═══
+ * ═══ Le repli du contrat ═══
  *
- * Le serveur met dans `data.url` un lien au schéma de l'application —
+ * Depuis le contrat v1 (`docs/contrat-notifications.md`), c'est le
+ * `type` qui décide (`routeur-notifications.ts`). L'`url` reste dans la
+ * charge pour les versions qui ne lisent qu'elle, et sert ici de repli
+ * quand le type n'est pas compris. Le serveur y met un lien au schéma de
+ * l'application —
  * `karria://offre/150279` — ou, demain, un lien universel
  * `https://karria.fr/offre/150279`. Les deux désignent la même route :
  * `/offre/150279`. C'est ce chemin qu'on donne au routeur.
