@@ -35,7 +35,7 @@ doit en attendre et ce qui change par rapport à la V1.
   `match_quality`, `origin` valent `null`, `reasons` est vide.
 - `search` — une recherche existe (`criteria_summary` la résume en une
   ligne) : les offres retenues pour elle, triées par pertinence (`sort=
-  relevance`, défaut) ou par fraîcheur (`sort=fresh`). Les mêmes filtres
+relevance`, défaut) ou par fraîcheur (`sort=fresh`). Les mêmes filtres
   s'appliquent par-dessus.
 
 Par défaut, le mode se **déduit** des critères. L'app peut aussi le
@@ -57,18 +57,18 @@ La recherche elle-même se change en parlant à Karria (contrat
 
 Paramètres de requête, tous facultatifs et combinables (les listes en CSV) :
 
-| Paramètre | Type | Sens |
-| --- | --- | --- |
-| `limit` | 1–50, défaut 20 | taille de page |
-| `offset` | ≥ 0 | décalage ; `has_next` dit s'il reste des pages |
-| `sort` | `relevance` \| `fresh` | mode `search` seulement ; `all_offers` est toujours par fraîcheur |
-| `saved_only` | bool | les offres gardées (toutes, même expirées) |
-| `unseen_only` | bool | jamais affichées |
-| `unapplied_only` | bool | pas encore postulées |
-| `contract_types` | CSV de `cdi, cdd, interim, alternance, stage, freelance, saisonnier` | |
-| `cities` | CSV de noms de ville (valeurs de `filter-options`) | |
-| `published_after` | ISO 8601 | publiées depuis |
-| `mode` | `all_offers` \| `search` | facultatif ; absent = déduit des critères. `all_offers` garde les critères et les alertes. Valeur inconnue → `422 invalid_input` |
+| Paramètre         | Type                                                                 | Sens                                                                                                                             |
+| ----------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `limit`           | 1–50, défaut 20                                                      | taille de page                                                                                                                   |
+| `offset`          | ≥ 0                                                                  | décalage ; `has_next` dit s'il reste des pages                                                                                   |
+| `sort`            | `relevance` \| `fresh`                                               | mode `search` seulement ; `all_offers` est toujours par fraîcheur                                                                |
+| `saved_only`      | bool                                                                 | les offres gardées (toutes, même expirées)                                                                                       |
+| `unseen_only`     | bool                                                                 | jamais affichées                                                                                                                 |
+| `unapplied_only`  | bool                                                                 | pas encore postulées                                                                                                             |
+| `contract_types`  | CSV de `cdi, cdd, interim, alternance, stage, freelance, saisonnier` |                                                                                                                                  |
+| `cities`          | CSV de noms de ville (valeurs de `filter-options`)                   |                                                                                                                                  |
+| `published_after` | ISO 8601                                                             | publiées depuis                                                                                                                  |
+| `mode`            | `all_offers` \| `search`                                             | facultatif ; absent = déduit des critères. `all_offers` garde les critères et les alertes. Valeur inconnue → `422 invalid_input` |
 
 Le filtrage étendu (texte libre, rayon, départements, temps de travail,
 télétravail, expérience, salaire, source) et les facettes avec effectifs ont
@@ -94,23 +94,48 @@ Réponse :
 
 ```json
 {
-  "id": "uuid", "job_offer_id": "uuid",
-  "score_normalized": 0.93, "match_quality": "high", "reasons": ["CDI", "Lyon · 4 km"],
-  "origin": "search", "is_new": true,
-  "feed_seen": false, "detail_opened": false, "saved": false, "applied": false, "dismissed": false,
+  "id": "uuid",
+  "job_offer_id": "uuid",
+  "score_normalized": 0.93,
+  "match_quality": "high",
+  "reasons": ["CDI", "Lyon · 4 km"],
+  "origin": "search",
+  "is_new": true,
+  "feed_seen": false,
+  "detail_opened": false,
+  "saved": false,
+  "applied": false,
+  "dismissed": false,
   "job_offer": {
-    "id": "uuid", "title": "Cuisinier H/F", "summary": null,
-    "excerpt": "Les premières lignes…", "description": null,
-    "company": { "name": "…", "logo": "https://…", "website": null },
+    "id": "uuid",
+    "title": "Cuisinier H/F",
+    "summary": null,
+    "excerpt": "Les premières lignes…",
+    "description": null,
+    "company": {
+      "name": "…",
+      "logo": "https://storage.karria.fr/karria-production-logos/<hash>/128.webp",
+      "logo_large": "https://storage.karria.fr/karria-production-logos/<hash>/256.webp",
+      "website": null
+    },
     "city": { "name": "Lyon", "postal_code": "69003" },
-    "location_label": "Lyon 3e", "department_code": "69",
-    "latitude": 45.76, "longitude": 4.84,
+    "location_label": "Lyon 3e",
+    "department_code": "69",
+    "latitude": 45.76,
+    "longitude": 4.84,
     "contract_type": { "code": "cdi", "label": "CDI" },
-    "remote": null, "schedule": "temps_plein", "experience": "debutant",
-    "salary_raw": "2 000 € brut/mois", "salary_min_monthly": 2000, "salary_max_monthly": null,
-    "published_at": "2026-10-23T05:12:00Z", "is_alternance": false,
-    "apply_url": "https://…", "origin_url": "https://…",
-    "source": "france_travail", "is_active": true
+    "remote": null,
+    "schedule": "temps_plein",
+    "experience": "debutant",
+    "salary_raw": "2 000 € brut/mois",
+    "salary_min_monthly": 2000,
+    "salary_max_monthly": null,
+    "published_at": "2026-10-23T05:12:00Z",
+    "is_alternance": false,
+    "apply_url": "https://…",
+    "origin_url": "https://…",
+    "source": "france_travail",
+    "is_active": true
   }
 }
 ```
@@ -118,6 +143,22 @@ Réponse :
 `match_quality` : `high` (« Très alignée »), `medium`, `low` (« À explorer »),
 `null` hors recherche. `remote`, `schedule`, `experience`, `contract_type`,
 `company`, `city` valent `null` quand l'annonce ne le dit pas.
+
+### Le logo de l'entreprise (2026-10-25)
+
+- `company.logo` : logo **carré 128 px** en WebP, `company.logo_large` : le même
+  en **256 px**. Les deux sont hébergés par Karria (`storage.karria.fr`, bucket
+  public en lecture seule) ; l'URL d'origine de la source (Indeed, HelloWork,
+  France Travail, LinkedIn…) n'est **plus jamais** servie — elle expirait et
+  exposait l'IP de la personne au site tiers.
+- L'URL porte l'**empreinte du contenu** : un logo qui change change d'URL.
+  Un fichier servi est donc immuable (`Cache-Control: public, max-age=31536000,
+immutable`) — l'app le garde en cache mémoire + disque sans revalider.
+- Carré déjà rogné, marges comprises, fond transparent possible : l'app le
+  pose sur une tuile blanche (`fond-logo`) dans les deux modes.
+- `null` (pas de logo, ou logo refusé par la porte de qualité) → **initiales**
+  sur une teinte calculée. Un logo qui ne se charge pas retombe aussi sur les
+  initiales. Les cartes lisent `logo` ; le détail `logo_large ?? logo`.
 
 ## `GET /job-matches/me/filter-options` → `200 FilterOptions`
 
@@ -158,23 +199,23 @@ champs par appel.
 Corps partiel ; les champs absents ne changent rien ; `422 interaction_empty`
 si rien ne change.
 
-| Champ | Type | Sens |
-| --- | --- | --- |
-| `saved` | bool | garder / ne plus garder |
-| `applied` | bool | postulé / finalement non |
-| `dismissed` | bool | écarter : l'offre quitte le fil et n'y revient plus (réversible en renvoyant `false`) |
-| `detail_opened` | `true` | la fiche a été ouverte ; ne redescend jamais |
-| `link_clicked` | `true` | le lien de candidature a été ouvert ; ne redescend jamais |
-| `position` **nouveau** | entier ≥ 0 | la place de la carte au moment du geste (voir `seen`) |
-| `dwell_ms` **nouveau** | entier ≥ 0 | temps passé sur la fiche quand elle se ferme, en ms |
+| Champ                  | Type       | Sens                                                                                  |
+| ---------------------- | ---------- | ------------------------------------------------------------------------------------- |
+| `saved`                | bool       | garder / ne plus garder                                                               |
+| `applied`              | bool       | postulé / finalement non                                                              |
+| `dismissed`            | bool       | écarter : l'offre quitte le fil et n'y revient plus (réversible en renvoyant `false`) |
+| `detail_opened`        | `true`     | la fiche a été ouverte ; ne redescend jamais                                          |
+| `link_clicked`         | `true`     | le lien de candidature a été ouvert ; ne redescend jamais                             |
+| `position` **nouveau** | entier ≥ 0 | la place de la carte au moment du geste (voir `seen`)                                 |
+| `dwell_ms` **nouveau** | entier ≥ 0 | temps passé sur la fiche quand elle se ferme, en ms                                   |
 
 Ces deux derniers champs ne changent rien à l'affichage : ils nourrissent
 l'apprentissage du classement (ADR-0019). Les envoyer quand on les connaît.
 
 ## Erreurs
 
-| Code HTTP | `error.code` | Quand |
-| --- | --- | --- |
-| 401 | `unauthenticated` | session absente ou expirée |
-| 404 | `offer_not_found` | `{id}` inconnu |
-| 422 | `invalid_input` | paramètre hors bornes, `interaction_empty`, lieu incomplet (`lat` sans `lng`) |
+| Code HTTP | `error.code`      | Quand                                                                         |
+| --------- | ----------------- | ----------------------------------------------------------------------------- |
+| 401       | `unauthenticated` | session absente ou expirée                                                    |
+| 404       | `offer_not_found` | `{id}` inconnu                                                                |
+| 422       | `invalid_input`   | paramètre hors bornes, `interaction_empty`, lieu incomplet (`lat` sans `lng`) |

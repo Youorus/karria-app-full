@@ -49,6 +49,7 @@ export function versOffre(brut: MatchBrut): Offre {
     titre: offre.title,
     entreprise: offre.company?.name ?? null,
     logo: offre.company?.logo ?? null,
+    logoGrand: offre.company?.logo_large ?? null,
     lieu: offre.location_label ?? offre.city?.name ?? null,
     ville: offre.city?.name ?? null,
     codePostal: offre.city?.postal_code ?? null,

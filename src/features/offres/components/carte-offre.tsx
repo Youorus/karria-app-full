@@ -24,7 +24,6 @@
  * 97 %. Le geste « mouvement réduit » coupe l'entrée.
  */
 
-import { Image } from "expo-image";
 import { Pressable } from "react-native";
 import Animated, {
   FadeInDown,
@@ -42,13 +41,8 @@ import { VStack } from "@/components/ui/vstack";
 import { SALAIRE } from "@/theme";
 import { useCouleurs } from "@/theme/use-couleurs";
 
-import {
-  contratCourt,
-  ilYa,
-  initiales,
-  salaireLisible,
-  teinteDeTuile,
-} from "../services/presentation";
+import { contratCourt, ilYa, salaireLisible } from "../services/presentation";
+import { TuileEntreprise } from "./tuile-entreprise";
 import type { Offre } from "../types/offres.types";
 
 /** Le ressort par défaut de la V1 (`Animation.spring`). */
@@ -123,29 +117,13 @@ export function CarteOffre({ offre, rang, maintenant, onOuvrir, onGarder }: Prop
           >
             {/* 1. L'entreprise, le titre, le signet */}
             <HStack space="md" className="items-center">
-              <Box
-                className="h-[54px] w-[54px] items-center justify-center overflow-hidden rounded-tuile border border-border-subtle"
-                // La teinte est calculée à partir du rang : une donnée, pas une
-                // valeur de charte (voir `teinteDeTuile`).
-                style={
-                  offre.logo === null
-                    ? { backgroundColor: teinteDeTuile(rang) }
-                    : undefined
-                }
-              >
-                {offre.logo !== null ? (
-                  <Image
-                    source={{ uri: offre.logo }}
-                    style={{ width: "75%", height: "75%" }}
-                    contentFit="contain"
-                    accessibilityLabel={offre.entreprise ?? "Logo de l'entreprise"}
-                  />
-                ) : (
-                  <Texte className="font-display text-title-sm text-on-scrim">
-                    {initiales(offre.entreprise)}
-                  </Texte>
-                )}
-              </Box>
+              <TuileEntreprise
+                logo={offre.logo}
+                entreprise={offre.entreprise}
+                teinte={rang}
+                taille="carte"
+                cle={offre.id}
+              />
               <VStack className="flex-1">
                 <HStack space="xs" className="items-center">
                   <Texte

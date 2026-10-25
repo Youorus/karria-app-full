@@ -3,7 +3,20 @@
 > Document de passation. À lire en premier par toute personne ou IA qui
 > reprend le travail, avec `AGENTS.md`. Mis à jour à chaque fin de session.
 
-**Dernière mise à jour : 2026-10-24 (nuit)**
+**Dernière mise à jour : 2026-10-25**
+
+## Session du 2026-10-25 — logos des entreprises
+
+- `company.logo` (128 px) et `company.logo_large` (256 px) : WebP carrés servis par
+  `storage.karria.fr`, adressés par empreinte, immuables (contrat
+  `docs/contrat-api-offres.md` § « Le logo de l'entreprise »).
+- Composant `features/offres/components/tuile-entreprise.tsx`, partagé par la carte
+  (`logo`, `recyclingKey` = id de l'offre) et le détail (`logoGrand ?? logo`) :
+  `expo-image` cache mémoire + disque, fondu 180 ms, `contain` sur tuile blanche
+  (jeton `fond-logo`, blanc dans les deux modes) ; repli sur les initiales si
+  l'URL est `null` **ou** si le chargement échoue (`onError`).
+- Type `Offre` : champ `logoGrand` ; le faux serveur sert `logo_large`.
+- Non vérifié sur Android ni en mode clair au moment du commit.
 
 ## Où on en est
 

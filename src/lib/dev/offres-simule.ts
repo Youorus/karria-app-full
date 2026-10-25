@@ -547,7 +547,7 @@ function versOffre(o: OffreSimulee, detail: boolean) {
     summary: null,
     excerpt: extrait(o.description),
     description: detail ? o.description : null,
-    company: { name: o.company, logo: o.logo, website: null },
+    company: { name: o.company, logo: o.logo, logo_large: o.logo, website: null },
     city: { name: o.city, postal_code: o.postal_code },
     location_label: etiquetteLieu(o),
     department_code: o.department_code,

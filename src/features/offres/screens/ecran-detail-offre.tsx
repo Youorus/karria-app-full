@@ -21,7 +21,6 @@
  * plutôt que d'apparaître d'un bloc.
  */
 
-import { Image } from "expo-image";
 import { Pressable, ScrollView } from "react-native";
 import Animated, { FadeInDown, useReducedMotion } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -40,14 +39,9 @@ import { SALAIRE, SUR_PRIMAIRE } from "@/theme";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import { BlocAnalyse } from "../components/bloc-analyse";
+import { TuileEntreprise } from "../components/tuile-entreprise";
 import { useDetailOffre } from "../hooks/use-detail-offre";
-import {
-  contratCourt,
-  initiales,
-  libelleSource,
-  salaireLisible,
-  teinteDeTuile,
-} from "../services/presentation";
+import { contratCourt, libelleSource, salaireLisible } from "../services/presentation";
 
 function Etiquette({
   icone,
@@ -140,28 +134,12 @@ export function EcranDetailOffre() {
           >
             <Animated.View entering={entree(0)}>
               <HStack space="md" className="items-center">
-                <Box
-                  className="h-[68px] w-[68px] shrink-0 items-center justify-center overflow-hidden rounded-[20px] border border-border-subtle"
-                  // Teinte calculée de l'identifiant, comme le détail de la V1.
-                  style={
-                    offre.logo === null
-                      ? { backgroundColor: teinteDeTuile(offre.id) }
-                      : undefined
-                  }
-                >
-                  {offre.logo !== null ? (
-                    <Image
-                      source={{ uri: offre.logo }}
-                      style={{ width: "80%", height: "80%" }}
-                      contentFit="contain"
-                      accessibilityLabel={offre.entreprise ?? "Logo de l'entreprise"}
-                    />
-                  ) : (
-                    <Texte className="font-display text-title text-on-scrim">
-                      {initiales(offre.entreprise)}
-                    </Texte>
-                  )}
-                </Box>
+                <TuileEntreprise
+                  logo={offre.logoGrand ?? offre.logo}
+                  entreprise={offre.entreprise}
+                  teinte={offre.id}
+                  taille="detail"
+                />
                 <VStack space="xs" className="flex-1">
                   <Texte className="font-bold text-footnote uppercase tracking-widest text-muted-foreground">
                     {offre.entreprise ?? "Entreprise"}

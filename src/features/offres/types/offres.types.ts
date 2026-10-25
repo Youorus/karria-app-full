@@ -40,7 +40,14 @@ export interface OffreBrute {
   excerpt: string;
   /** Le texte de l'annonce (Markdown léger) — détail seulement. */
   description: string | null;
-  company: { name: string; logo: string | null; website: string | null } | null;
+  company: {
+    name: string;
+    /** Logo carré 128 px (WebP) servi par `storage.karria.fr`, ou `null`. */
+    logo: string | null;
+    /** Le même en 256 px, pour le détail, ou `null`. */
+    logo_large: string | null;
+    website: string | null;
+  } | null;
   city: { name: string; postal_code: string | null } | null;
   /** À afficher tel quel : « Lyon 3e », « Nanterre (92) ». */
   location_label: string | null;
@@ -120,7 +127,10 @@ export interface Offre {
   id: string;
   titre: string;
   entreprise: string | null;
+  /** Logo 128 px (cartes), `null` → initiales. */
   logo: string | null;
+  /** Logo 256 px (détail), `null` → on retombe sur `logo`. */
+  logoGrand: string | null;
   /** Le lieu prêt à afficher (`location_label`), sinon la ville. */
   lieu: string | null;
   ville: string | null;

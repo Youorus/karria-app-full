@@ -145,6 +145,9 @@
     --color-scrim-fort: #0f172abf;
     --color-on-scrim: #ffffff;
     --color-on-scrim-doux: #ffffffcc;
+    /* La tuile d'un logo d'entreprise : blanche dans les deux modes — un logo
+       transparent à texte sombre doit rester lisible sur le fond de nuit. */
+    --color-fond-logo: #ffffff;
     --color-inverse: #0f172a;
     --color-inverse-foreground: #f5f3f0;
   }
@@ -234,6 +237,7 @@
     --color-scrim-fort: #000000bf;
     --color-on-scrim: #ffffff;
     --color-on-scrim-doux: #ffffffcc;
+    --color-fond-logo: #ffffff;
     --color-inverse: #f5f3f0;
     --color-inverse-foreground: #0e0d0c;
   }
