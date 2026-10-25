@@ -16,7 +16,16 @@
   (jeton `fond-logo`, blanc dans les deux modes) ; repli sur les initiales si
   l'URL est `null` **ou** si le chargement échoue (`onError`).
 - Type `Offre` : champ `logoGrand` ; le faux serveur sert `logo_large`.
-- Non vérifié sur Android ni en mode clair au moment du commit.
+- **Vérifié sur le simulateur iPhone 17 (iOS, mode sombre) contre la production** : le fil
+  affiche les logos (PROMAN, Tereva…) et les initiales à défaut. Le client de développement
+  installé datait d'avant `@shopify/react-native-skia` (écran rouge `RNSkiaModule`) : il a
+  fallu `npx expo run:ios --device <udid> --no-bundler`. À refaire après tout ajout de module
+  natif.
+- Côté API, un domaine ne fournit d'icône que si le nom s'y lit : le logo d'`iziwork.com`
+  affiché pour PROMAN (vu sur le simulateur) a été corrigé en production.
+- Non vérifié sur Android ni en mode clair.
+- Des modifications non commitées d'une autre main sont dans l'arbre (`app.json`, `eas.json`,
+  `package.json`, `docs/contrat-api-appareils.md`…) : laissées telles quelles.
 
 ## Où on en est
 
