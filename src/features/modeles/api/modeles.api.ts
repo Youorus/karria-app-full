@@ -22,7 +22,8 @@ import type {
 } from "../types/modeles.types";
 
 function versApercus(brut: ModeleBrut): Apercu[] {
-  if (brut.pages !== undefined && brut.pages.length > 0) {
+  // La galerie renvoie `pages: null` (le détail seul les porte).
+  if (brut.pages != null && brut.pages.length > 0) {
     return brut.pages.map((p, i) => ({
       cle: `${p.kind}-${i}`,
       type: p.kind === "cv" ? "cv" : "lettre",

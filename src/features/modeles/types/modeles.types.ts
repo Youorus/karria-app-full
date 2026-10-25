@@ -46,7 +46,7 @@ export interface ModeleBrut {
   has_photo: boolean;
   cover_letters?: LettreBrute[];
   /** Seulement dans le détail. */
-  pages?: PageBrute[];
+  pages?: PageBrute[] | null;
   version?: number;
 }
 
