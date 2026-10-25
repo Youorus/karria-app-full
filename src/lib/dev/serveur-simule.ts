@@ -38,12 +38,11 @@ import { estUneRouteCv, repondreCv } from "./cv-simule";
 import { estUneRouteModele, repondreModeles } from "./modeles-simule";
 import { estUneRouteOffres, repondreOffres } from "./offres-simule";
 
-/** Ce que `karria_api_v2` sert déjà — en production depuis 2026-10-23 :
- *  la session, les appareils, le CV, la voix, le fil d'offres, Karria et
- *  la recherche. Seuls les modèles de CV (`/templates/`,
- *  `/user-templates/`) restent au faux serveur, en développement, tant
- *  que leur module n'existe pas : on retire la dernière ligne quand il
- *  sera livré. */
+/** Ce que `karria_api_v2` sert — en production depuis 2026-10-23 : la
+ *  session, les appareils, le CV, la voix, le fil d'offres, Karria, la
+ *  recherche et, depuis 2026-10-25, les modèles de CV (`/templates/`,
+ *  `/user-templates/`). Le faux serveur ne répond plus qu'en mode
+ *  simulation. */
 const SERVI_PAR_LA_V2 = [
   "/auth/",
   "/devices/",
@@ -52,6 +51,8 @@ const SERVI_PAR_LA_V2 = [
   "/job-matches/",
   "/assistant/",
   "/search/",
+  "/templates/",
+  "/user-templates/",
 ];
 
 /** Les routes que le contrat définit avant que le backend visé ne les
