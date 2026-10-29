@@ -23,10 +23,24 @@
  * seconde avec moins de marge, et un écran peu dense (ratio < 2,5)
  * trahit un appareil modeste. Entre 120 et 2 600 : en dessous, la sphère
  * se lit comme une poignée de points ; au-dessus, le gain ne se voit plus.
+ *
+ * Le **palier visuel** de l'appareil (`hooks/qualite-visuelle.ts`) module
+ * encore : un appareil moyen reçoit 60 % des grains, un appareil modeste
+ * 35 % et un plafond bien plus bas — chaque grain coûte deux calculs par
+ * image sur le fil d'interface et une estampe au GPU.
  */
+
+import type { PalierVisuel } from "@/hooks/qualite-visuelle";
 
 export const PARTICULES_MIN = 120;
 export const PARTICULES_MAX = 2_600;
+
+/** Part des grains et plafond par palier. */
+export const PALIERS: Record<PalierVisuel, { part: number; plafond: number }> = {
+  haut: { part: 1, plafond: PARTICULES_MAX },
+  moyen: { part: 0.6, plafond: 1_400 },
+  bas: { part: 0.35, plafond: 600 },
+};
 
 /** La part des particules qui gravitent **autour** de la sphère, comme
  *  les grains épars de la référence, plutôt qu'à sa surface. */
@@ -36,10 +50,12 @@ export function nombreDeParticules(
   taille: number,
   plateforme: "ios" | "android" | string,
   densite: number,
+  palier: PalierVisuel = "haut",
 ): number {
   const base = taille * taille * 0.25;
   const facteur = plateforme === "android" ? (densite < 2.5 ? 0.45 : 0.7) : 1;
-  return Math.round(Math.min(PARTICULES_MAX, Math.max(PARTICULES_MIN, base * facteur)));
+  const { part, plafond } = PALIERS[palier];
+  return Math.round(Math.min(plafond, Math.max(PARTICULES_MIN, base * facteur * part)));
 }
 
 /** La graine d'une particule : sa direction sur la sphère unité, sa phase

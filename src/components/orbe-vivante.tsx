@@ -30,14 +30,25 @@
  * la cadence change. L'amplitude de l'ondulation suit le niveau audio
  * quand Karria écoute.
  *
- * ═══ La batterie ═══
+ * ═══ La batterie, et les appareils modestes ═══
  *
  * L'horloge s'arrête quand l'écran n'est plus au premier plan, quand
  * l'application passe en arrière-plan, et quand le système demande moins
  * de mouvement — l'orbe reste alors une image fixe, sans tourbillon qui
- * tourne. Le nombre de grains dépend de la taille et de l'appareil
- * (voir `orbe-particules.ts`) ; les états changent la vitesse, jamais le
- * nombre.
+ * tourne. Le nombre de grains dépend de la taille, de l'appareil et de son
+ * **palier visuel** (`orbe-particules.ts`, `hooks/qualite-visuelle.ts`) ;
+ * les états changent la vitesse, jamais le nombre.
+ *
+ * Ce qui coûte, par image : deux passes de trigonométrie par grain sur le
+ * fil d'interface (≈ 0,3 µs chacune : 2 600 grains ≈ 1,5 ms), une estampe
+ * par grain au GPU (bon marché, un seul appel), et surtout le **flou
+ * gaussien** du tourbillon — un calque hors écran de la taille de la
+ * boîte, flouté sur un rayon de 14 % de la sphère, soit ~17 px pour l'orbe
+ * de 120 pt : sur un GPU d'entrée de gamme c'est le poste le plus lourd.
+ * Palier **moyen** : flou réduit de moitié et 60 % des grains. Palier
+ * **bas** : pas de flou (le tourbillon reste, net), 35 % des grains, et une
+ * image sur deux — l'horloge n'avance qu'à 30 images par seconde, et Skia ne
+ * redessine que quand elle avance.
  *
  * ═══ Les couleurs ═══
  *
@@ -84,6 +95,7 @@ import {
 } from "react-native-reanimated";
 
 import { Box } from "@/components/ui/box";
+import { useQualiteVisuelle } from "@/hooks/use-qualite-visuelle";
 import { AURA } from "@/theme";
 
 import {
@@ -181,6 +193,7 @@ export function OrbeVivante({
 }: Props) {
   const reduit = useReducedMotion();
   const auPremierPlan = useIsFocused();
+  const palier = useQualiteVisuelle();
   const [appActive, setAppActive] = useState(AppState.currentState === "active");
   useEffect(() => {
     const abonnement = AppState.addEventListener("change", (etat) =>
@@ -196,8 +209,8 @@ export function OrbeVivante({
   const taillePoint = Math.min(3.2, Math.max(1.2, taille * 0.028));
 
   const nombre = useMemo(
-    () => nombreDeParticules(taille, Platform.OS, PixelRatio.get()),
-    [taille],
+    () => nombreDeParticules(taille, Platform.OS, PixelRatio.get(), palier),
+    [taille, palier],
   );
   const graine = useMemo(() => semerLesParticules(nombre), [nombre]);
   const grain = useMemo(() => leGrain(), []);
@@ -229,15 +242,29 @@ export function OrbeVivante({
     intensite.set(withTiming(cible.intensite, TRANSITION));
   }, [active, ecoute, vitesse, amplitude, intensite]);
 
+  // En bas de gamme, une image sur deux : le temps avance quand même du
+  // vrai temps écoulé, donc la cadence visuelle est la même, moins fluide.
+  const cadenceReduite = palier === "bas";
+  const attente = useSharedValue(0);
   const avancer = useCallback(
     (image: { timeSincePreviousFrame: number | null }) => {
       "worklet";
       // Bornée : au retour d'une pause, un pas d'une seconde ferait
       // sauter la matière au lieu de la laisser repartir.
       const dt = Math.min((image.timeSincePreviousFrame ?? 0) / 1000, 0.05);
+      if (cadenceReduite) {
+        const cumule = attente.get() + dt;
+        if (cumule < 1 / 32) {
+          attente.set(cumule);
+          return;
+        }
+        attente.set(0);
+        temps.set(temps.get() + cumule * vitesse.get());
+        return;
+      }
       temps.set(temps.get() + dt * vitesse.get());
     },
-    [temps, vitesse],
+    [temps, vitesse, attente, cadenceReduite],
   );
   const horloge = useFrameCallback(avancer, false);
   const tourne = !reduit && appActive && auPremierPlan;
@@ -292,7 +319,7 @@ export function OrbeVivante({
     borner(0.5 + 0.4 * intensite.get() + 0.3 * niveau.get()),
   );
   const origine = { x: centre, y: centre };
-  const flou = taille * 0.14;
+  const flou = palier === "haut" ? taille * 0.14 : palier === "moyen" ? taille * 0.07 : 0;
 
   // ── Le cœur ──
   // Une lueur de l'aura sous les grains : elle rend le K lisible sur un
@@ -316,9 +343,11 @@ export function OrbeVivante({
         <Group
           opacity={opaciteTourbillon}
           layer={
-            <Paint>
-              <Blur blur={flou} />
-            </Paint>
+            flou > 0 ? (
+              <Paint>
+                <Blur blur={flou} />
+              </Paint>
+            ) : undefined
           }
         >
           <Group transform={rotation} origin={origine}>

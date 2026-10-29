@@ -22,6 +22,20 @@
  * nappes restent immobiles. Une animation permanente peut donner la
  * nausée ; le réglage existe pour cela, et on le respecte sans condition.
  *
+ * ═══ Ce que ça coûte, et ce qu'on s'autorise par appareil ═══
+ *
+ * Chaque image anime trois cercles à dégradé radial dont le rayon dépasse
+ * la largeur de l'écran — deux à trois fois la surface de l'écran à
+ * peindre et à fusionner — et le calque qui les porte change d'opacité et
+ * d'échelle, ce qui force le compositeur à le dessiner hors écran puis à
+ * le recomposer. Sur un Android d'entrée de gamme, ce seul fond prend la
+ * moitié du budget de 16 ms. Le palier visuel (`hooks/qualite-visuelle.ts`)
+ * tranche : **haut**, tout ; **moyen**, la dérive mais plus de souffle
+ * (opacité et échelle fixes, donc pas de calque hors écran) ; **bas**, une
+ * image fixe. Et quel que soit le palier, l'aura ne bouge que si son écran
+ * est au premier plan : les cinq onglets portent chacun la leur, et quatre
+ * fonds animés hors écran coûtaient autant que le cinquième.
+ *
  * ═══ Pourquoi des `style` ici ═══
  *
  * Les positions et rayons sont calculés depuis la taille de l'écran, et
@@ -34,9 +48,9 @@ import { useEffect } from "react";
 import { useWindowDimensions } from "react-native";
 import Animated, {
   Easing,
+  cancelAnimation,
   useAnimatedProps,
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -51,6 +65,7 @@ import Svg, {
 } from "react-native-svg";
 
 import { Box } from "@/components/ui/box";
+import { useAnimationActive, useQualiteVisuelle } from "@/hooks/use-qualite-visuelle";
 import { AURA, FOND } from "@/theme";
 import { useCouleurs } from "@/theme/use-couleurs";
 
@@ -135,12 +150,17 @@ function NappeAnimee({
   const t = useSharedValue(0);
 
   useEffect(() => {
-    if (immobile) return;
+    if (immobile) {
+      // Arrêter là où elle est : repartir de zéro ferait sauter la nappe.
+      cancelAnimation(t);
+      return;
+    }
     t.value = withRepeat(
       withTiming(1, { duration: nappe.periode, easing: Easing.inOut(Easing.sin) }),
       -1,
       true,
     );
+    return () => cancelAnimation(t);
   }, [immobile, nappe.periode, t]);
 
   const proprietes = useAnimatedProps(() => {
@@ -167,14 +187,20 @@ function NappeAnimee({
 export function Aura({ active = false, assise = false }: Props) {
   const { width: largeur, height: hauteur } = useWindowDimensions();
   const { mode } = useCouleurs();
-  const immobile = useReducedMotion();
+  const palier = useQualiteVisuelle();
+  const anime = useAnimationActive();
   const intensite = INTENSITE[mode];
+  // Les nappes dérivent sauf en bas de gamme ; le souffle (opacité et
+  // échelle du calque entier) est réservé au haut de gamme.
+  const derive = anime && palier !== "bas";
+  const souffleAnime = anime && palier === "haut";
 
   // L'intensité globale : une respiration lente au repos, plus ample et
   // plus rapide quand l'IA travaille.
   const souffle = useSharedValue(0.85);
   useEffect(() => {
-    if (immobile) {
+    if (!souffleAnime) {
+      cancelAnimation(souffle);
       souffle.value = withTiming(active ? 1 : 0.85, { duration: 400 });
       return;
     }
@@ -189,7 +215,8 @@ export function Aura({ active = false, assise = false }: Props) {
           -1,
           true,
         );
-  }, [active, immobile, souffle]);
+    return () => cancelAnimation(souffle);
+  }, [active, souffleAnime, souffle]);
 
   const styleSouffle = useAnimatedStyle(() => ({
     opacity: Math.min(1, souffle.value),
@@ -219,7 +246,7 @@ export function Aura({ active = false, assise = false }: Props) {
               nappe={nappe}
               largeur={largeur}
               hauteur={hauteur}
-              immobile={immobile}
+              immobile={!derive}
             />
           ))}
         </Svg>

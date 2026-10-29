@@ -25,6 +25,13 @@ describe("Le nombre de particules", () => {
     expect(nombreDeParticules(120, "ios", 3)).toBe(PARTICULES_MAX);
   });
 
+  it("en donne moins à un appareil moyen, et bien moins à un appareil modeste", () => {
+    expect(nombreDeParticules(120, "ios", 3, "moyen")).toBe(1_400);
+    expect(nombreDeParticules(120, "ios", 3, "bas")).toBe(600);
+    expect(nombreDeParticules(60, "ios", 3, "bas")).toBe(315);
+    expect(nombreDeParticules(16, "android", 2, "bas")).toBe(PARTICULES_MIN);
+  });
+
   it("en donne moins à Android, et encore moins à un écran peu dense", () => {
     expect(nombreDeParticules(60, "android", 3)).toBeLessThan(
       nombreDeParticules(60, "ios", 3),
