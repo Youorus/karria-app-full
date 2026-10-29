@@ -14,6 +14,12 @@
  * (`docs/contrat-api-offres.md`) : il n'y a plus rien à générer ni à
  * sonder.
  *
+ * ═══ L'annonce du détail ═══
+ *
+ * Sous le texte de l'offre, une annonce native **propre au détail**
+ * (`use-annonce-detail.ts`) : jamais celle du fil, qui est déjà affichée
+ * ailleurs. Aucune quand la personne est sans pub ou qu'aucune ne vient.
+ *
  * ═══ Le signet attend le serveur ═══
  *
  * La V1 basculait le signet en local et ne l'enregistrait nulle part. Ici,
@@ -25,6 +31,8 @@ import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useState } from "react";
 import { Linking, Platform, Share } from "react-native";
 
+import { useAnnonceDetail } from "@/features/publicite/hooks/use-annonce-detail";
+import type { NativeAd } from "@/features/publicite/api/publicite.api";
 import { ErreurApi } from "@/lib/http";
 import {
   ecarterOffre,
@@ -41,6 +49,8 @@ export type EtatDescription = "chargement" | "prete" | "erreur";
 
 export interface DetailOffre {
   offre: Offre | null;
+  /** L'annonce native du détail (son propre emplacement), ou rien. */
+  annonce: NativeAd | null;
   chargement: boolean;
   erreur: string | null;
   etatDescription: EtatDescription;
@@ -77,6 +87,7 @@ export function useDetailOffre(): DetailOffre {
   );
   const [tentative, setTentative] = useState(0);
   const [enregistrement, setEnregistrement] = useState(false);
+  const annonce = useAnnonceDetail();
 
   // L'offre complète : toujours lue, sauf si la mémoire a déjà son texte.
   useEffect(() => {
@@ -169,6 +180,7 @@ export function useDetailOffre(): DetailOffre {
 
   return {
     offre,
+    annonce,
     chargement,
     erreur,
     etatDescription,

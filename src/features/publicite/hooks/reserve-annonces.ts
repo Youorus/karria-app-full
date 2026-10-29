@@ -26,6 +26,14 @@
  * message UMP indisponible (réseau) au premier passage ne doit pas couper
  * les annonces jusqu'au redémarrage ; le passage suivant redemande.
  *
+ * ═══ Sans pub ═══
+ *
+ * Une personne abonnée (« Karria sans pub », `lib/sans-pub.ts`) ne doit
+ * voir **aucune** annonce : ni le consentement, ni le SDK, ni une requête
+ * ne partent tant que le drapeau est levé, et ce qui était chargé est
+ * libéré dès qu'il se lève. La règle est vérifiée ici, au plus bas, pour
+ * qu'aucun écran ne puisse l'oublier.
+ *
  * ═══ L'expiration ═══
  *
  * Google demande qu'une annonce native soit montrée dans l'heure qui suit
@@ -35,6 +43,8 @@
  */
 
 import { Platform } from "react-native";
+
+import { abonnerSansPub, estSansPub } from "@/lib/sans-pub";
 
 import {
   chargerAnnonce,
@@ -75,7 +85,7 @@ function publier(): void {
 }
 
 export function demarrer(): Promise<Autorisation> {
-  if (bloc.mode === "coupe") {
+  if (bloc.mode === "coupe" || estSansPub()) {
     return Promise.resolve({ peutDemander: false, personnalisees: false });
   }
   autorisation ??= demarrerLaPublicite(bloc.mode === "test").then((reponse) => {
@@ -86,7 +96,7 @@ export function demarrer(): Promise<Autorisation> {
 }
 
 async function vider(): Promise<void> {
-  if (enCours || bloc.mode === "coupe") return;
+  if (enCours || bloc.mode === "coupe" || estSansPub()) return;
   enCours = true;
   try {
     const { peutDemander, personnalisees } = await demarrer();
@@ -109,7 +119,7 @@ async function vider(): Promise<void> {
 
 /** Précharge ces emplacements, dans l'ordre, s'ils ne l'ont jamais été. */
 export function prechauffer(emplacements: readonly number[]): void {
-  if (bloc.mode === "coupe") return;
+  if (bloc.mode === "coupe" || estSansPub()) return;
   for (const e of emplacements) {
     if (demandes.has(e)) continue;
     demandes.add(e);
@@ -144,6 +154,12 @@ export function liberer(): void {
   file.length = 0;
   publier();
 }
+
+// Dès que la personne passe sans pub, tout ce qui était chargé est libéré :
+// un abonné ne doit pas garder une annonce prête sous le coude.
+abonnerSansPub(() => {
+  if (estSansPub()) liberer();
+});
 
 export function abonner(rappel: () => void): () => void {
   abonnes.add(rappel);

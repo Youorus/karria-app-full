@@ -37,6 +37,7 @@ import {
 import { desinscrireAppareil } from "@/features/notifications/api/appareils.api";
 import { liberer as libererLesAnnonces } from "@/features/publicite/hooks/reserve-annonces";
 import { auMomentDeLaDeconnexion } from "@/lib/http";
+import { poserSansPub } from "@/lib/sans-pub";
 import { lireInstallationId, oublierReponseNotifications } from "@/lib/installation";
 import { ecrireJetons, lireJetons, oublierSession, type Jetons } from "@/lib/session";
 import { revoquerLaSession } from "../api/auth.api";
@@ -101,6 +102,8 @@ export function FournisseurDeSession({ children }: { children: ReactNode }) {
   // POP_TO_TOP à la racine, où `(app)` est la seule route : « action non
   // traitée » en rouge en bas de l'écran, et rien de plus.
   const revenirALAccueil = useCallback(() => {
+    // Les droits sont ceux d'un compte : le prochain repart avec des annonces.
+    poserSansPub(false);
     setEtat("anonyme");
     router.replace("/bienvenue");
   }, [router]);
@@ -160,6 +163,7 @@ export function FournisseurDeSession({ children }: { children: ReactNode }) {
     }
     await oublierLesFournisseurs();
     await oublierSession();
+    poserSansPub(false);
     setEtat("anonyme");
     router.replace({ pathname: "/bienvenue", params: { [PARAMETRE_ADIEU]: "1" } });
   }, [router]);

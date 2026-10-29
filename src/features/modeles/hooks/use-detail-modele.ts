@@ -16,15 +16,31 @@
  * ═══ L'acquisition attend le serveur ═══
  *
  * « Obtenir ce modèle » passe par « Ajout en cours… » puis « Ajouté à ta
- * collection ! » une fois le serveur d'accord — jamais avant. Un modèle
- * payant n'est pas vendable ici tant que l'achat intégré (RevenueCat) n'est
- * pas branché : le bouton le dit au lieu de faire semblant.
+ * collection ! » une fois le serveur d'accord — jamais avant.
+ *
+ * ═══ Un modèle Premium s'achète chez Stripe ═══
+ *
+ * « Débloquer ce modèle · 4,99 € » ouvre la page de paiement dans le
+ * navigateur (`features/soutien/api`), comme le soutien. Au retour, on
+ * relit le serveur jusqu'à ce qu'il dise « livré » : le modèle est alors
+ * dans « les miens ». Le prix affiché est celui du serveur (`modele.prix`),
+ * jamais un montant écrit ici. Si l'interrupteur des paiements est éteint
+ * pour cette plateforme, le bouton le dit et ne fait rien.
  */
 
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
-import { Share } from "react-native";
+import * as WebBrowser from "expo-web-browser";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Platform, Share } from "react-native";
 
+import {
+  lireCatalogue,
+  lireStatut,
+  ouvrirAchatModele,
+  RETOUR,
+} from "@/features/soutien/api/soutien.api";
+import { attendreLaLivraison } from "@/features/soutien/services/attente";
+import { SIMULATION } from "@/lib/config";
 import { ErreurApi } from "@/lib/http";
 import {
   lireAvis,
@@ -36,7 +52,16 @@ import {
 } from "../api/modeles.api";
 import type { AvisDuModele, Modele } from "../types/modeles.types";
 
-export type EtatAcquisition = "libre" | "en-cours" | "ajoute" | "possede" | "erreur";
+export type EtatAcquisition =
+  | "libre"
+  | "en-cours"
+  /** La page Stripe est ouverte, ou l'on attend sa confirmation. */
+  | "paiement"
+  | "ajoute"
+  | "possede"
+  | "erreur"
+  /** Payé peut-être, pas encore confirmé par le serveur. */
+  | "en-attente";
 
 export interface DetailModele {
   modele: Modele | null;
@@ -45,6 +70,8 @@ export interface DetailModele {
   complet: boolean;
   erreur: string | null;
   acquisition: EtatAcquisition;
+  /** Faux : les paiements sont éteints pour cette plateforme (serveur). */
+  paiementsActifs: boolean;
   obtenir: () => void;
   partager: () => void;
   retour: () => void;
@@ -64,7 +91,9 @@ export function useDetailModele(): DetailModele {
   const [complet, setComplet] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [acquisition, setAcquisition] = useState<EtatAcquisition>("libre");
+  const [paiementsActifs, setPaiementsActifs] = useState(false);
   const [tentative, setTentative] = useState(0);
+  const enVol = useRef(false);
 
   useEffect(() => {
     let vivant = true;
@@ -72,13 +101,15 @@ export function useDetailModele(): DetailModele {
       lireModele(id),
       lireMesModeles().catch(() => new Set<string>()),
       lireAvis(id).catch(() => null),
+      lireCatalogue(Platform.OS).catch(() => null),
     ])
       .then(
-        ([m, miens, a]) => {
+        ([m, miens, a, catalogue]) => {
           if (!vivant) return;
           setModele(m);
           setAvis(a);
           setAcquisition(miens.has(id) ? "possede" : "libre");
+          setPaiementsActifs(catalogue?.actif === true);
           setErreur(null);
         },
         (cause: unknown) => {
@@ -108,16 +139,48 @@ export function useDetailModele(): DetailModele {
   }, [id]);
 
   const obtenir = useCallback(() => {
-    if (modele === null || modele.premium || acquisition !== "libre") return;
-    setAcquisition("en-cours");
-    obtenirModele(modele.id).then(
-      () => setAcquisition("ajoute"),
-      (cause: unknown) => {
-        console.warn("[karria] modèle non obtenu", cause);
+    if (modele === null || acquisition !== "libre" || enVol.current) return;
+    if (!modele.premium) {
+      setAcquisition("en-cours");
+      obtenirModele(modele.id).then(
+        () => setAcquisition("ajoute"),
+        (cause: unknown) => {
+          console.warn("[karria] modèle non obtenu", cause);
+          setAcquisition("erreur");
+        },
+      );
+      return;
+    }
+    if (!paiementsActifs) return;
+    enVol.current = true;
+    setAcquisition("paiement");
+    void (async () => {
+      try {
+        const session = await ouvrirAchatModele(modele.id);
+        // Comme le soutien : une session du navigateur que la page de retour
+        // de l'API referme ; en simulation, le faux serveur livre d'emblée.
+        if (!SIMULATION) await WebBrowser.openAuthSessionAsync(session.adresse, RETOUR);
+        const issue = await attendreLaLivraison(
+          async () => (await lireStatut(session.id)).livre,
+        );
+        if (issue === "livre") {
+          setAcquisition("ajoute");
+          return;
+        }
+        setAcquisition("en-attente");
+      } catch (cause) {
+        console.warn("[karria] achat du modèle non ouvert", cause);
+        // Déjà à la personne (acheté ailleurs) : l'état vrai est au serveur.
+        if (cause instanceof ErreurApi && cause.raison === "template_already_owned") {
+          setAcquisition("possede");
+          return;
+        }
         setAcquisition("erreur");
-      },
-    );
-  }, [modele, acquisition]);
+      } finally {
+        enVol.current = false;
+      }
+    })();
+  }, [modele, acquisition, paiementsActifs]);
 
   const partager = useCallback(() => {
     if (modele === null) return;
@@ -145,6 +208,7 @@ export function useDetailModele(): DetailModele {
     complet,
     erreur,
     acquisition,
+    paiementsActifs,
     obtenir,
     partager,
     retour,

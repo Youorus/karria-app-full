@@ -22,8 +22,9 @@
  * comme le serait une URL signée. `thumbnail_blurhash` est un champ
  * **proposé** au contrat : le flou qui précède l'image.
  *
- * L'achat d'un modèle Premium passe par l'achat intégré, hors de ce
- * contrat : `POST /user-templates/me` ne sert que les modèles gratuits.
+ * L'achat d'un modèle Premium passe par Stripe (`paiements-simule.ts`) :
+ * `POST /user-templates/me` ne sert que les modèles gratuits, et le faux
+ * paiement remet le modèle par `possederModele`.
  */
 
 import { Image } from "react-native";
@@ -279,4 +280,20 @@ export function repondreModeles(
 /** Pour les tests seulement : repart des possessions de départ. */
 export function reinitialiserModeles(): void {
   etat.possedes = new Set(DEPART);
+}
+
+/** Un modèle par identifiant (ou par nom), et s'il est déjà à la personne —
+ *  pour le faux serveur des paiements, qui vend et remet les Premium. */
+export function trouverModele(
+  idOuNom: string,
+): { id: string; is_premium: boolean; possede: boolean } | undefined {
+  const m = MODELES.find((x) => x.id === idOuNom || x.name === idOuNom);
+  return m === undefined
+    ? undefined
+    : { id: m.id, is_premium: m.is_premium, possede: etat.possedes.has(m.id) };
+}
+
+/** Ce que ferait le webhook du vrai serveur : le modèle payé est remis. */
+export function possederModele(id: string): void {
+  etat.possedes.add(id);
 }

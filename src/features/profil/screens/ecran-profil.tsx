@@ -4,8 +4,8 @@
  * ═══ Ce qu'il contient, et ce qu'il ne contient plus ═══
  *
  * Trois blocs, du plus intime au plus lointain, avec beaucoup d'air
- * entre eux : qui je suis (posé au centre, sans cadre), mon CV (une
- * ligne), un mot de l'équipe et son café (Karria reste gratuit).
+ * entre eux : qui je suis, mon CV (une ligne), un mot de l'équipe et ses
+ * deux façons d'aider — sans pub, ou un café (`features/soutien`).
  * Minimaliste et chaleureux, à la demande de Marc (2026-10-24) : une
  * seule touche de couleur chaude, sur la même aura que les autres
  * onglets — le fond fait l'unité de l'application. L'apparence, les notifications, la
@@ -28,7 +28,7 @@ import { Aura } from "@/components/aura";
 import { BoutonEnTeteRond, EnTeteKarria } from "@/components/en-tete-karria";
 import { Icone } from "@/components/icone";
 import { Box } from "@/components/ui/box";
-import { CarteCafe } from "@/features/soutien/components/carte-cafe";
+import { CarteSoutien } from "@/features/soutien/components/carte-soutien";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import { CarteCv } from "../components/carte-cv";
@@ -50,8 +50,7 @@ export function EcranProfil() {
       <Aura />
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         <EnTeteKarria
-          titre="Profil"
-          sousTitre="Ton espace personnel"
+          titre="Mon profil"
           droite={
             <BoutonEnTeteRond onPress={ouvrirParametres} libelle="Ouvrir les paramètres">
               <Icone nom="reglages" couleur={couleurs.texte} taille={20} />
@@ -71,7 +70,7 @@ export function EcranProfil() {
           </Animated.View>
 
           <Animated.View entering={entree(2)}>
-            <CarteCafe soutien={soutien} />
+            <CarteSoutien soutien={soutien} />
           </Animated.View>
         </ScrollView>
       </SafeAreaView>

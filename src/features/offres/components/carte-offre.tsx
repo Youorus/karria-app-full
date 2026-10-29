@@ -132,13 +132,7 @@ export function CarteOffre({ offre, rang, maintenant, onOuvrir, onGarder }: Prop
                   >
                     {offre.entreprise ?? "Entreprise"}
                   </Texte>
-                  {offre.nouvelle ? (
-                    <Box className="rounded-xs bg-nouveau px-1.5 py-px">
-                      <Texte className="font-bold text-caption text-on-scrim">
-                        Nouvelle
-                      </Texte>
-                    </Box>
-                  ) : null}
+
                   {offre.nonOuverte ? (
                     <Box className="h-1.5 w-1.5 rounded-full bg-primary" />
                   ) : null}

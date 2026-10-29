@@ -119,10 +119,10 @@ export async function lireMesModeles(): Promise<Set<string>> {
   return new Set(bruts.filter((p) => p.is_active).map((p) => p.template.id));
 }
 
-/** Obtenir un modèle gratuit. Les modèles Premium passent par l'achat
- *  intégré (RevenueCat), qui n'est pas encore branché dans la refonte. Le
- *  corps est celui du contrat, rien de plus : la v2 refuse les champs
- *  inconnus (422). */
+/** Obtenir un modèle gratuit. Les modèles Premium s'achètent chez Stripe
+ *  (`features/soutien/api`, `POST /payments/checkout-session`) et sont remis
+ *  par le serveur à la confirmation. Le corps est celui du contrat, rien de
+ *  plus : la v2 refuse les champs inconnus (422). */
 export async function obtenirModele(id: string): Promise<void> {
   await http.post("/user-templates/me", { template_id: id });
 }

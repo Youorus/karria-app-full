@@ -3,53 +3,50 @@
  *
  * ═══ Ce qu'elle montre, et d'où ça vient ═══
  *
- * La photo du CV, ou des initiales sur un disque bleu ; le nom et le
- * métier visé s'ils sont dans le CV ; l'adresse e-mail toujours. Rien
- * n'est demandé à l'inscription (AGENTS.md §9) : cette carte se remplit
- * **avec** le CV, et le dit quand il manque — « complète ton CV pour
- * voir ton nom ici » plutôt qu'un champ à saisir.
+ * La photo du CV, ou des initiales sur la crème du café ; le nom tiré du
+ * CV, et dessous le pseudonyme (la partie locale de l'adresse) ou, à
+ * défaut, le métier visé. Rien n'est demandé à l'inscription (AGENTS.md
+ * §9) : cette carte se remplit **avec** le CV.
  *
- * ═══ Calme, au centre ═══
+ * ═══ En ligne, compacte ═══
  *
- * Plus de cadre ni de pastille (2026-10-24, Marc : « minimaliste et très
- * chaleureux ») : la personne est posée au centre, sur le fond, avec de
- * l'air autour. Un disque de 84 points cerné d'un anneau caramel, les
- * initiales sur la crème du café ; le nom, le métier en texte simple,
- * l'adresse en retrait. Les initiales viennent du service, jamais vides.
+ * Redessinée par Marc (2026-10-29) : l'avatar (72 points, anneau caramel)
+ * à gauche, le nom et le pseudonyme à droite — la carte prend moins de
+ * hauteur et laisse la place au soutien, dessous.
  */
 
 import { Image } from "expo-image";
 
 import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
+import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
 
 import type { Identite } from "../services/identite";
 
-const TAILLE_AVATAR = 84;
+const TAILLE_AVATAR = 72;
 
 function Avatar({ identite }: { identite: Identite }) {
   return (
-    <Box className="rounded-full border border-border-chaleur p-1.5">
+    <Box className="rounded-full border border-border-chaleur p-1">
       {identite.photo !== null ? (
         <Image
           source={{ uri: identite.photo }}
-          // Taille et rayon en style : `expo-image` ne lit pas de classe.
           style={{
             width: TAILLE_AVATAR,
             height: TAILLE_AVATAR,
             borderRadius: TAILLE_AVATAR / 2,
           }}
           contentFit="cover"
-          accessibilityLabel={`Photo de ${identite.nom}`}
+          accessibilityLabel={"Photo de " + identite.nom}
         />
       ) : (
         <Box
           className="items-center justify-center rounded-full bg-surface-chaleur"
           style={{ width: TAILLE_AVATAR, height: TAILLE_AVATAR }}
-          accessibilityLabel={`Initiales ${identite.initiales}`}
+          accessibilityLabel={"Initiales " + identite.initiales}
         >
-          <Texte className="font-display text-title-lg text-chaleur">
+          <Texte className="font-display text-title-md text-chaleur font-bold">
             {identite.initiales}
           </Texte>
         </Box>
@@ -59,54 +56,43 @@ function Avatar({ identite }: { identite: Identite }) {
 }
 
 interface Props {
-  /** `null` : on charge, la carte montre un squelette. */
   identite: Identite | null;
   email: string | null;
 }
 
 export function CarteIdentite({ identite, email }: Props) {
   return (
-    <VStack className="items-center gap-4 py-4">
+    <HStack space="md" className="items-center justify-between py-1">
       {identite === null ? (
         <Box
           className="rounded-full bg-remplissage-doux"
-          style={{ width: TAILLE_AVATAR + 14, height: TAILLE_AVATAR + 14 }}
+          style={{ width: TAILLE_AVATAR + 8, height: TAILLE_AVATAR + 8 }}
         />
       ) : (
         <Avatar identite={identite} />
       )}
-      <VStack className="items-center gap-1">
+
+      <VStack className="flex-1 px-1">
         {identite === null ? (
           <>
-            <Box className="h-6 w-40 rounded-full bg-remplissage-doux" />
-            <Box className="h-4 w-28 rounded-full bg-remplissage-doux" />
+            <Box className="h-6 w-36 rounded-full bg-remplissage-doux" />
+            <Box className="h-4 w-24 rounded-full bg-remplissage-doux mt-1" />
           </>
         ) : (
           <>
             <Texte
               accessibilityRole="header"
-              className="text-center font-display text-title-sm tracking-tight text-foreground"
-              numberOfLines={2}
+              className="font-display text-title-sm text-foreground font-bold"
+              numberOfLines={1}
             >
               {identite.nom}
             </Texte>
-            <Texte
-              className="text-center text-body text-muted-foreground"
-              numberOfLines={1}
-            >
-              {identite.titre ?? "Ton nom et ton métier viendront de ton CV."}
+            <Texte className="text-body text-muted-foreground pt-0.5" numberOfLines={1}>
+              {email ? "@" + email.split("@")[0] : (identite.titre ?? "Ton métier visé")}
             </Texte>
           </>
         )}
-        {email !== null ? (
-          <Texte
-            className="pt-1 text-center text-footnote text-foreground-faint"
-            numberOfLines={1}
-          >
-            {email}
-          </Texte>
-        ) : null}
       </VStack>
-    </VStack>
+    </HStack>
   );
 }

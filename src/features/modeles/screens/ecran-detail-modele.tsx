@@ -68,6 +68,7 @@ export function EcranDetailModele() {
     complet,
     erreur,
     acquisition,
+    paiementsActifs,
     obtenir,
     partager,
     retour,
@@ -283,6 +284,7 @@ export function EcranDetailModele() {
         <BarreActionModele
           modele={modele}
           acquisition={acquisition}
+          paiementsActifs={paiementsActifs}
           onObtenir={obtenir}
           onVoirLaGalerie={voirLaGalerie}
         />

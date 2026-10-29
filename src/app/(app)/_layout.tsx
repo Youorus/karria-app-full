@@ -21,6 +21,7 @@ import { Redirect, Stack } from "expo-router";
 
 import { useSession } from "@/features/auth/hooks/use-session";
 import { useAppareilConnecte } from "@/features/notifications/hooks/use-appareil-connecte";
+import { useDroitsConnectes } from "@/features/soutien/hooks/use-droits-connectes";
 import { FOND } from "@/theme";
 import { useTheme } from "@/theme/preference";
 
@@ -81,18 +82,22 @@ export default function LayoutApp() {
           name="compte/supprimer"
           options={{ animation: "fade_from_bottom", animationDuration: 280 }}
         />
+        {/* Le retour de Stripe, quand le lien arrive hors de la session du
+            navigateur (page ouverte dans Safari) : il renvoie au profil. */}
+        <Stack.Screen name="paiement/retour" options={{ animation: "none" }} />
       </Stack>
     </>
   );
 }
 
 /**
- * L'appareil s'enregistre et les notifications touchées s'ouvrent, tant
- * qu'une session existe. Un composant sans rendu plutôt qu'un hook appelé
- * ici : le hook ne doit tourner **qu'une fois connecté**, et un hook ne
+ * L'appareil s'enregistre et les droits (sans pub) se lisent, tant qu'une
+ * session existe. Un composant sans rendu plutôt que des hooks appelés
+ * ici : ils ne doivent tourner **qu'une fois connecté**, et un hook ne
  * peut pas être appelé après le `Redirect` ci-dessus.
  */
 function GardeAppareil() {
   useAppareilConnecte();
+  useDroitsConnectes();
   return null;
 }

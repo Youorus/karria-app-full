@@ -9,9 +9,15 @@
  * première annonce n'arrive qu'après `intervalle` cartes — puis on pose
  * la question (UMP, puis ATT) et l'on précharge. Avant cela, aucune
  * requête ne part.
+ *
+ * Une personne sans pub reçoit une table vide, toujours : la réserve
+ * refuse déjà de charger, mais la liste ne doit pas non plus montrer ce
+ * qui aurait été chargé avant que le serveur réponde.
  */
 
 import { useEffect, useSyncExternalStore } from "react";
+
+import { useSansPub } from "@/hooks/use-sans-pub";
 
 import { emplacementsPour, type RegleDeListe } from "../services/regles-publicite";
 import type { NativeAd } from "../api/publicite.api";
@@ -26,7 +32,8 @@ export function useAnnoncesDeListe(
   regle: RegleDeListe,
 ): ReadonlyMap<number, NativeAd> {
   const pretes = useSyncExternalStore(abonner, annoncesPretes);
-  const nombreEmplacements = emplacementsPour(nombre, regle).length;
+  const sansPub = useSansPub();
+  const nombreEmplacements = sansPub ? 0 : emplacementsPour(nombre, regle).length;
 
   useEffect(() => {
     if (nombreEmplacements === 0) return;
@@ -42,5 +49,7 @@ export function useAnnoncesDeListe(
     };
   }, [nombreEmplacements]);
 
-  return pretes;
+  return sansPub ? AUCUNE : pretes;
 }
+
+const AUCUNE: ReadonlyMap<number, NativeAd> = new Map();

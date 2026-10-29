@@ -5,6 +5,8 @@
  * `template-card.tsx`. Pures et testées, hors des écrans.
  */
 
+import { centimesDepuisTexte, euros } from "@/lib/monnaie";
+
 import type { FiltreGalerie, Modele } from "../types/modeles.types";
 
 /** « elegant » → « Elegant ». */
@@ -70,4 +72,11 @@ export function noteLisible(note: number, nombre: number): string {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   });
+}
+
+/** « 4.99 » (le prix du serveur) → « 4,99 € » ; illisible → `null`. */
+export function prixLisible(prix: string | null): string | null {
+  if (prix === null) return null;
+  const centimes = centimesDepuisTexte(prix);
+  return centimes === null ? null : euros(centimes);
 }

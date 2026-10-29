@@ -3,7 +3,55 @@
 > Document de passation. À lire en premier par toute personne ou IA qui
 > reprend le travail, avec `AGENTS.md`. Mis à jour à chaque fin de session.
 
-**Dernière mise à jour : 2026-10-29**
+**Dernière mise à jour : 2026-10-29 (soir)**
+
+## Session du 2026-10-29 (suite) — paiements Stripe : sans pub, cafés, modèles Premium
+
+**Décision de Marc** : Stripe seul, dans le navigateur, comme Zoumani (validée par Apple).
+Aucun achat intégré, aucun RevenueCat, **aucun SDK Stripe dans le binaire** (PassKit →
+question Apple Pay en revue). `app.json` : `expo-audio` sans lecture ni enregistrement en
+arrière-plan (plus de `UIBackgroundModes`) — à garder.
+
+**Livré** (contrat `docs/contrat-api-paiements.md`, servi par `karria_api_v2` depuis le
+29/10 mais **éteint** tant que les clés Stripe ne sont pas posées) :
+
+- **Carte de soutien** (`features/soutien/components/carte-soutien.tsx`, remplace
+  `carte-cafe.tsx`) : le mot de l'équipe, puis « Profiter de Karria sans pub » (4,99 €/mois,
+  sans engagement, bouton principal) et « Nous offrir un café » (sélecteur 1 / 2 / 3 / 5 avec
+  les prix du serveur, bouton de contour). États : squelette ; interrupteur éteint → le mot
+  seul ; sans pub actif → « Tu es sans pub », date de renouvellement ou de fin, avertissement
+  si prélèvement en échec, « Gérer mon abonnement » (portail Stripe) ; merci après un café.
+- **Flux** (`hooks/use-soutien.ts`, `api/soutien.api.ts`, `services/attente.ts`) :
+  `POST /payments/checkout-session` → `WebBrowser.openAuthSessionAsync(url,
+"karria://paiement/retour")` → la page de retour de l'API referme la session → relecture
+  de `GET /payments/status/{id}` (`fulfilled`) et `GET /payments/me`, jamais l'adresse.
+  En simulation, pas de navigateur : `lib/dev/paiements-simule.ts` livre à la 2e relecture.
+- **Sans pub = plus d'AdMob** : `lib/sans-pub.ts` (drapeau abonnable), recopié depuis
+  `GET /payments/me` à l'ouverture de la session et au retour au premier plan
+  (`use-droits-connectes.ts`, monté dans `app/(app)/_layout.tsx`), au focus du profil, et
+  remis à faux à la déconnexion. `reserve-annonces.ts` refuse de démarrer/charger et libère
+  tout ; `use-annonces-de-liste` rend une table vide ; `use-annonce-detail` rend `null`.
+- **Modèles Premium** : « Débloquer ce modèle · 4,99 € » (prix du serveur, `prixLisible`)
+  → même flux Stripe → « Ajouté à ta collection ! » quand `fulfilled`. Désactivé avec
+  l'explication si l'interrupteur est éteint.
+- **Interrupteur par plateforme** : `enabled.ios|android` du catalogue et de `/payments/me`
+  (`PAYMENTS__IOS_ENABLED` côté serveur) → aucun bouton de paiement quand il est éteint.
+- **Reprise des modifications de Marc** (accueil « doodle » + feuille de connexion, carte
+  d'identité en ligne, « Mon profil », pastille « Nouvelle » retirée, écran de chargement sans
+  aura) : gardées, en-têtes de documentation rétablis, jetons à la place des `/60` `/20`.
+  Corrigé : le détail d'une offre a **sa propre annonce** (`use-annonce-detail.ts`, une
+  instance par ouverture, détruite à la sortie) au lieu de réutiliser celle de l'emplacement 0
+  du fil ; plus de fausse carte « Sponsorisé — Karria AI Pro » ; plus de `console.log`
+  « vue pub comptabilisée ».
+- Route `app/(app)/paiement/retour.tsx` (lien arrivé hors session → profil).
+  `lib/monnaie.ts` (`euros`, `centimesDepuisTexte`).
+
+`npm run check` vert (261 tests), `npx expo export --platform ios` produit un paquet.
+**Non vérifié à l'écran** (pas de clé Stripe ni de simulateur lancé dans cette session) :
+la carte en clair/sombre, le retour de la session du navigateur sur appareil, Android.
+
+**Marc doit** : poser les clés Stripe (voir `karria_api_v2/docs/REPRISE.md` et
+`DEPLOIEMENT.md`), tester avec les cartes de test, puis relire la carte sur le simulateur.
 
 ## Session du 2026-10-29 — relecture Fable : performance sur appareils modestes, push, AdMob
 
@@ -39,6 +87,7 @@ stables ; plus de style en ligne dans la carte d'annonce.
 
 **À Marc — modifications non commitées dans l'arbre, non touchées** (`ecran-detail-offre.tsx`,
 `use-detail-offre.ts`, `carte-cafe.tsx`, `ecran-bienvenue.tsx`, `carte-identite.tsx`…) :
+
 1. le détail d'une offre réutilise **la même** `NativeAd` que l'emplacement 0 du fil (trafic
    invalide pour Google) et affiche à défaut une fausse carte « Sponsorisé — Karria AI Pro » :
    à retirer, ou lui donner son propre emplacement ; le `console.log` « vue pub comptabilisée »
@@ -146,7 +195,7 @@ vivante, animations.
 | Modèles                    | Onglet et détail au contrat `docs/contrat-api-modeles.md` (UUID, `pages`, corps de `POST /user-templates/me` réduit à `template_id`). **Servis par le faux serveur** `lib/dev/modeles-simule.ts` : `/templates/` répond 404 en production (vérifié le 2026-10-24). Il sert les 3 modèles du PoC (Meridian, Marketing, Minimalist) avec leurs **vrais aperçus** (WebP dans `lib/dev/modeles/`, absents du paquet de production) et un `thumbnail_blurhash` (champ **proposé** au contrat). **Bascule** : ajouter `"/templates/"` et `"/user-templates/"` à `SERVI_PAR_LA_V2` (`lib/dev/serveur-simule.ts`), rien d'autre. Images `expo-image` en cache mémoire+disque, clé `modele-<id>-v<version>`. Ouverture : zoom natif sur iOS 18+, zoom Reanimated mesuré (`hooks/use-ouverture-modele.ts`) sur Android, aucun en mouvement réduit ; le détail s'affiche aussitôt depuis la galerie (`modeleConnu`). Pastille et puce « Premium » (or, jetons `premium-texte`, `surface-premium`, `border-premium`). Lien `karria://modeles?categorie=étudiant`. Puces : hauteur fixe, défileur `grow-0 shrink-0` (corrige l'étirement à une carte). |
 | CV                         | Création en conversation : 8 chapitres, texte ou voix, jet validé ou corrigé, photo avec amélioration IA. Puis l'écran CV de la V1. **Import d'un CV existant** (« J'ai déjà un CV », `expo-document-picker` → `POST /cv/import`) : les chapitres extraits arrivent en propositions à valider une à une ; seuls les chapitres validés comptent.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Orbe                       | `OrbeVivante` est une sphère de particules Skia sur un tourbillon chromatique (`components/orbe-vivante.tsx`, maths dans `orbe-particules.ts`). Même API + `ecoute`, `niveauAudio`. Réglages dans l'en-tête du fichier.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Profil                     | Refait minimaliste et chaleureux (2026-10-24) : sans aura ni cadre, identité centrée (anneau et initiales caramel), raccourci CV, carte **« Offrir un café »** (`features/soutien`) = un mot signé de l'équipe sur crème (`surface-chaleur`), une rangée segmentée de 1 à 3 tasses, un bouton. Derrière le port `services/pourboire.ts` ; branché sur `bientot` (« Bientôt », désactivé) tant qu'aucune lib d'achat intégré n'est installée. Jetons ajoutés : `chaleur`, `surface-chaleur`, `border-chaleur` (+ `CHALEUR`, `PREMIUM_TEXTE` dans `theme/index.ts`). Vérifié en sombre sur iOS ; **pas encore en clair ni sur Android**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Profil                     | Minimaliste et chaleureux : identité en ligne (avatar caramel, nom, pseudonyme), raccourci CV, **carte de soutien** (`features/soutien`, 2026-10-29) = un mot signé de l'équipe sur crème, « Profiter de Karria sans pub » (4,99 €/mois, Stripe, portail pour gérer) et « Nous offrir un café » (1/2/3/5 tasses, prix du serveur). Contrat `docs/contrat-api-paiements.md`. Jetons : `chaleur`, `surface-chaleur`, `border-chaleur`, Premium. **Pas encore vérifié à l'écran** après la refonte du 29/10.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Paramètres (`/parametres`) | Apparence, notifications, documents, version, déconnexion, suppression de compte (`/compte/supprimer` : raison du départ → ce qui sera supprimé → confirmation ; `DELETE /auth/me` vérifié contre la v2)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 `npm run check` passe (179 tests au dernier passage) et `npx expo export --platform ios` produit un paquet. Commits poussés sur `main` de `karria-app-full` le 2026-10-24 (autorisés par Marc pour cette session).
@@ -195,9 +244,9 @@ npx expo run:ios --device <UDID simulateur>
 
 0. **Modèles** : dès que la v2 sert `/templates/` (curl `https://api.karria.fr/api/v1/templates/` → 401 et non 404), faire la bascule `SERVI_PAR_LA_V2` ci-dessus et vérifier la galerie contre la production. Faire valider par l'agent backend le champ proposé `thumbnail_blurhash`. Tester le zoom Reanimated sur un émulateur Android (non vérifié) et le Profil en mode clair.
 
-1. **Activer les cafés (achat intégré obligatoire : Apple 3.1.1, Google Play Billing — pas de lien de don externe).**
-   - Marc : créer 3 produits **consommables** `com.karria.cafe.1`, `com.karria.cafe.2`, `com.karria.cafe.3` (même id sur App Store Connect et Play Console, app `com.karria.app`), contrats « Paid Apps » signés ; les importer dans RevenueCat (projet de la V1) et les grouper dans une offering `cafes`. Clés : `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY` (celles de la V1, cf. `eas.json` de la V1).
-   - Code : demander l'accord pour `react-native-purchases` (V1 : ^10), écrire `features/soutien/api/pourboire.revenuecat.ts` qui implémente `PortPourboire` (`getOfferings` → prix localisés, `purchaseStoreProduct` → `"merci"`, annulation → `"renonce"`), le brancher dans `pourboire.ts`, `prebuild` + `pod install`. Tester en TestFlight / test interne Play (pas sur simulateur sans StoreKit config).
+1. **Paiements (Stripe seul, décidé le 2026-10-29)** : tout est codé (voir la session du
+   2026-10-29, suite). Reste à Marc : les clés Stripe côté API, un passage en mode test avec
+   les cartes de test, la relecture de la carte de soutien sur le simulateur.
    - Fast Refresh sur l'onglet Offres lève « Changing viewabilityConfigCallbackPairs on the fly » (le hook est réinitialisé) : relancer l'app suffit ; pas un bug en usage normal.
 
 2. **Tester sur le simulateur, contre la production** (non vérifié à l'écran

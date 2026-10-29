@@ -1,5 +1,5 @@
 /**
- * Le profil : la personne, son CV, le café pour l'équipe — et la porte des
+ * Le profil : la personne, son CV, le soutien à l'équipe — et la porte des
  * paramètres.
  *
  * ═══ Ce qui n'est plus ici ═══
@@ -41,7 +41,7 @@ export interface Profil {
   identite: Identite | null;
   email: string | null;
   cv: { etat: EtatDuCv; resume: string } | null;
-  /** La carte « offrir un café » (`features/soutien`). */
+  /** La carte de soutien — sans pub, café (`features/soutien`). */
   soutien: Soutien;
   ouvrirParametres: () => void;
   /** Vers le CV : la création s'il n'y en a pas, l'onglet sinon. */

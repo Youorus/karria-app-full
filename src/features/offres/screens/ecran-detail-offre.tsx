@@ -8,6 +8,8 @@
  *   l'entreprise en capitales puis le titre très gras ; dessous, les
  *   étiquettes lieu / contrat / salaire (vert) ;
  * - « Description — L'annonce », avec son chargeur ;
+ * - une annonce native propre au détail, quand il y en a une et que la
+ *   personne n'est pas sans pub (aucune carte de remplacement sinon) ;
  * - « Voir l'annonce d'origine », dans le pied flottant.
  *
  * Le pied « Créer mon CV / Créer ma lettre » de la V1 arrive avec le
@@ -38,10 +40,12 @@ import { VStack } from "@/components/ui/vstack";
 import { SALAIRE, SUR_PRIMAIRE } from "@/theme";
 import { useCouleurs } from "@/theme/use-couleurs";
 
+import { CarteAnnonce } from "@/features/publicite/components/carte-annonce";
+
 import { BlocAnalyse } from "../components/bloc-analyse";
 import { TuileEntreprise } from "../components/tuile-entreprise";
 import { useDetailOffre } from "../hooks/use-detail-offre";
-import { contratCourt, libelleSource, salaireLisible } from "../services/presentation";
+import { contratCourt, salaireLisible } from "../services/presentation";
 
 function Etiquette({
   icone,
@@ -73,6 +77,7 @@ export function EcranDetailOffre() {
   const reduit = useReducedMotion();
   const {
     offre,
+    annonce,
     chargement,
     erreur,
     etatDescription,
@@ -180,16 +185,18 @@ export function EcranDetailOffre() {
                     />
                   ) : null}
                 </HStack>
-                <Texte className="px-1 text-caption text-foreground-faint">
-                  {offre.active ? "Publiée sur" : "Expirée · publiée sur"}{" "}
-                  {libelleSource(offre.source)}
-                </Texte>
               </VStack>
             </Animated.View>
 
             <Animated.View entering={entree(2)}>
               <BlocAnalyse etat={etatDescription} texte={offre.description} />
             </Animated.View>
+
+            {annonce !== null ? (
+              <Animated.View entering={entree(3)}>
+                <CarteAnnonce annonce={annonce} />
+              </Animated.View>
+            ) : null}
           </ScrollView>
         )}
       </SafeAreaView>

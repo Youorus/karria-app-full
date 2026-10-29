@@ -11,6 +11,7 @@ import {
   noteLisible,
   pucesDeLaGalerie,
   sousTitreGalerie,
+  prixLisible,
 } from "./presentation";
 
 function modele(id: number, categorie: string, premium = false): Modele {
@@ -84,5 +85,14 @@ describe("Les compteurs et libellés", () => {
     expect(sousTitreGalerie(1)).toBe("1 modèle — les tiens sont cochés ✓");
     expect(noteLisible(0, 0)).toBe("Pas encore noté");
     expect(noteLisible(4.56, 12)).toBe("4,6");
+  });
+});
+
+describe("prixLisible", () => {
+  it("écrit le prix du serveur à la française", () => {
+    expect(prixLisible("4.99")).toBe("4,99 €");
+    expect(prixLisible("12")).toBe("12 €");
+    expect(prixLisible(null)).toBeNull();
+    expect(prixLisible("gratuit")).toBeNull();
   });
 });

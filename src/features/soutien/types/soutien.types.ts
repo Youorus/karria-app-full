@@ -1,41 +1,114 @@
 /**
- * Le soutien à l'équipe : « offrir un café » depuis le profil.
+ * Le soutien à l'équipe : « Karria sans pub » et « nous offrir un café »,
+ * depuis le profil — calqué sur `docs/contrat-api-paiements.md`.
  *
- * ═══ Pourquoi pas un abonnement ═══
+ * ═══ Deux gestes, un seul moyen ═══
  *
- * Marc a renoncé à l'abonnement (octobre 2026) : Karria reste gratuit,
- * pour tout le monde, sans formule bridée. À la place, une invitation
- * chaleureuse à soutenir l'équipe, à la manière des « Buy me a coffee »
- * des équipes indépendantes. Un café ne débloque **rien** : c'est un
- * merci, pas un achat de fonctionnalité.
+ * Marc a tranché (octobre 2026) : Stripe seul, dans le navigateur, comme
+ * Zoumani qu'Apple a validé. Aucun achat intégré, aucun SDK Stripe dans
+ * l'application. L'abonnement « sans pub » retire les annonces ; un café ne
+ * débloque **rien** — c'est un merci.
  *
- * ═══ Pourquoi l'achat intégré ═══
+ * ═══ Les prix viennent du serveur ═══
  *
- * Un pourboire au développeur dans une app des stores passe par l'achat
- * intégré (Apple, règle 3.1.1 ; Google Play Billing). Un lien de don
- * externe est refusé pour cet usage. Chaque taille de café est donc un
- * **produit consommable** des stores, identifié par `produitId`.
+ * En centimes, tels que Stripe les prélèvera. L'application ne connaît
+ * aucun montant : si un prix change côté serveur, l'écran suit sans
+ * livraison (AGENTS.md §6.4).
  */
 
-/** Le nombre de tasses : trois montants, pas un champ libre. */
-export type Tasses = 1 | 2 | 3;
+/** Les paliers de cafés du serveur. */
+export type Tasses = 1 | 2 | 3 | 5;
+
+export type TypeDePaiement = "ad_free" | "coffee" | "template";
+
+// ─── Ce que le serveur envoie ──────────────────────────────────────────
+
+export interface PrixBrut {
+  lookup_key: string;
+  label: string;
+  amount_cents: number;
+  currency: string;
+  interval?: "month" | null;
+}
+
+export interface CatalogueBrut {
+  currency: string;
+  ad_free: PrixBrut;
+  coffees: (PrixBrut & { count: number })[];
+  templates: { template_id: string; label: string; amount_cents: number }[];
+  enabled: { ios: boolean; android: boolean };
+}
+
+export interface SessionPaiementBrute {
+  checkout_url: string;
+  session_id: string;
+  payment_type: TypeDePaiement;
+  mode: "payment" | "subscription";
+  amount_cents: number;
+  currency: string;
+}
+
+export interface StatutPaiementBrut {
+  session_id: string;
+  status: "paid" | "unpaid";
+  payment_type: TypeDePaiement | null;
+  fulfilled: boolean;
+}
+
+export interface FacturationBrute {
+  ad_free: {
+    active: boolean;
+    status: "none" | "active" | "past_due" | "canceled";
+    until: string | null;
+    cancel_at_period_end: boolean;
+    manageable: boolean;
+  };
+  thanks: { coffees: number; total_cents: number; last_at: string | null };
+  enabled: { ios: boolean; android: boolean };
+}
+
+// ─── Ce que l'application manipule ─────────────────────────────────────
 
 export interface OffreDeCafe {
   tasses: Tasses;
-  /** L'identifiant du produit consommable, le même sur les deux stores. */
-  produitId: string;
-  /** Le prix localisé rendu par le store (« 2,99 € »), `null` tant que
-   *  le store ne l'a pas dit — on n'affiche jamais un prix inventé. */
-  prix: string | null;
+  prixCentimes: number;
 }
 
-/** Ce que le store permet aujourd'hui. */
-export interface CatalogueDeCafes {
-  /** Faux tant que l'achat intégré n'est pas branché : « Bientôt ». */
-  disponible: boolean;
-  offres: OffreDeCafe[];
+export interface Catalogue {
+  sansPub: { libelle: string; prixCentimes: number };
+  cafes: OffreDeCafe[];
+  /** Les modèles Premium en vente, par identifiant → prix en centimes. */
+  modeles: Map<string, number>;
+  /** Faux : l'app ne montre aucun paiement (interrupteur du serveur). */
+  actif: boolean;
 }
 
-/** L'issue d'un pourboire : la personne peut renoncer dans la feuille du
- *  store, ce n'est pas une erreur. */
-export type IssueDuPourboire = "merci" | "renonce";
+export type StatutSansPub = "aucun" | "actif" | "impaye" | "resilie";
+
+export interface Facturation {
+  sansPub: {
+    actif: boolean;
+    statut: StatutSansPub;
+    /** La fin connue : période payée, ou grâce après un prélèvement en échec. */
+    jusquAu: Date | null;
+    resiliationEnFinDePeriode: boolean;
+    /** Un client Stripe existe : le portail peut s'ouvrir. */
+    gerable: boolean;
+  };
+  cafes: { nombre: number; dernierLe: Date | null };
+  actif: boolean;
+}
+
+export interface SessionPaiement {
+  id: string;
+  adresse: string;
+  type: TypeDePaiement;
+  montantCentimes: number;
+}
+
+export interface StatutPaiement {
+  id: string;
+  paye: boolean;
+  /** Vrai quand le serveur a reçu la notification de Stripe et livré. */
+  livre: boolean;
+}

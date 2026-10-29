@@ -37,12 +37,13 @@ import { estUneRouteAppareil, repondreAppareils } from "./appareils-simule";
 import { estUneRouteCv, repondreCv } from "./cv-simule";
 import { estUneRouteModele, repondreModeles } from "./modeles-simule";
 import { estUneRouteOffres, repondreOffres } from "./offres-simule";
+import { estUneRoutePaiement, repondrePaiements } from "./paiements-simule";
 
 /** Ce que `karria_api_v2` sert — en production depuis 2026-10-23 : la
  *  session, les appareils, le CV, la voix, le fil d'offres, Karria, la
- *  recherche et, depuis 2026-10-25, les modèles de CV (`/templates/`,
- *  `/user-templates/`). Le faux serveur ne répond plus qu'en mode
- *  simulation. */
+ *  recherche, depuis 2026-10-25 les modèles de CV (`/templates/`,
+ *  `/user-templates/`) et, depuis 2026-10-29, les paiements Stripe
+ *  (`/payments/`). Le faux serveur ne répond plus qu'en mode simulation. */
 const SERVI_PAR_LA_V2 = [
   "/auth/",
   "/devices/",
@@ -53,6 +54,7 @@ const SERVI_PAR_LA_V2 = [
   "/search/",
   "/templates/",
   "/user-templates/",
+  "/payments/",
 ];
 
 /** Les routes que le contrat définit avant que le backend visé ne les
@@ -182,6 +184,9 @@ export async function repondreEnSimulation(requete: RequeteSimulee): Promise<Res
 
   // Les modèles de CV : les routes de la V1, en attendant leur module v2.
   if (estUneRouteModele(chemin)) return repondreModeles(methode, chemin, corps);
+
+  // Les paiements Stripe : catalogue, sessions, droits (contrat `payments`).
+  if (estUneRoutePaiement(chemin)) return repondrePaiements(methode, chemin, corps);
 
   switch (route) {
     case "POST /auth/email/start": {
