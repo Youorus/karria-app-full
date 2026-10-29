@@ -22,7 +22,7 @@
  */
 
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Alert, Linking } from "react-native";
 
 import { useSession } from "@/features/auth/hooks/use-session";
@@ -62,6 +62,7 @@ export function useParametres(): Parametres {
   const { pousser, remplacer } = useNavigationUnique();
   const router = useRouter();
   const [notifications, setNotifications] = useState<PermissionPush | null>(null);
+  const notificationsCourantes = useRef<PermissionPush | null>(null);
   const [choixPublicitaires, setChoixPublicitaires] = useState(false);
 
   useFocusEffect(
@@ -81,12 +82,16 @@ export function useParametres(): Parametres {
       let vivant = true;
       void lirePermission().then((permission) => {
         if (!vivant) return;
-        setNotifications((precedente) => {
-          if (precedente !== null && precedente !== permission) {
-            void synchroniserAppareil();
-          }
-          return permission;
-        });
+        // Comparée hors de la fonction de mise à jour : React peut la jouer
+        // deux fois, et un effet n'a rien à y faire.
+        if (
+          notificationsCourantes.current !== null &&
+          notificationsCourantes.current !== permission
+        ) {
+          void synchroniserAppareil();
+        }
+        notificationsCourantes.current = permission;
+        setNotifications(permission);
       });
       return () => {
         vivant = false;

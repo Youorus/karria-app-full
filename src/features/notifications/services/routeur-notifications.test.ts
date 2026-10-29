@@ -143,3 +143,13 @@ describe("Le moment de naviguer", () => {
     },
   );
 });
+
+describe("Un lien dont l'identifiant n'a pas la forme attendue", () => {
+  it("retombe sur le fil, et perd ses paramètres", () => {
+    expect(destinationDe({ url: "karria://offre/..%2Fx?y=1" }).pile).toEqual(["/offres"]);
+    expect(destinationDe({ url: "karria://offre/42?from=mail#x" }).pile).toEqual([
+      "/offres",
+      "/offre/42",
+    ]);
+  });
+});

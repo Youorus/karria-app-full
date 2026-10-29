@@ -35,6 +35,7 @@ import {
 } from "react";
 
 import { desinscrireAppareil } from "@/features/notifications/api/appareils.api";
+import { liberer as libererLesAnnonces } from "@/features/publicite/hooks/reserve-annonces";
 import { auMomentDeLaDeconnexion } from "@/lib/http";
 import { lireInstallationId, oublierReponseNotifications } from "@/lib/installation";
 import { ecrireJetons, lireJetons, oublierSession, type Jetons } from "@/lib/session";
@@ -145,6 +146,7 @@ export function FournisseurDeSession({ children }: { children: ReactNode }) {
     }
     await oublierLesFournisseurs();
     await oublierSession();
+    libererLesAnnonces();
     revenirALAccueil();
   }, [revenirALAccueil]);
 

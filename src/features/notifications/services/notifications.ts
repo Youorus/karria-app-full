@@ -264,9 +264,11 @@ export function surReponse(rappel: (reponse: ReponseSysteme) => void): () => voi
  */
 export async function notificationQuiALance(): Promise<ReponseSysteme | null> {
   try {
-    const reponse = await Notifications.getLastNotificationResponseAsync();
-    if (reponse === null) return null;
-    await Notifications.clearLastNotificationResponseAsync();
+    // Les formes synchrones : les `…Async` sont dépréciées en SDK 57, et la
+    // lecture puis l'effacement se font sans fenêtre entre les deux.
+    const reponse = Notifications.getLastNotificationResponse();
+    if (reponse === null || reponse === undefined) return null;
+    Notifications.clearLastNotificationResponse();
     return versReponse(reponse);
   } catch (cause) {
     console.warn("[karria] notification de lancement illisible", cause);

@@ -15,9 +15,11 @@ import { useEffect, useSyncExternalStore } from "react";
 
 import { emplacementsPour, type RegleDeListe } from "../services/regles-publicite";
 import type { NativeAd } from "../api/publicite.api";
-import { abonner, annoncesPretes, prechauffer } from "./reserve-annonces";
+import { abonner, annoncesPretes, prechauffer, rafraichir } from "./reserve-annonces";
 
 const DELAI_MS = 2500;
+/** À ce rythme, on vérifie qu'aucune annonce affichée n'a dépassé sa durée de vie. */
+const VERIFICATION_MS = 5 * 60 * 1000;
 
 export function useAnnoncesDeListe(
   nombre: number,
@@ -28,11 +30,16 @@ export function useAnnoncesDeListe(
 
   useEffect(() => {
     if (nombreEmplacements === 0) return;
+    rafraichir();
     const minuterie = setTimeout(
       () => prechauffer(Array.from({ length: nombreEmplacements }, (_, e) => e)),
       DELAI_MS,
     );
-    return () => clearTimeout(minuterie);
+    const verification = setInterval(() => rafraichir(), VERIFICATION_MS);
+    return () => {
+      clearTimeout(minuterie);
+      clearInterval(verification);
+    };
   }, [nombreEmplacements]);
 
   return pretes;

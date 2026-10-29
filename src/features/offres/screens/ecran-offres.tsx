@@ -124,12 +124,12 @@ export function EcranOffres() {
               <FlatList
                 ref={liste}
                 data={elements}
-                keyExtractor={(el, i) =>
+                keyExtractor={(el) =>
                   el.type === "offre"
                     ? String(el.offre.id)
                     : el.type === "annonce"
                       ? `annonce-${el.emplacement}`
-                      : `${el.type}-${i}`
+                      : el.type
                 }
                 renderItem={({ item }) =>
                   item.type === "offre" ? (

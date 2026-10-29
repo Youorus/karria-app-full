@@ -37,6 +37,7 @@ import mobileAds, {
   NativeMediaAspectRatio,
   NativeAdChoicesPlacement,
   TestIds,
+  MaxAdContentRating,
 } from "react-native-google-mobile-ads";
 
 import type { BlocAnnonce } from "../services/regles-publicite";
@@ -92,9 +93,12 @@ export async function demarrerLaPublicite(test: boolean): Promise<Autorisation> 
 
   const suivi = await suiviAutoriseSurIos();
   try {
-    if (test) {
-      await mobileAds().setRequestConfiguration({ testDeviceIdentifiers: ["EMULATOR"] });
-    }
+    // Un fil d'offres d'emploi n'est pas un lieu pour des contenus adultes :
+    // la classification « T » (adolescents) borne ce que Google peut servir.
+    await mobileAds().setRequestConfiguration({
+      maxAdContentRating: MaxAdContentRating.T,
+      ...(test ? { testDeviceIdentifiers: ["EMULATOR"] } : {}),
+    });
     await mobileAds().initialize();
   } catch (cause) {
     console.warn("[karria] SDK publicitaire non initialisé", cause);

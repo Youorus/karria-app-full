@@ -22,7 +22,16 @@
  *
  * `demarrer` pose le consentement (UMP, puis ATT) et initialise le SDK,
  * une seule fois par session — d'où l'état au niveau du module, et non
- * dans un composant qui se remonte.
+ * dans un composant qui se remonte. Un **refus** n'est pas gardé : un
+ * message UMP indisponible (réseau) au premier passage ne doit pas couper
+ * les annonces jusqu'au redémarrage ; le passage suivant redemande.
+ *
+ * ═══ L'expiration ═══
+ *
+ * Google demande qu'une annonce native soit montrée dans l'heure qui suit
+ * son chargement. Une session longue, une application reprise après une
+ * nuit : `rafraichir` détruit les annonces trop vieilles et remet leurs
+ * emplacements en file ; `vider` fait de même quand on se déconnecte.
  */
 
 import { Platform } from "react-native";
@@ -46,8 +55,12 @@ const bloc = blocNatif({
   idAndroid: process.env.EXPO_PUBLIC_ADMOB_NATIVE_ANDROID,
 });
 
+/** Au-delà, une annonce chargée n'est plus montrable (règle AdMob : une heure). */
+const DUREE_DE_VIE_MS = 50 * 60 * 1000;
+
 let autorisation: Promise<Autorisation> | null = null;
 const annonces = new Map<number, NativeAd>();
+const chargeesA = new Map<number, number>();
 /** Emplacements demandés (en cours, servis, ou sans annonce) : jamais deux fois. */
 const demandes = new Set<number>();
 const file: number[] = [];
@@ -65,7 +78,10 @@ export function demarrer(): Promise<Autorisation> {
   if (bloc.mode === "coupe") {
     return Promise.resolve({ peutDemander: false, personnalisees: false });
   }
-  autorisation ??= demarrerLaPublicite(bloc.mode === "test");
+  autorisation ??= demarrerLaPublicite(bloc.mode === "test").then((reponse) => {
+    if (!reponse.peutDemander) autorisation = null;
+    return reponse;
+  });
   return autorisation;
 }
 
@@ -80,6 +96,7 @@ async function vider(): Promise<void> {
       const annonce = await chargerAnnonce(bloc, personnalisees);
       if (annonce !== null) {
         annonces.set(emplacement, annonce);
+        chargeesA.set(emplacement, Date.now());
         publier();
       }
       if (file.length > 0) await new Promise((r) => setTimeout(r, ESPACEMENT_MS));
@@ -99,6 +116,33 @@ export function prechauffer(emplacements: readonly number[]): void {
     file.push(e);
   }
   void vider();
+}
+
+/** Détruit les annonces trop vieilles et remet leurs emplacements en file. */
+export function rafraichir(maintenant: number = Date.now()): void {
+  const perimes: number[] = [];
+  for (const [emplacement, instant] of chargeesA) {
+    if (maintenant - instant >= DUREE_DE_VIE_MS) perimes.push(emplacement);
+  }
+  if (perimes.length === 0) return;
+  for (const emplacement of perimes) {
+    annonces.get(emplacement)?.destroy();
+    annonces.delete(emplacement);
+    chargeesA.delete(emplacement);
+    demandes.delete(emplacement);
+  }
+  publier();
+  prechauffer(perimes);
+}
+
+/** Tout détruire (déconnexion) : les objets natifs sont libérés, la file vidée. */
+export function liberer(): void {
+  for (const annonce of annonces.values()) annonce.destroy();
+  annonces.clear();
+  chargeesA.clear();
+  demandes.clear();
+  file.length = 0;
+  publier();
 }
 
 export function abonner(rappel: () => void): () => void {

@@ -126,9 +126,18 @@ export function lireNotification(donnees: unknown): NotificationKarria | null {
 
 /** Un détail ouvert par un simple lien garde son écran parent dessous. */
 function pileDepuisChemin(chemin: string): readonly string[] {
-  if (chemin.startsWith("/offre/")) return ["/offres", chemin];
-  if (chemin.startsWith("/modele/")) return ["/modeles", chemin];
-  return [chemin];
+  // Sans paramètres ni ancre : un lien ne porte qu'un écran et un identifiant.
+  const propre = chemin.split(/[?#]/, 1)[0] ?? chemin;
+  const detail = /^\/(offre|modele)\/([^/]+)$/.exec(propre);
+  if (detail !== null) {
+    const [, ecran, id] = detail;
+    // Même règle que pour `id` du contrat : une forme inattendue n'ouvre rien d'autre que le fil.
+    if (!FORME_ID.test(id)) return PILE_DU_FIL;
+    return ecran === "offre"
+      ? ["/offres", `/offre/${id}`]
+      : ["/modeles", `/modele/${id}`];
+  }
+  return [propre];
 }
 
 export function destinationDe(donnees: unknown): DestinationNotification {

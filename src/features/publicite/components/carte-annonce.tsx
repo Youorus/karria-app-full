@@ -66,7 +66,7 @@ export function CarteAnnonce({ annonce }: Props) {
                 {icone !== null ? (
                   <Image
                     source={{ uri: icone }}
-                    style={{ width: "100%", height: "100%" }}
+                    className="h-full w-full"
                     contentFit="cover"
                     accessibilityIgnoresInvertColors
                   />

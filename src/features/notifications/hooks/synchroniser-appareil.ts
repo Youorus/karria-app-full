@@ -15,11 +15,14 @@
  * une ligne de journal, et l'utilisateur continue comme si de rien
  * n'était. La prochaine ouverture réessaiera.
  *
- * ═══ Une à la fois ═══
+ * ═══ Une à la fois, et jamais une de perdue ═══
  *
  * Le démarrage et le changement de jeton peuvent tomber en même temps. La
  * seconde demande attend la première plutôt que d'envoyer deux `PUT`
- * concurrents dont l'ordre d'arrivée déciderait de la fiche finale.
+ * concurrents dont l'ordre d'arrivée déciderait de la fiche finale — et
+ * elle est **rejouée** après, pas fusionnée : un jeton rafraîchi pendant
+ * l'envoi du précédent doit partir lui aussi, sinon le serveur garderait
+ * un jeton mort jusqu'au prochain lancement.
  */
 
 import { lireInstallationId } from "@/lib/installation";
@@ -29,23 +32,35 @@ import { decrireAppareil } from "../services/appareil";
 import { lirePermission, obtenirLeJetonPush } from "../services/notifications";
 
 let enCours: Promise<void> | null = null;
+let relancer = false;
+
+async function executer(): Promise<void> {
+  try {
+    const permission = await lirePermission();
+    // Un jeton ne se demande qu'à qui a dit oui : avant, l'appel
+    // déclencherait la boîte de permission à l'insu de l'écran.
+    const jeton = permission === "granted" ? await obtenirLeJetonPush() : null;
+    await enregistrerAppareil(
+      await lireInstallationId(),
+      decrireAppareil(permission, jeton),
+    );
+  } catch (cause) {
+    console.warn("[karria] enregistrement de l'appareil impossible", cause);
+  }
+}
 
 export function synchroniserAppareil(): Promise<void> {
-  enCours ??= (async () => {
-    try {
-      const permission = await lirePermission();
-      // Un jeton ne se demande qu'à qui a dit oui : avant, l'appel
-      // déclencherait la boîte de permission à l'insu de l'écran.
-      const jeton = permission === "granted" ? await obtenirLeJetonPush() : null;
-      await enregistrerAppareil(
-        await lireInstallationId(),
-        decrireAppareil(permission, jeton),
-      );
-    } catch (cause) {
-      console.warn("[karria] enregistrement de l'appareil impossible", cause);
-    } finally {
-      enCours = null;
-    }
+  if (enCours !== null) {
+    // Une demande pendant l'envoi : on la retient et on la joue juste après.
+    relancer = true;
+    return enCours;
+  }
+  enCours = (async () => {
+    do {
+      relancer = false;
+      await executer();
+    } while (relancer);
+    enCours = null;
   })();
   return enCours;
 }

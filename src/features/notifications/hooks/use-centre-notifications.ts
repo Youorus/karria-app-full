@@ -149,12 +149,13 @@ export function useCentreNotifications(): CentreNotifications {
   }, [aiguilleur, banniere]);
 
   // Une nouvelle bannière relance le délai ; la précédente est remplacée.
+  // L'expiration n'est pas un geste : elle ne compte pas comme « écartée ».
   const cleBanniere = banniere?.cle ?? null;
   useEffect(() => {
     if (cleBanniere === null) return;
-    const minuterie = setTimeout(fermerBanniere, DUREE_BANNIERE_MS);
+    const minuterie = setTimeout(() => setBanniere(null), DUREE_BANNIERE_MS);
     return () => clearTimeout(minuterie);
-  }, [cleBanniere, fermerBanniere]);
+  }, [cleBanniere]);
 
   return { banniere, ouvrirBanniere, fermerBanniere };
 }
