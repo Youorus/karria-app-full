@@ -3,7 +3,55 @@
 > Document de passation. À lire en premier par toute personne ou IA qui
 > reprend le travail, avec `AGENTS.md`. Mis à jour à chaque fin de session.
 
-**Dernière mise à jour : 2026-10-25**
+**Dernière mise à jour : 2026-10-29**
+
+## Session du 2026-10-29 — relecture Fable : performance sur appareils modestes, push, AdMob
+
+**Verdict sur l'aura et l'orbe (question de Marc).** Oui, telles quelles, elles coûtaient sur un
+Android d'entrée de gamme — pas par le calcul des grains (2 600 grains ≈ 1,5 ms sur le fil
+d'interface) mais par le **GPU** : l'aura peint trois dégradés radiaux de 2 à 3 écrans de
+surface **et** change l'opacité/l'échelle du calque entier à chaque image (calque hors écran +
+recomposition) ; l'orbe floute (rayon ≈ 17 px pour 120 pt) un calque de la taille de sa boîte.
+Et les **cinq onglets** gardaient chacun leur aura animée hors écran. Rien de tout cela ne se
+voyait sur l'iPhone 17 du simulateur.
+
+**Fait** (`src/hooks/qualite-visuelle.ts`, pur et testé ; `use-qualite-visuelle.ts`) :
+
+- un **palier visuel** décidé une fois par session (`expo-device` : année de classe, mémoire ;
+  `PixelRatio` ; plateforme) : `haut` / `moyen` / `bas` ; iOS part du haut, Android du moyen ;
+- **aura** : ne bouge que si son écran est au premier plan et l'app active ; `moyen` → dérive
+  sans souffle (opacité/échelle fixes : plus de calque hors écran) ; `bas` → image fixe ;
+  mouvement réduit respecté comme avant ;
+- **orbe** : `moyen` → 60 % des grains (plafond 1 400) et flou de moitié ; `bas` → 35 %
+  (plafond 600), **pas de flou**, horloge à 30 images/s (Skia ne redessine que quand elle
+  avance) ; pauses existantes (hors écran, arrière-plan, mouvement réduit) gardées.
+- Non mesuré sur un vrai Android (pas d'appareil ici) : les seuils (`2017`, `2020`, `3,5 Go`,
+  densité `2,5`) sont des choix raisonnés à ajuster au premier retour.
+
+**Push et AdMob — corrigé** : un changement de jeton pendant un envoi est **rejoué** (il était
+fusionné et perdu jusqu'au prochain lancement) ; l'expiration de la bannière ne compte plus
+comme « écartée » ; API `getLastNotificationResponse` synchrones (les `…Async` sont dépréciées
+en SDK 57) ; plus d'effet dans un `setState` (Paramètres) ; un lien `url` ne pousse qu'un
+identifiant de forme connue, sans paramètres ; un refus **passager** du consentement UMP n'est
+plus gardé pour la session ; les annonces natives **expirent** (50 min, `destroy()` puis
+rechargement) et sont libérées à la déconnexion ; `maxAdContentRating: T` ; clés de liste
+stables ; plus de style en ligne dans la carte d'annonce.
+
+**À Marc — modifications non commitées dans l'arbre, non touchées** (`ecran-detail-offre.tsx`,
+`use-detail-offre.ts`, `carte-cafe.tsx`, `ecran-bienvenue.tsx`, `carte-identite.tsx`…) :
+1. le détail d'une offre réutilise **la même** `NativeAd` que l'emplacement 0 du fil (trafic
+   invalide pour Google) et affiche à défaut une fausse carte « Sponsorisé — Karria AI Pro » :
+   à retirer, ou lui donner son propre emplacement ; le `console.log` « vue pub comptabilisée »
+   de `use-detail-offre.ts` ne compte rien ;
+2. la carte café passe par Stripe Checkout (API `payments`) : règle 3.1.1 de l'App Store — voir
+   `karria_api_v2/docs/adr/0023-encaissements-stripe.md` ; l'API répond 503 tant que la clé
+   n'est pas posée.
+
+**Reste (AdMob, à décider)** : `NativeMediaView` absent de la carte (la politique AdMob
+demande un média ou une image ; le validateur n'a rien dit) ; `skAdNetworkItems` absent
+d'`app.json` (attribution iOS) ; `userTrackingUsageDescription` déclaré deux fois.
+
+`npm run check` vert (240 tests), `npx expo export --platform ios` produit un paquet.
 
 ## Session du 2026-10-25 (suite) — notifications de niveau « grande app », AdMob, tuile sans logo
 
