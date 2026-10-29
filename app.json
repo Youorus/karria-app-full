@@ -71,7 +71,9 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Karria t'écoute quand tu préfères parler plutôt qu'écrire, pour rédiger ton CV avec toi."
+          "microphonePermission": "Karria t'écoute quand tu préfères parler plutôt qu'écrire, pour rédiger ton CV avec toi.",
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
         }
       ],
       [
