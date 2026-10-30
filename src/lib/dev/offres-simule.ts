@@ -24,6 +24,8 @@
  * jamais pour la juger.
  */
 
+import { consentementIaAccorde, refusIa } from "./consentement-simule";
+
 // ─────────────────────────────────────────────────────────────────────
 // Les formes
 // ─────────────────────────────────────────────────────────────────────
@@ -1161,6 +1163,11 @@ export function repondreOffres(
   if (match !== null) return match;
 
   if (route === "POST /assistant/messages") {
+    // Comme la vraie API (ADR-0025) : l'accord sur l'IA avant le premier message.
+    if (!consentementIaAccorde()) {
+      const refus = refusIa();
+      return erreur(refus.statut, refus.raison, refus.message, refus.details);
+    }
     const contenu = champ(corps, "content");
     if (typeof contenu !== "string" || contenu.trim() === "") {
       return erreur(422, "assistant_message_empty", "Le message est vide.", {

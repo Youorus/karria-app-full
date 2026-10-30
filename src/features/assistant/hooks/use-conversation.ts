@@ -28,6 +28,15 @@
  * suites possibles, pas de l'historique. Un élargissement touché part
  * comme un message — c'est le serveur qui le reconnaît et l'applique.
  *
+ * ═══ Le premier message demande l'accord sur l'IA ═══
+ *
+ * Un message part chez un modèle tiers : avant le premier, la feuille de
+ * consentement se montre (`useActionIa`), et le message part dès « J'accepte
+ * et je continue ». Si le serveur répond quand même `ai_consent_required`
+ * (accord retiré, fournisseur changé), la bulle optimiste se retire, la
+ * feuille se remontre, et le message repart tout seul après l'accord — sans
+ * message d'erreur, puisque ce n'est pas une panne.
+ *
  * ═══ La recherche se voit dans le fil ═══
  *
  * Quand Karria a lancé une recherche, le fil derrière le rideau n'est
@@ -37,6 +46,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useActionIa } from "@/features/auth/hooks/use-action-ia";
 import { ErreurApi } from "@/lib/http";
 import { envoyerMessage } from "../api/assistant.api";
 import { BATTEMENT_MS, borneSuivante } from "@/lib/revelation";
@@ -94,6 +104,10 @@ export function useConversation(onRecherche?: (resultats: number) => void): Conv
   const [erreur, setErreur] = useState<string | null>(null);
   const [suite, setSuite] = useState<Suite | null>(null);
   const conversationId = useRef<string | null>(null);
+  const { avecConsentement, rejouerSiConsentementRequis } = useActionIa();
+  // Le rejeu après l'accord passe par une référence : la fonction se cite
+  // elle-même, et React refuse qu'une valeur soit lue avant d'être déclarée.
+  const rejouer = useRef<(texte: string) => void>(() => undefined);
 
   // La réponse en cours de révélation, s'il y en a une.
   const enRevelation = messages.find(
@@ -115,11 +129,8 @@ export function useConversation(onRecherche?: (resultats: number) => void): Conv
     return () => clearTimeout(battement);
   }, [enRevelation]);
 
-  const envoyer = useCallback(
-    (fourni?: string) => {
-      const texte = (fourni ?? brouillon).trim();
-      if (texte === "" || reflechit) return;
-
+  const expedier = useCallback(
+    (texte: string) => {
       setErreur(null);
       setBrouillon("");
       setSuite(null);
@@ -157,12 +168,32 @@ export function useConversation(onRecherche?: (resultats: number) => void): Conv
             conversationId.current = null;
           }
           setMessages((liste) => liste.filter((m) => m.id !== id));
+          // Le serveur veut l'accord d'abord : la feuille s'ouvre, le message
+          // repartira tout seul. Rien à afficher d'autre.
+          if (
+            rejouerSiConsentementRequis(cause, "assistant", () => rejouer.current(texte))
+          ) {
+            return;
+          }
           setBrouillon(texte);
           setErreur(messageDErreur(cause));
         })
         .finally(() => setReflechit(false));
     },
-    [brouillon, reflechit, onRecherche],
+    [onRecherche, rejouerSiConsentementRequis],
+  );
+
+  useEffect(() => {
+    rejouer.current = expedier;
+  }, [expedier]);
+
+  const envoyer = useCallback(
+    (fourni?: string) => {
+      const texte = (fourni ?? brouillon).trim();
+      if (texte === "" || reflechit) return;
+      avecConsentement("assistant", () => expedier(texte));
+    },
+    [brouillon, reflechit, avecConsentement, expedier],
   );
 
   const changerBrouillon = useCallback(

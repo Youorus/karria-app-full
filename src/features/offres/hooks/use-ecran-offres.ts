@@ -14,6 +14,13 @@
  * En haut du fil, il ouvre Karria ; une fois la liste défilée, il ramène
  * en haut (V1). `defile` le dit à l'écran.
  *
+ * ═══ Sans compte ═══
+ *
+ * Le ✦ ouvre la porte au lieu de Karria : la feuille de connexion dit ce
+ * qu'on gagne, et Karria s'ouvre toute seule une fois connecté. Le détail
+ * s'ouvre sans rien noter. La feuille de filtres cache l'« Affichage »
+ * (sauvegardées, non vues, non postulées) : ces filtres parlent d'un compte.
+ *
  * ═══ Karria et le fil se répondent ═══
  *
  * Quand Karria lance une recherche dans le rideau, le fil se recharge
@@ -27,6 +34,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ViewabilityConfigCallbackPairs, ViewToken } from "react-native";
 
 import { useMenuCompte } from "@/features/auth/hooks/use-menu-compte";
+import { ouvrirPorte } from "@/features/auth/hooks/porte-store";
+import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
 import type { NativeAd } from "@/features/publicite/api/publicite.api";
 import { useAnnoncesDeListe } from "@/features/publicite/hooks/use-annonces-de-liste";
 import { entrelacer, REGLE_DU_FIL } from "@/features/publicite/services/regles-publicite";
@@ -60,6 +69,8 @@ export interface EcranOffres extends FilOffres {
   feuilleFiltres: boolean;
   ouvrirFiltres: () => void;
   fermerFiltres: () => void;
+  /** Sans compte : la feuille de filtres n'offre pas l'« Affichage ». */
+  invite: boolean;
   agentOuvert: boolean;
   ouvrirAgent: () => void;
   fermerAgent: () => void;
@@ -79,6 +90,7 @@ export interface EcranOffres extends FilOffres {
 const nombre = (n: number) => n.toLocaleString("fr-FR");
 
 export function useEcranOffres(): EcranOffres {
+  const { exiger, invite } = usePorte();
   const fil = useFilOffres();
   const ouvrirMenu = useMenuCompte();
   const { pousser } = useNavigationUnique();
@@ -104,7 +116,12 @@ export function useEcranOffres(): EcranOffres {
   const [karriaVu, setKarriaVu] = useState<string | undefined>(undefined);
   if (karria !== karriaVu) {
     setKarriaVu(karria);
-    if (karria === "1") setAgentOuvert(true);
+    // Un invité n'a pas de notification, mais un lien se forge : la porte,
+    // pas Karria.
+    if (karria === "1") {
+      if (invite) ouvrirPorte("karria", { cle: "karria" });
+      else setAgentOuvert(true);
+    }
   }
   useEffect(() => {
     if (karria === "1") routeur.setParams({ karria: undefined });
@@ -178,14 +195,19 @@ export function useEcranOffres(): EcranOffres {
   const ouvrirOffre = useCallback(
     (offre: Offre) => {
       memoriser([offre]);
-      if (offre.nonOuverte) {
+      if (offre.nonOuverte && !invite) {
         marquerOuverte(offre);
         noterDetailOuvert(offre.id);
       }
       pousser({ pathname: "/offre/[id]", params: { id: offre.id } });
     },
-    [pousser, marquerOuverte],
+    [pousser, marquerOuverte, invite],
   );
+
+  const ouvrirAgent = useCallback(() => {
+    if (exiger("karria", { cle: "karria" })) setAgentOuvert(true);
+  }, [exiger]);
+  useReprise("karria", () => setAgentOuvert(true));
 
   const signalerDefilement = useCallback((y: number) => setDefile(y > 0), []);
 
@@ -224,8 +246,9 @@ export function useEcranOffres(): EcranOffres {
     feuilleFiltres,
     ouvrirFiltres: useCallback(() => setFeuilleFiltres(true), []),
     fermerFiltres: useCallback(() => setFeuilleFiltres(false), []),
+    invite,
     agentOuvert,
-    ouvrirAgent: useCallback(() => setAgentOuvert(true), []),
+    ouvrirAgent,
     fermerAgent: useCallback(() => setAgentOuvert(false), []),
     surRecherche,
     visibilite,

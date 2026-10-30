@@ -10,6 +10,11 @@
  * l'application. Mélanger les deux faisait de l'onglet une liste de
  * boutons où l'on cherchait son nom.
  *
+ * ═══ Sans compte ═══
+ *
+ * Rien n'est lu : le profil montre l'invitation (l'orbe, ce qu'un compte
+ * apporte, « Se connecter ») et laisse les paramètres accessibles.
+ *
  * ═══ Relu à chaque retour ═══
  *
  * Le CV peut avoir été créé entre deux visites (onglet CV, ou la carte
@@ -23,6 +28,8 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 
 import { lireMoi } from "@/features/auth/api/auth.api";
+import { usePorte } from "@/features/auth/hooks/use-porte";
+import { poserConsentementIa } from "@/features/auth/services/consentement-ia";
 import { lireBrouillon, lireMonCv } from "@/features/cv/api/cv.api";
 import type { Cv } from "@/features/cv/types/cv.types";
 import { useSoutien, type Soutien } from "@/features/soutien/hooks/use-soutien";
@@ -37,6 +44,10 @@ import {
 } from "../services/identite";
 
 export interface Profil {
+  /** Sans compte : l'invitation remplace les cartes. */
+  invite: boolean;
+  /** Ouvre la feuille de connexion. */
+  seConnecter: () => void;
   /** `null` tant qu'on charge : la carte montre un squelette. */
   identite: Identite | null;
   email: string | null;
@@ -50,16 +61,21 @@ export interface Profil {
 
 export function useProfil(): Profil {
   const { pousser } = useNavigationUnique();
-  const soutien = useSoutien();
+  const { exiger, invite } = usePorte();
+  const soutien = useSoutien(!invite);
   const [email, setEmail] = useState<string | null>(null);
   const [cvLu, setCvLu] = useState<{ cv: Cv | null; brouillon: boolean } | null>(null);
 
   useFocusEffect(
     useCallback(() => {
+      if (invite) return undefined;
       let vivant = true;
       lireMoi().then(
         (moi) => {
-          if (vivant) setEmail(moi.email);
+          if (!vivant) return;
+          setEmail(moi.email);
+          // Le profil relit le compte : l'état du consentement à l'IA suit.
+          poserConsentementIa(moi.consentementIa);
         },
         (cause: unknown) => console.warn("[karria] profil indisponible", cause),
       );
@@ -77,7 +93,7 @@ export function useProfil(): Profil {
       return () => {
         vivant = false;
       };
-    }, []),
+    }, [invite]),
   );
 
   const etat = cvLu === null ? null : etatDuCv(cvLu.cv, cvLu.brouillon);
@@ -87,6 +103,8 @@ export function useProfil(): Profil {
   }, [etat, pousser]);
 
   return {
+    invite,
+    seConnecter: useCallback(() => void exiger("profil"), [exiger]),
     identite: email === null && cvLu === null ? null : identite(email, cvLu?.cv ?? null),
     email,
     cv:

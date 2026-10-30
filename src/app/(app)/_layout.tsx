@@ -1,10 +1,24 @@
 /**
- * L'espace connecté : les onglets, et ce qui s'ouvre par-dessus.
+ * L'espace de l'application : les onglets, et ce qui s'ouvre par-dessus —
+ * pour une personne connectée **ou un invité**.
  *
- * ═══ Le garde ═══
+ * ═══ Plus de garde à l'entrée ═══
  *
- * Toute route de ce groupe exige une session. Le contrôle vit ici, une
- * fois : un écran ajouté demain est protégé sans qu'on y pense.
+ * Les offres ne sont pas un contenu de compte (App Store 5.1.1 v) : ce
+ * groupe se monte sans session. Ce qui demande un compte — garder, parler à
+ * Karria, le CV, le profil — s'en charge au geste, par la porte
+ * (`features/auth/hooks/use-porte.ts`) : l'invitation à se connecter monte
+ * par-dessus, et l'écran reprend son geste une fois la session ouverte. Ne
+ * pas démonter ce groupe à la connexion est ce qui rend la reprise possible.
+ *
+ * Ce qui ne doit tourner **qu'une fois connecté** — l'enregistrement de
+ * l'appareil, la lecture des droits — vit dans `GardeAppareil`, monté sur la
+ * session seulement.
+ *
+ * ═══ Deux feuilles, montées une fois ═══
+ *
+ * L'invitation à se connecter et la feuille de consentement à l'IA : des
+ * `Modal` globaux, ouverts par un store depuis n'importe quel hook.
  *
  * ═══ Le détail d'une offre ═══
  *
@@ -17,8 +31,10 @@
  */
 
 import { Platform } from "react-native";
-import { Redirect, Stack } from "expo-router";
+import { Stack } from "expo-router";
 
+import { FeuilleConsentementIa } from "@/features/auth/components/feuille-consentement-ia";
+import { InvitationConnexion } from "@/features/auth/components/invitation-connexion";
 import { useSession } from "@/features/auth/hooks/use-session";
 import { useAppareilConnecte } from "@/features/notifications/hooks/use-appareil-connecte";
 import { useDroitsConnectes } from "@/features/soutien/hooks/use-droits-connectes";
@@ -29,13 +45,9 @@ export default function LayoutApp() {
   const { etat } = useSession();
   const { mode } = useTheme();
 
-  if (etat !== "connecte") {
-    return <Redirect href="/bienvenue" />;
-  }
-
   return (
     <>
-      <GardeAppareil />
+      {etat === "connecte" ? <GardeAppareil /> : null}
       <Stack
         screenOptions={{
           headerShown: false,
@@ -86,6 +98,8 @@ export default function LayoutApp() {
             navigateur (page ouverte dans Safari) : il renvoie au profil. */}
         <Stack.Screen name="paiement/retour" options={{ animation: "none" }} />
       </Stack>
+      <InvitationConnexion />
+      <FeuilleConsentementIa />
     </>
   );
 }
@@ -93,8 +107,8 @@ export default function LayoutApp() {
 /**
  * L'appareil s'enregistre et les droits (sans pub) se lisent, tant qu'une
  * session existe. Un composant sans rendu plutôt que des hooks appelés
- * ici : ils ne doivent tourner **qu'une fois connecté**, et un hook ne
- * peut pas être appelé après le `Redirect` ci-dessus.
+ * dans la mise en page : ils ne doivent tourner **qu'une fois connecté**,
+ * et un hook ne se monte pas sous condition.
  */
 function GardeAppareil() {
   useAppareilConnecte();

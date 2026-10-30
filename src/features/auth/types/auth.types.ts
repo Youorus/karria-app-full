@@ -43,19 +43,60 @@ export interface ConnexionBrute {
 
 export interface Connexion {
   jetons: { acces: string; rafraichissement: string };
-  compte: Moi;
+  compte: Compte;
   /** Vrai à la toute première connexion : l'assistant se présente. */
   compteCree: boolean;
+}
+
+/** Les outils d'IA, tels que le serveur les nomme (`purposes`). */
+export type UsageIa =
+  | "assistant"
+  | "transcription"
+  | "cv_creation"
+  | "cv_import"
+  | "photo_enhancement"
+  | "template_analysis";
+
+/** `GET /auth/me/ai-consent` — `docs/contrat-api-consentement-ia.md`. */
+export interface ConsentementIaBrut {
+  required: boolean;
+  disclosure: {
+    version: string;
+    providers: { id: string; name: string }[];
+    purposes: UsageIa[];
+  };
+  accepted_version: string | null;
+  accepted_at: string | null;
+  revoked_at: string | null;
+}
+
+export interface ConsentementIa {
+  /** Vrai : montrer la feuille avant tout outil d'IA. */
+  requis: boolean;
+  /** La version à renvoyer à l'acceptation — celle qu'on a montrée. */
+  version: string;
+  fournisseurs: { id: string; nom: string }[];
+  usages: UsageIa[];
+  versionAcceptee: string | null;
+  accepteLe: string | null;
+  retireLe: string | null;
 }
 
 export interface MoiBrut {
   id: string;
   email: string;
+  ai_consent: ConsentementIaBrut;
 }
 
-export interface Moi {
+/** Le compte tel que la connexion le rend : l'identifiant et l'adresse. */
+export interface Compte {
   id: string;
   email: string;
+}
+
+/** `GET /auth/me` : le compte, et où en est son consentement à l'IA. */
+export interface Moi extends Compte {
+  consentementIa: ConsentementIa;
 }
 
 /**

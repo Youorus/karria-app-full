@@ -7,8 +7,13 @@
  * chapitres validés ou passés.
  */
 
-import { describe, expect, it } from "@jest/globals";
+import { beforeAll, describe, expect, it } from "@jest/globals";
 
+import {
+  accepterConsentementIa,
+  retirerConsentementIa,
+  VERSION_SIMULEE,
+} from "./consentement-simule";
 import { estUneRouteCv, repondreCv } from "./cv-simule";
 
 async function appeler(methode: string, chemin: string, corps?: unknown) {
@@ -27,7 +32,28 @@ describe("Les routes en avance sur le backend", () => {
   });
 });
 
+describe("La porte de l'IA (ADR-0025)", () => {
+  it("refuse l'interprétation tant que l'accord n'est pas donné", async () => {
+    retirerConsentementIa();
+    const { statut, corps } = await appeler("POST", "/cv/draft/interpret", {
+      chapter: "identity",
+      answer: "Je suis Awa",
+    });
+    expect(statut).toBe(403);
+    const details = (corps.error as { details: { reason: string; version: string } })
+      .details;
+    expect(details.reason).toBe("ai_consent_required");
+    expect(details.version).toBe(VERSION_SIMULEE);
+    expect(accepterConsentementIa("autre")).toBe(VERSION_SIMULEE);
+    expect(accepterConsentementIa(VERSION_SIMULEE)).toBeNull();
+  });
+});
+
 describe("L'interprétation simulée", () => {
+  beforeAll(() => {
+    accepterConsentementIa(VERSION_SIMULEE);
+  });
+
   it("tire une expérience au format V1 d'une phrase libre", async () => {
     const { corps } = await appeler("POST", "/cv/draft/interpret", {
       chapter: "experiences",
@@ -54,6 +80,10 @@ describe("L'interprétation simulée", () => {
 });
 
 describe("L'import d'un CV existant", () => {
+  beforeAll(() => {
+    accepterConsentementIa(VERSION_SIMULEE);
+  });
+
   const fichier = (type: string) => ({
     getParts: () => [{ fieldName: "file", uri: "file:///cv.pdf", type }],
   });

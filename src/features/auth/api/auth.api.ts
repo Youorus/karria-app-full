@@ -17,6 +17,7 @@
 
 import { http } from "@/lib/http";
 import { VERSIONS } from "../services/consentements";
+import { versConsentementIa } from "./consentement-ia.api";
 import type {
   Connexion,
   ConnexionBrute,
@@ -110,7 +111,11 @@ export async function connecterAvec(
 
 export async function lireMoi(): Promise<Moi> {
   const brut = await http.get<MoiBrut>("/auth/me");
-  return { id: brut.id, email: brut.email };
+  return {
+    id: brut.id,
+    email: brut.email,
+    consentementIa: versConsentementIa(brut.ai_consent),
+  };
 }
 
 export async function revoquerLaSession(rafraichissement: string): Promise<void> {

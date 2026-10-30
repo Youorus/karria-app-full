@@ -1,9 +1,24 @@
-# Contrat API — le compte : sa suppression
+# Contrat API — le compte : `GET /auth/me` et sa suppression
 
-Ce que `karria_api_v2` expose pour qu'une personne supprime son compte
-depuis l'application, en disant pourquoi elle part. La forme exécutable de
-ce contrat est `src/lib/dev/serveur-simule.ts` (section `/auth/`) : les
-deux doivent toujours dire la même chose.
+Ce que `karria_api_v2` expose sur le compte connecté et pour qu'une personne
+supprime son compte depuis l'application, en disant pourquoi elle part. La
+forme exécutable de ce contrat est `src/lib/dev/serveur-simule.ts` (section
+`/auth/`) : les deux doivent toujours dire la même chose.
+
+## `GET /auth/me` → `200`
+
+```jsonc
+{
+  "id": "…", // UUID
+  "email": "awa@exemple.fr",
+  "ai_consent": { … } // depuis le 2026-10-30 : l'objet de `GET /auth/me/ai-consent`
+}
+```
+
+`ai_consent` dit, dès l'ouverture de session, si la feuille de consentement à
+l'IA devra se montrer avant le premier outil d'IA (`required`), et quelle
+`disclosure` (version, fournisseurs, usages) afficher. Le détail est dans
+`contrat-api-consentement-ia.md`.
 
 ## Le principe
 

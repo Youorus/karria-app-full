@@ -338,15 +338,16 @@ export const http = {
   /**
    * Supprime une ressource.
    *
-   * Sans retour : les routes de suppression du projet répondent toutes
-   * `204`, et attendre un JSON là où il n'y en a pas ferait échouer un
-   * appel qui a réussi.
+   * Sans retour par défaut : les routes de suppression du projet répondent
+   * presque toutes `204`, et attendre un JSON là où il n'y en a pas ferait
+   * échouer un appel qui a réussi. Le retrait du consentement à l'IA, lui,
+   * rend l'état qui en résulte : on nomme alors le type attendu.
    *
    * Le corps est facultatif. Une seule route s'en sert — la suppression du
    * compte, qui emporte la raison du départ (`docs/contrat-api-compte.md`).
    * Un `DELETE` avec corps est licite en HTTP et `fetch` l'envoie ; c'est
    * plus juste qu'un `POST /auth/me/delete` qui cacherait le verbe.
    */
-  delete: (chemin: string, body?: unknown) =>
-    appeler<void>(chemin, { method: "DELETE", body }),
+  delete: <T = void>(chemin: string, body?: unknown) =>
+    appeler<T>(chemin, { method: "DELETE", body }),
 };

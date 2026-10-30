@@ -62,6 +62,7 @@ export function EcranOffres() {
     filtres,
     options,
     filtresActifs,
+    invite,
     actualiser,
     chargerLaSuite,
     appliquerFiltres,
@@ -222,6 +223,7 @@ export function EcranOffres() {
 
       <FeuilleFiltres
         visible={feuilleFiltres}
+        invite={invite}
         filtres={filtres}
         options={options}
         actifs={filtresActifs}

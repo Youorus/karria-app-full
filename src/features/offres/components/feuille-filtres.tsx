@@ -120,6 +120,8 @@ function basculer(liste: string[], valeur: string): string[] {
 
 interface Props {
   visible: boolean;
+  /** Sans compte : pas d'« Affichage » — ces filtres parlent d'un compte. */
+  invite?: boolean;
   filtres: Filtres;
   options: OptionsDeFiltre;
   actifs: number;
@@ -129,6 +131,7 @@ interface Props {
 
 export function FeuilleFiltres({
   visible,
+  invite = false,
   filtres,
   options,
   actifs,
@@ -216,25 +219,27 @@ export function FeuilleFiltres({
           <ScrollView contentContainerClassName="gap-6 px-5 py-4">
             {vue === "principale" ? (
               <>
-                <Section titre="Affichage">
-                  <HStack className="flex-wrap gap-2">
-                    <Pastille
-                      libelle="Sauvegardées"
-                      active={filtres.sauvegardees}
-                      onPress={() => changer({ sauvegardees: !filtres.sauvegardees })}
-                    />
-                    <Pastille
-                      libelle="Non vues"
-                      active={filtres.nonVues}
-                      onPress={() => changer({ nonVues: !filtres.nonVues })}
-                    />
-                    <Pastille
-                      libelle="Non postulées"
-                      active={filtres.nonPostulees}
-                      onPress={() => changer({ nonPostulees: !filtres.nonPostulees })}
-                    />
-                  </HStack>
-                </Section>
+                {invite ? null : (
+                  <Section titre="Affichage">
+                    <HStack className="flex-wrap gap-2">
+                      <Pastille
+                        libelle="Sauvegardées"
+                        active={filtres.sauvegardees}
+                        onPress={() => changer({ sauvegardees: !filtres.sauvegardees })}
+                      />
+                      <Pastille
+                        libelle="Non vues"
+                        active={filtres.nonVues}
+                        onPress={() => changer({ nonVues: !filtres.nonVues })}
+                      />
+                      <Pastille
+                        libelle="Non postulées"
+                        active={filtres.nonPostulees}
+                        onPress={() => changer({ nonPostulees: !filtres.nonPostulees })}
+                      />
+                    </HStack>
+                  </Section>
+                )}
                 <Section titre="Publication">
                   <HStack className="flex-wrap gap-2">
                     {PERIODES.map((p) => (

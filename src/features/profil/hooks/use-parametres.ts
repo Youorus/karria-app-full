@@ -15,6 +15,17 @@
  * qu'on les a réactivées. Et si elle a changé, l'appareil se réenregistre
  * pour que le serveur le sache.
  *
+ * ═══ Sans compte ═══
+ *
+ * L'apparence, les documents et la version restent ; les notifications, le
+ * consentement à l'IA et le compte parlent d'une personne : la ligne
+ * « Se connecter » les remplace.
+ *
+ * ═══ Karria et l'IA ═══
+ *
+ * La ligne ouvre la feuille de consentement en consultation : ce qui part,
+ * chez qui, la date de l'accord, et « Retirer mon consentement ».
+ *
  * ═══ La suppression n'est pas ici ═══
  *
  * Elle a son écran : une raison à choisir, ce qui disparaît à lire, un
@@ -25,7 +36,9 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { Alert, Linking } from "react-native";
 
+import { usePorte } from "@/features/auth/hooks/use-porte";
 import { useSession } from "@/features/auth/hooks/use-session";
+import { ouvrirConsultationIa } from "@/features/auth/services/consentement-ia";
 import { ouvrirDocument, type Document } from "@/features/auth/services/documents";
 import { synchroniserAppareil } from "@/features/notifications/hooks/synchroniser-appareil";
 import { lirePermission } from "@/features/notifications/services/notifications";
@@ -39,6 +52,11 @@ import { VERSION } from "@/lib/version";
 import { useTheme, type Theme } from "@/theme/preference";
 
 export interface Parametres {
+  /** Sans compte : les sections d'un compte cèdent la place à « Se connecter ». */
+  invite: boolean;
+  seConnecter: () => void;
+  /** Ouvre la feuille « Karria et tes données » (consultation, retrait). */
+  consentementIa: () => void;
   theme: Theme;
   changerTheme: (theme: Theme) => void;
   /** `null` tant qu'on ne sait pas : rien à afficher plutôt qu'un faux état. */
@@ -58,6 +76,7 @@ export interface Parametres {
 
 export function useParametres(): Parametres {
   const { fermer } = useSession();
+  const { exiger, invite } = usePorte();
   const { theme, changerTheme } = useTheme();
   const { pousser, remplacer } = useNavigationUnique();
   const router = useRouter();
@@ -79,6 +98,7 @@ export function useParametres(): Parametres {
 
   useFocusEffect(
     useCallback(() => {
+      if (invite) return undefined;
       let vivant = true;
       void lirePermission().then((permission) => {
         if (!vivant) return;
@@ -96,7 +116,7 @@ export function useParametres(): Parametres {
       return () => {
         vivant = false;
       };
-    }, []),
+    }, [invite]),
   );
 
   const gererNotifications = useCallback(() => {
@@ -122,6 +142,9 @@ export function useParametres(): Parametres {
   }, [router, remplacer]);
 
   return {
+    invite,
+    seConnecter: useCallback(() => void exiger("profil"), [exiger]),
+    consentementIa: useCallback(() => ouvrirConsultationIa(), []),
     theme,
     changerTheme,
     notifications,

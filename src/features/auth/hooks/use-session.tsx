@@ -35,10 +35,12 @@ import {
 } from "react";
 
 import { desinscrireAppareil } from "@/features/notifications/api/appareils.api";
+import { poserConsentementIa } from "../services/consentement-ia";
 import { liberer as libererLesAnnonces } from "@/features/publicite/hooks/reserve-annonces";
 import { auMomentDeLaDeconnexion } from "@/lib/http";
 import { poserSansPub } from "@/lib/sans-pub";
 import { lireInstallationId, oublierReponseNotifications } from "@/lib/installation";
+import { oublierDecouverte } from "@/lib/invite";
 import { ecrireJetons, lireJetons, oublierSession, type Jetons } from "@/lib/session";
 import { revoquerLaSession } from "../api/auth.api";
 import { oublierLesFournisseurs } from "../services/social";
@@ -104,6 +106,10 @@ export function FournisseurDeSession({ children }: { children: ReactNode }) {
   const revenirALAccueil = useCallback(() => {
     // Les droits sont ceux d'un compte : le prochain repart avec des annonces.
     poserSansPub(false);
+    // Qui sort veut l'accueil, pas le fil d'un invité, à la prochaine ouverture.
+    void oublierDecouverte();
+    // L'accord sur l'IA est celui d'un compte : le prochain repart de zéro.
+    poserConsentementIa(null);
     setEtat("anonyme");
     router.replace("/bienvenue");
   }, [router]);
@@ -164,6 +170,7 @@ export function FournisseurDeSession({ children }: { children: ReactNode }) {
     await oublierLesFournisseurs();
     await oublierSession();
     poserSansPub(false);
+    poserConsentementIa(null);
     setEtat("anonyme");
     router.replace({ pathname: "/bienvenue", params: { [PARAMETRE_ADIEU]: "1" } });
   }, [router]);

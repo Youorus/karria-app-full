@@ -2,8 +2,15 @@
 
 Ce que `karria_api_v2` exposera pour l'onglet **Modèles** (galerie, détail, aperçus), le
 choix d'un modèle par la personne, l'export de son CV en **PDF** et en **DOCX**, et le
-**score de compatibilité ATS** de chaque CV produit. Préfixe `/api/v1`, session exigée
-(`Authorization: Bearer`), erreurs au format `{ error: { code, message, details } }`.
+**score de compatibilité ATS** de chaque CV produit. Préfixe `/api/v1`, erreurs au format
+`{ error: { code, message, details } }`. Session (`Authorization: Bearer`) exigée partout,
+**sauf** la galerie, le détail et les avis (`GET /templates/`, `GET /templates/{id}`,
+`GET /templates/{id}/reviews`), lisibles sans compte depuis le 2026-10-30 (ADR-0025) et
+comptés par origine (120 lectures par 10 min ; `429 anonymous_rate_limited`,
+`details.retry_after`). `POST /templates/{id}/view`, la possession, le choix, l'aperçu
+personnalisé et l'export exigent la session ; l'export exige en plus le consentement à
+l'IA (`403 ai_consent_required`, `contrat-api-consentement-ia.md`) parce que le score ATS
+est **expliqué** par un modèle.
 
 État : **servi en production** depuis le 2026-10-24 (module `documents` de l'API,
 ADR-0020 acceptée). Modèles publiés : Meridian, Minimalist (Marketing est en revue, non

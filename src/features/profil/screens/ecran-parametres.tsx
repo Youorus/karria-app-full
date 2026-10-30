@@ -52,6 +52,9 @@ export function EcranParametres() {
   const couleurs = useCouleurs();
   const reduit = useReducedMotion();
   const {
+    invite,
+    seConnecter,
+    consentementIa,
     theme,
     changerTheme,
     notifications,
@@ -122,21 +125,25 @@ export function EcranParametres() {
             </VStack>
           </Animated.View>
 
-          <Animated.View entering={entree(1)}>
-            <GroupeReglages titre="Notifications">
-              <LigneReglage
-                icone={notifications === "denied" ? "clocheBarree" : "cloche"}
-                titre="Notifications"
-                detail={
-                  notifications === null ? "Lecture…" : NOTIFICATIONS[notifications].etat
-                }
-                action={
-                  notifications === null ? null : NOTIFICATIONS[notifications].action
-                }
-                onPress={notifications === null ? undefined : gererNotifications}
-              />
-            </GroupeReglages>
-          </Animated.View>
+          {invite ? null : (
+            <Animated.View entering={entree(1)}>
+              <GroupeReglages titre="Notifications">
+                <LigneReglage
+                  icone={notifications === "denied" ? "clocheBarree" : "cloche"}
+                  titre="Notifications"
+                  detail={
+                    notifications === null
+                      ? "Lecture…"
+                      : NOTIFICATIONS[notifications].etat
+                  }
+                  action={
+                    notifications === null ? null : NOTIFICATIONS[notifications].action
+                  }
+                  onPress={notifications === null ? undefined : gererNotifications}
+                />
+              </GroupeReglages>
+            </Animated.View>
+          )}
 
           <Animated.View entering={entree(2)}>
             <GroupeReglages titre="À propos">
@@ -150,6 +157,14 @@ export function EcranParametres() {
                 titre="Politique de confidentialité"
                 onPress={() => lire("confidentialite")}
               />
+              {invite ? null : (
+                <LigneReglage
+                  icone="etincelles"
+                  titre="Karria et l'IA"
+                  detail="Ce que je partage avec mes fournisseurs, et ton accord."
+                  onPress={consentementIa}
+                />
+              )}
               {choixPublicitaires ? (
                 <LigneReglage
                   icone="bouclier"
@@ -164,19 +179,31 @@ export function EcranParametres() {
 
           <Animated.View entering={entree(3)}>
             <GroupeReglages titre="Compte">
-              <LigneReglage
-                icone="deconnexion"
-                titre="Se déconnecter"
-                detail="Tes données restent, tu te reconnectes quand tu veux."
-                onPress={seDeconnecter}
-              />
-              <LigneReglage
-                icone="corbeille"
-                titre="Supprimer mon compte"
-                detail="Définitif. On te demande d'abord pourquoi."
-                onPress={supprimerLeCompte}
-                ton="destructif"
-              />
+              {invite ? (
+                <LigneReglage
+                  icone="profil"
+                  titre="Se connecter"
+                  detail="Ton CV, tes offres gardées, ta recherche : tout te suit."
+                  action="Entrer"
+                  onPress={seConnecter}
+                />
+              ) : (
+                <>
+                  <LigneReglage
+                    icone="deconnexion"
+                    titre="Se déconnecter"
+                    detail="Tes données restent, tu te reconnectes quand tu veux."
+                    onPress={seDeconnecter}
+                  />
+                  <LigneReglage
+                    icone="corbeille"
+                    titre="Supprimer mon compte"
+                    detail="Définitif. On te demande d'abord pourquoi."
+                    onPress={supprimerLeCompte}
+                    ton="destructif"
+                  />
+                </>
+              )}
             </GroupeReglages>
           </Animated.View>
 

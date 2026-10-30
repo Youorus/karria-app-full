@@ -13,6 +13,12 @@
  * paramètres : ce sont des réglages de l'application, pas des faits sur
  * la personne.
  *
+ * ═══ Sans compte ═══
+ *
+ * L'invitation prend la place des cartes : l'orbe, « Ton espace t'attend »,
+ * ce qu'un compte apporte, et « Se connecter ». La roue des paramètres
+ * reste : l'apparence et les documents ne demandent pas de compte.
+ *
  * ═══ L'entrée ═══
  *
  * Les cartes montent l'une après l'autre, 70 ms d'écart — le même rythme
@@ -33,12 +39,22 @@ import { useCouleurs } from "@/theme/use-couleurs";
 
 import { CarteCv } from "../components/carte-cv";
 import { CarteIdentite } from "../components/carte-identite";
+import { ProfilInvite } from "../components/profil-invite";
 import { useProfil } from "../hooks/use-profil";
 
 export function EcranProfil() {
   const couleurs = useCouleurs();
   const reduit = useReducedMotion();
-  const { identite, email, cv, soutien, ouvrirParametres, ouvrirCv } = useProfil();
+  const {
+    invite,
+    seConnecter,
+    identite,
+    email,
+    cv,
+    soutien,
+    ouvrirParametres,
+    ouvrirCv,
+  } = useProfil();
 
   const entree = (rang: number) =>
     reduit ? undefined : FadeInDown.duration(380).delay(80 + rang * 70);
@@ -57,22 +73,26 @@ export function EcranProfil() {
             </BoutonEnTeteRond>
           }
         />
-        <ScrollView
-          contentContainerClassName="gap-8 px-6 pb-36 pt-2"
-          showsVerticalScrollIndicator={false}
-        >
-          <Animated.View entering={entree(0)}>
-            <CarteIdentite identite={identite} email={email} />
-          </Animated.View>
+        {invite ? (
+          <ProfilInvite onSeConnecter={seConnecter} />
+        ) : (
+          <ScrollView
+            contentContainerClassName="gap-8 px-6 pb-36 pt-2"
+            showsVerticalScrollIndicator={false}
+          >
+            <Animated.View entering={entree(0)}>
+              <CarteIdentite identite={identite} email={email} />
+            </Animated.View>
 
-          <Animated.View entering={entree(1)}>
-            <CarteCv cv={cv} onPress={ouvrirCv} />
-          </Animated.View>
+            <Animated.View entering={entree(1)}>
+              <CarteCv cv={cv} onPress={ouvrirCv} />
+            </Animated.View>
 
-          <Animated.View entering={entree(2)}>
-            <CarteSoutien soutien={soutien} />
-          </Animated.View>
-        </ScrollView>
+            <Animated.View entering={entree(2)}>
+              <CarteSoutien soutien={soutien} />
+            </Animated.View>
+          </ScrollView>
+        )}
       </SafeAreaView>
     </Box>
   );

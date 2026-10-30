@@ -25,6 +25,8 @@
  * interprète vraiment.
  */
 
+import { consentementIaAccorde, refusIa } from "./consentement-simule";
+
 const PREFIXES_EN_AVANCE = ["/cv/", "/voice/transcribe"];
 
 export function estUneRouteCv(chemin: string): boolean {
@@ -575,8 +577,23 @@ function brouillonNeuf() {
   };
 }
 
+/** Les routes du CV qui confient une donnée à un modèle — refusées sans accord. */
+const ROUTES_IA = new Set([
+  "POST /cv/import",
+  "POST /voice/transcribe",
+  "POST /cv/draft/interpret",
+]);
+
+function porteIa(): Response {
+  const refus = refusIa();
+  return erreur(refus.statut, refus.raison, refus.message, refus.details);
+}
+
 export function repondreCv(methode: string, chemin: string, corps: unknown): Response {
   const route = `${methode} ${chemin.split("?")[0]}`;
+
+  // Comme la vraie API (ADR-0025) : l'accord sur l'IA avant toute donnée.
+  if (ROUTES_IA.has(route) && !consentementIaAccorde()) return porteIa();
 
   if (route === "GET /cv/me") return json(200, etat.cv ?? cvVide());
 
@@ -611,6 +628,7 @@ export function repondreCv(methode: string, chemin: string, corps: unknown): Res
       return erreur(422, "chapter_invalid", "Image manquante.", { field: "image" });
     }
     if (parties.find((p) => p.fieldName === "enhance")?.string === "true") {
+      if (!consentementIaAccorde()) return porteIa();
       return erreur(
         503,
         "photo_enhance_unavailable",

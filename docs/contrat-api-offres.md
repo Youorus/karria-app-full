@@ -1,8 +1,10 @@
 # Contrat API — les offres et le fil
 
 Ce que `karria_api_v2` expose pour le fil d'offres, le détail d'une offre et
-ce que la personne en fait. Préfixe `/api/v1`, session exigée (`Authorization:
-Bearer`), erreurs au format `{ error: { code, message, details } }`.
+ce que la personne en fait. Préfixe `/api/v1`, erreurs au format
+`{ error: { code, message, details } }`. Session (`Authorization: Bearer`)
+exigée pour tout ce qui **écrit** ; la **lecture** du fil se fait aussi sans
+compte (voir « Sans compte », ci-dessous).
 La source de vérité exécutable est l'OpenAPI de l'API
 (`https://api.128-140-80-204.sslip.io/docs`) ; ce document dit ce que l'app
 doit en attendre et ce qui change par rapport à la V1.
@@ -24,6 +26,35 @@ doit en attendre et ce qui change par rapport à la V1.
 - `score_recency` n'existe plus : `is_new` (publiée il y a moins de 48 h et
   jamais vue) le remplace.
 - `PATCH /job-matches/{id}/interaction` remplace les routes V1 d'état.
+
+## Sans compte (2026-10-30, ADR-0025)
+
+Une offre d'emploi n'est pas un contenu de compte (règle 5.1.1 v de l'App
+Store) : `GET /job-matches/me`, `GET /job-matches/me/filter-options` et
+`GET /job-matches/{id}` répondent **sans session**. Les mêmes gestionnaires
+sont aussi servis sous `GET /offers/feed`, `GET /offers/filter-options` et
+`GET /offers/{id}` — un nom qui ne dit plus « me » ; l'app garde
+`/job-matches/…`.
+
+Sans session :
+
+- le fil est toujours `mode: all_offers`, `criteria_summary: null`,
+  `score_normalized`/`match_quality`/`origin` à `null` ; `saved`, `applied`,
+  `dismissed`, `feed_seen`, `detail_opened` valent `false` ; `is_new` ne dépend
+  que de la date ;
+- `contract_types`, `cities`, `published_after`, `limit`, `offset` s'appliquent ;
+  `saved_only`, `unseen_only`, `unapplied_only` répondent
+  `401 unauthenticated` avec `details.reason = account_required` et
+  `details.field` ;
+- rien n'est consigné : pas d'état, pas de journal, pas de critères ;
+- l'origine est **comptée** (240 lectures par 10 min, par adresse) :
+  `429 rate_limited`, `details.reason = anonymous_rate_limited`,
+  `details.retry_after` (secondes).
+
+`POST /job-matches/me/seen`, `PATCH /job-matches/{id}/interaction`, Karria
+(`/assistant/*`) et la recherche (`/search/*`) exigent toujours la session.
+L'app, en mode invité, n'envoie donc ni « vu » ni interaction, et ouvre la
+feuille de connexion pour garder, écarter ou parler à Karria.
 
 ## Les deux modes du fil
 
@@ -216,6 +247,8 @@ l'apprentissage du classement (ADR-0019). Les envoyer quand on les connaît.
 
 | Code HTTP | `error.code`      | Quand                                                                         |
 | --------- | ----------------- | ----------------------------------------------------------------------------- |
-| 401       | `unauthenticated` | session absente ou expirée                                                    |
+| 401       | `unauthenticated` | session absente sur une route qui l'exige ; `account_required` pour un filtre personnel sans compte |
+| 403       | `forbidden`       | `ai_consent_required` sur `POST /assistant/messages` (voir `contrat-api-consentement-ia.md`) |
+| 429       | `rate_limited`    | `anonymous_rate_limited` (lecture sans compte, `retry_after`) ; `assistant_rate_limited` |
 | 404       | `offer_not_found` | `{id}` inconnu                                                                |
 | 422       | `invalid_input`   | paramètre hors bornes, `interaction_empty`, lieu incomplet (`lat` sans `lng`) |

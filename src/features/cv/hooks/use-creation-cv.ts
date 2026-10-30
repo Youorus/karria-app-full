@@ -28,6 +28,14 @@
  * n'est compté comme fait tant que ce n'est pas validé : seule la
  * validation écrit dans le brouillon.
  *
+ * ═══ L'accord sur l'IA, au premier geste qui en a besoin ═══
+ *
+ * Répondre (interprétation), dicter (transcription), améliorer la photo :
+ * chacun part chez un modèle tiers. Avant le premier, la feuille de
+ * consentement se montre (`useActionIa`) et le geste reprend après
+ * « J'accepte et je continue ». Un `403 ai_consent_required` du serveur
+ * fait pareil : la feuille, puis le geste rejoué.
+ *
  * ═══ Rien ne se perd ═══
  *
  * Le brouillon vit sur le serveur, chapitre validé par chapitre validé :
@@ -38,6 +46,7 @@
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useActionIa } from "@/features/auth/hooks/use-action-ia";
 import { ErreurApi } from "@/lib/http";
 import {
   finaliser,
@@ -153,6 +162,12 @@ export function useCreationCv(): CreationCv {
   const router = useRouter();
   const micro = useMicro();
   const photo = useChoixPhoto();
+  const { avecConsentement, rejouerSiConsentementRequis } = useActionIa();
+  // Les rejeux après l'accord passent par des références : chaque fonction se
+  // cite elle-même, et React refuse qu'une valeur soit lue avant sa déclaration.
+  const rejouerInterpretation = useRef<(propre: string) => void>(() => undefined);
+  const rejouerTranscription = useRef<(uri: string) => void>(() => undefined);
+  const rejouerPhoto = useRef<(image: string) => void>(() => undefined);
   const [brouillon, setBrouillon] = useState<Brouillon | null>(null);
   const [phase, setPhase] = useState<Phase>({ nom: "chargement" });
   const [texte, setTexte] = useState("");
@@ -268,10 +283,8 @@ export function useCreationCv(): CreationCv {
     enregistrer(chapitre.boucle && elements.length > 0 ? elements : null);
   }, [chapitre.boucle, elements, enregistrer]);
 
-  const repondre = useCallback(
-    (reponse: string) => {
-      const propre = reponse.trim();
-      if (propre === "") return;
+  const interpreterLaReponse = useCallback(
+    (propre: string) => {
       setTexte("");
       setProbleme(null);
       setPhase({ nom: "reflexion", reponse: propre });
@@ -289,12 +302,32 @@ export function useCreationCv(): CreationCv {
         .catch((cause: unknown) => {
           console.warn("[karria] interprétation en échec", cause);
           if (!vivant.current) return;
+          setPhase({ nom: "question" });
+          if (
+            rejouerSiConsentementRequis(cause, "cv_creation", () =>
+              rejouerInterpretation.current(propre),
+            )
+          ) {
+            return;
+          }
           setTexte(propre);
           setProbleme(lisible(cause, "Je n'ai pas pu réfléchir à ta réponse. Réessaie."));
-          setPhase({ nom: "question" });
         });
     },
-    [cle, correctionDe],
+    [cle, correctionDe, rejouerSiConsentementRequis],
+  );
+
+  useEffect(() => {
+    rejouerInterpretation.current = interpreterLaReponse;
+  }, [interpreterLaReponse]);
+
+  const repondre = useCallback(
+    (reponse: string) => {
+      const propre = reponse.trim();
+      if (propre === "") return;
+      avecConsentement("cv_creation", () => interpreterLaReponse(propre));
+    },
+    [avecConsentement, interpreterLaReponse],
   );
 
   const toucherSuggestion = useCallback(
@@ -302,31 +335,56 @@ export function useCreationCv(): CreationCv {
     [passer, repondre],
   );
 
-  const basculerMicro = useCallback(() => {
-    if (phase.nom === "ecoute") {
+  const transcrireEtRepondre = useCallback(
+    (uri: string) => {
       setPhase({ nom: "reflexion", reponse: "" });
-      micro
-        .arreter()
-        .then((uri) =>
-          uri === null
-            ? Promise.reject(new Error("aucun enregistrement"))
-            : transcrire(uri),
-        )
+      transcrire(uri)
         .then((entendu) => {
           if (vivant.current) repondre(entendu);
         })
         .catch((cause: unknown) => {
           console.warn("[karria] transcription en échec", cause);
           if (!vivant.current) return;
+          setPhase({ nom: "question" });
+          if (
+            rejouerSiConsentementRequis(cause, "transcription", () =>
+              rejouerTranscription.current(uri),
+            )
+          ) {
+            return;
+          }
+          setProbleme("Je ne t'ai pas bien entendu. Réessaie, ou écris-moi.");
+        });
+    },
+    [repondre, rejouerSiConsentementRequis],
+  );
+
+  useEffect(() => {
+    rejouerTranscription.current = transcrireEtRepondre;
+  }, [transcrireEtRepondre]);
+
+  const basculerMicro = useCallback(() => {
+    if (phase.nom === "ecoute") {
+      setPhase({ nom: "reflexion", reponse: "" });
+      micro.arreter().then((uri) => {
+        if (!vivant.current) return;
+        if (uri === null) {
           setProbleme("Je ne t'ai pas bien entendu. Réessaie, ou écris-moi.");
           setPhase({ nom: "question" });
-        });
+          return;
+        }
+        transcrireEtRepondre(uri);
+      });
       return;
     }
-    micro.demarrer().then((ok) => {
-      if (ok && vivant.current) setPhase({ nom: "ecoute" });
+    // L'accord d'abord, le micro ensuite : on ne fait pas parler quelqu'un
+    // pour lui dire après que sa voix ne partira pas.
+    avecConsentement("transcription", () => {
+      micro.demarrer().then((ok) => {
+        if (ok && vivant.current) setPhase({ nom: "ecoute" });
+      });
     });
-  }, [phase.nom, micro, repondre]);
+  }, [phase.nom, micro, transcrireEtRepondre, avecConsentement]);
 
   const valider = useCallback(() => {
     if (phase.nom !== "jet") return;
@@ -389,6 +447,15 @@ export function useCreationCv(): CreationCv {
         .catch((cause: unknown) => {
           console.warn("[karria] photo non envoyée", cause);
           if (!vivant.current) return;
+          if (
+            ameliorer &&
+            rejouerSiConsentementRequis(cause, "photo_enhancement", () =>
+              rejouerPhoto.current(image),
+            )
+          ) {
+            setPhase({ nom: "photo-amelioration", originale: image });
+            return;
+          }
           if (ameliorer) {
             // L'amélioration a échoué : l'originale reste un très bon choix.
             setProbleme(lisible(cause, "Je n'ai pas pu améliorer ta photo."));
@@ -404,8 +471,11 @@ export function useCreationCv(): CreationCv {
           setPhase({ nom: "photo-source" });
         });
     },
-    [enregistrer],
+    [enregistrer, rejouerSiConsentementRequis],
   );
+  useEffect(() => {
+    rejouerPhoto.current = (image) => envoyerPhoto(image, true);
+  }, [envoyerPhoto]);
 
   return {
     phase,
@@ -455,7 +525,12 @@ export function useCreationCv(): CreationCv {
       },
       ameliorer: (oui) => {
         if (phase.nom !== "photo-amelioration") return;
-        envoyerPhoto(phase.originale, oui);
+        const { originale } = phase;
+        if (!oui) {
+          envoyerPhoto(originale, false);
+          return;
+        }
+        avecConsentement("photo_enhancement", () => envoyerPhoto(originale, true));
       },
       garder: (image) => {
         if (phase.nom !== "photo-comparaison") return;

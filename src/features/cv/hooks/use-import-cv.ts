@@ -9,6 +9,13 @@
  * appelant fournit. Le choix du fichier, l'envoi et les messages d'échec
  * ne s'écrivent qu'une fois.
  *
+ * ═══ L'accord sur l'IA, avant le sélecteur ═══
+ *
+ * Le fichier part chez un modèle tiers : la feuille de consentement se
+ * montre avant même de choisir le fichier (`useActionIa`) — on ne fait pas
+ * chercher un document pour l'arrêter ensuite. Un `403 ai_consent_required`
+ * du serveur rouvre la feuille et rejoue l'envoi du même fichier.
+ *
  * ═══ Le sélecteur ne filtre pas plus que le serveur ═══
  *
  * Les types proposés sont ceux que le serveur accepte (`TYPES_ACCEPTES`) :
@@ -19,7 +26,9 @@
 import { getDocumentAsync } from "expo-document-picker";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { importerCv } from "../api/cv.api";
+import { useActionIa } from "@/features/auth/hooks/use-action-ia";
+
+import { importerCv, type FichierCv } from "../api/cv.api";
 import { messageDImport, TYPES_ACCEPTES } from "../services/import";
 import type { Brouillon } from "../types/cv.types";
 
@@ -39,10 +48,36 @@ export function useImportCv(onImporte: (brouillon: Brouillon) => void): ImportCv
   useEffect(() => {
     suite.current = onImporte;
   }, [onImporte]);
+  const { avecConsentement, rejouerSiConsentementRequis } = useActionIa();
+  // Le rejeu après l'accord passe par une référence : `envoyer` se cite.
+  const rejouer = useRef<(fichier: FichierCv) => void>(() => undefined);
 
-  const importer = useCallback(() => {
-    if (enCours) return;
-    setProbleme(null);
+  const envoyer = useCallback(
+    (fichier: FichierCv) => {
+      setEnCours(true);
+      importerCv(fichier)
+        .then((brouillon) => suite.current(brouillon))
+        .catch((cause: unknown) => {
+          console.warn("[karria] import de CV en échec", cause);
+          if (
+            rejouerSiConsentementRequis(cause, "cv_import", () =>
+              rejouer.current(fichier),
+            )
+          ) {
+            return;
+          }
+          setProbleme(messageDImport(cause));
+        })
+        .finally(() => setEnCours(false));
+    },
+    [rejouerSiConsentementRequis],
+  );
+
+  useEffect(() => {
+    rejouer.current = envoyer;
+  }, [envoyer]);
+
+  const choisirEtEnvoyer = useCallback(() => {
     setEnCours(true);
     getDocumentAsync({
       type: [...TYPES_ACCEPTES],
@@ -51,22 +86,22 @@ export function useImportCv(onImporte: (brouillon: Brouillon) => void): ImportCv
     })
       .then((choix) => {
         const fichier = choix.canceled ? undefined : choix.assets[0];
-        if (fichier === undefined) return null;
-        return importerCv({
-          uri: fichier.uri,
-          nom: fichier.name,
-          type: fichier.mimeType ?? null,
-        });
-      })
-      .then((brouillon) => {
-        if (brouillon !== null) suite.current(brouillon);
+        setEnCours(false);
+        if (fichier === undefined) return;
+        envoyer({ uri: fichier.uri, nom: fichier.name, type: fichier.mimeType ?? null });
       })
       .catch((cause: unknown) => {
-        console.warn("[karria] import de CV en échec", cause);
+        console.warn("[karria] sélecteur de fichier en échec", cause);
+        setEnCours(false);
         setProbleme(messageDImport(cause));
-      })
-      .finally(() => setEnCours(false));
-  }, [enCours]);
+      });
+  }, [envoyer]);
+
+  const importer = useCallback(() => {
+    if (enCours) return;
+    setProbleme(null);
+    avecConsentement("cv_import", choisirEtEnvoyer);
+  }, [enCours, avecConsentement, choisirEtEnvoyer]);
 
   return { importer, enCours, probleme };
 }

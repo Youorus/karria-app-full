@@ -34,6 +34,11 @@
 import { CIBLE_V2 } from "@/lib/config";
 
 import { estUneRouteAppareil, repondreAppareils } from "./appareils-simule";
+import {
+  accepterConsentementIa,
+  consentementIaBrut,
+  retirerConsentementIa,
+} from "./consentement-simule";
 import { estUneRouteCv, repondreCv } from "./cv-simule";
 import { estUneRouteModele, repondreModeles } from "./modeles-simule";
 import { estUneRouteOffres, repondreOffres } from "./offres-simule";
@@ -243,8 +248,32 @@ export async function repondreEnSimulation(requete: RequeteSimulee): Promise<Res
       // on répond quand même, sinon chaque rechargement à chaud
       // déconnecterait — ce qui n'apprend rien sur l'application.
       const compte = jeton === null ? undefined : etat.sessions.get(jeton);
-      return json(200, compte ?? { id: "usr_simule", email: "toi@exemple.fr" });
+      return json(200, {
+        ...(compte ?? { id: "usr_simule", email: "toi@exemple.fr" }),
+        ai_consent: consentementIaBrut(),
+      });
     }
+
+    // Le consentement à l'IA — `docs/contrat-api-consentement-ia.md`.
+    case "GET /auth/me/ai-consent":
+      return json(200, consentementIaBrut());
+
+    case "PUT /auth/me/ai-consent": {
+      const attendue = accepterConsentementIa(champ(corps, "version"));
+      if (attendue !== null) {
+        return erreur(
+          409,
+          "ai_consent_version_mismatch",
+          "L'information a changé depuis : relis-la avant d'accepter.",
+          { expected_version: attendue },
+        );
+      }
+      return json(200, consentementIaBrut());
+    }
+
+    case "DELETE /auth/me/ai-consent":
+      retirerConsentementIa();
+      return json(200, consentementIaBrut());
 
     case "DELETE /auth/me": {
       // `docs/contrat-api-compte.md` : la raison est obligatoire et prise

@@ -10,6 +10,11 @@
 
 import { beforeEach, describe, expect, it } from "@jest/globals";
 
+import {
+  accepterConsentementIa,
+  retirerConsentementIa,
+  VERSION_SIMULEE,
+} from "./consentement-simule";
 import { reinitialiserOffres, repondreOffres } from "./offres-simule";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -156,7 +161,19 @@ describe("Les offres vues et l'interaction", () => {
 });
 
 describe("La conversation avec Karria", () => {
+  it("exige l'accord sur l'IA avant le premier message (ADR-0025)", async () => {
+    retirerConsentementIa();
+    const { statut, corps } = await appeler("POST", "/assistant/messages", {
+      conversation_id: null,
+      content: "Je cherche un poste",
+    });
+    expect(statut).toBe(403);
+    expect(corps.error.details.reason).toBe("ai_consent_required");
+    accepterConsentementIa(VERSION_SIMULEE);
+  });
+
   it("pose une question quand il manque le lieu, avec des réponses rapides", async () => {
+    accepterConsentementIa(VERSION_SIMULEE);
     const { corps } = await appeler("POST", "/assistant/messages", {
       conversation_id: null,
       content: "Je cherche un poste de développeur",

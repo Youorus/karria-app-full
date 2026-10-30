@@ -13,6 +13,12 @@
  * déplier — et se complète quand le serveur répond (pages, avis, « à
  * toi »). `chargement` ne couvre donc que le cas d'un lien profond.
  *
+ * ═══ Sans compte ═══
+ *
+ * Le modèle et ses pages se lisent ; la vue n'est pas comptée, « les
+ * miens » et le catalogue des paiements ne sont pas demandés. « Obtenir »
+ * passe par la porte, et se fait tout seul une fois connecté.
+ *
  * ═══ L'acquisition attend le serveur ═══
  *
  * « Obtenir ce modèle » passe par « Ajout en cours… » puis « Ajouté à ta
@@ -40,6 +46,7 @@ import {
   RETOUR,
 } from "@/features/soutien/api/soutien.api";
 import { attendreLaLivraison } from "@/features/soutien/services/attente";
+import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
 import { SIMULATION } from "@/lib/config";
 import { ErreurApi } from "@/lib/http";
 import {
@@ -83,6 +90,7 @@ export function useDetailModele(): DetailModele {
   const params = useLocalSearchParams<{ id: string }>();
   const id = params.id;
   const router = useRouter();
+  const { exiger, invite } = usePorte();
   const [modele, setModele] = useState<Modele | null>(() => modeleConnu(id));
   const [avis, setAvis] = useState<AvisDuModele | null>(null);
   const [chargement, setChargement] = useState(() => modeleConnu(id) === null);
@@ -99,9 +107,11 @@ export function useDetailModele(): DetailModele {
     let vivant = true;
     Promise.all([
       lireModele(id),
-      lireMesModeles().catch(() => new Set<string>()),
+      invite
+        ? Promise.resolve(new Set<string>())
+        : lireMesModeles().catch(() => new Set<string>()),
       lireAvis(id).catch(() => null),
-      lireCatalogue(Platform.OS).catch(() => null),
+      invite ? Promise.resolve(null) : lireCatalogue(Platform.OS).catch(() => null),
     ])
       .then(
         ([m, miens, a, catalogue]) => {
@@ -130,16 +140,18 @@ export function useDetailModele(): DetailModele {
     return () => {
       vivant = false;
     };
-  }, [id, tentative]);
+  }, [id, tentative, invite]);
 
-  // La vue, comptée après une seconde à l'écran.
+  // La vue, comptée après une seconde à l'écran — par une personne connectée.
   useEffect(() => {
+    if (invite) return;
     const minuteur = setTimeout(() => noterVue(id), 1_000);
     return () => clearTimeout(minuteur);
-  }, [id]);
+  }, [id, invite]);
 
   const obtenir = useCallback(() => {
     if (modele === null || acquisition !== "libre" || enVol.current) return;
+    if (!exiger("modele", { cle: "modele.obtenir", charge: modele.id })) return;
     if (!modele.premium) {
       setAcquisition("en-cours");
       obtenirModele(modele.id).then(
@@ -180,7 +192,11 @@ export function useDetailModele(): DetailModele {
         enVol.current = false;
       }
     })();
-  }, [modele, acquisition, paiementsActifs]);
+  }, [modele, acquisition, paiementsActifs, exiger]);
+
+  useReprise("modele.obtenir", (charge) => {
+    if (charge === id) obtenir();
+  });
 
   const partager = useCallback(() => {
     if (modele === null) return;

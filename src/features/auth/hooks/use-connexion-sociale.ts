@@ -29,6 +29,13 @@
  * sans relancer une connexion (A20) : quelqu'un qui décide de passer par
  * l'e-mail n'a pas à garder un reproche sous les yeux.
  *
+ * ═══ Où l'on va après ═══
+ *
+ * À l'accueil, la connexion rejoue l'aiguillage (`/` : les offres, ou la
+ * question des notifications). Depuis l'invitation du mode invité, on ne
+ * va **nulle part** : l'écran qui a demandé la connexion est toujours là,
+ * dessous, et reprend son geste. `apresConnexion` le décide.
+ *
  * ═══ La disponibilité d'Apple vit ici, pas dans l'écran ═══
  *
  * Apple n'existe que sur iOS, et seulement à partir d'iOS 13. Afficher un
@@ -65,7 +72,12 @@ export interface ConnexionSociale {
   effacerErreur: () => void;
 }
 
-export function useConnexionSociale(): ConnexionSociale {
+interface Options {
+  /** Ce qu'on fait une fois connecté. Par défaut : l'aiguillage de l'accueil. */
+  apresConnexion?: () => void;
+}
+
+export function useConnexionSociale({ apresConnexion }: Options = {}): ConnexionSociale {
   const { ouvrir } = useSession();
   const { quitterLeParcours } = useNavigationUnique();
   const [enCours, setEnCours] = useState<FournisseurSocial | null>(null);
@@ -110,7 +122,8 @@ export function useConnexionSociale(): ConnexionSociale {
           credential.nonce,
         );
         await ouvrir(connexion.jetons, { compteCree: connexion.compteCree });
-        quitterLeParcours("/");
+        if (apresConnexion !== undefined) apresConnexion();
+        else quitterLeParcours("/");
       } catch (cause) {
         console.warn("[karria] échange de session impossible", cause);
         setErreur("La connexion n'a pas abouti. Réessaie dans un instant.");
@@ -118,7 +131,7 @@ export function useConnexionSociale(): ConnexionSociale {
         setEnCours(null);
       }
     },
-    [enCours, ouvrir, quitterLeParcours],
+    [enCours, ouvrir, quitterLeParcours, apresConnexion],
   );
 
   const effacerErreur = useCallback(() => setErreur(null), []);

@@ -20,6 +20,12 @@
  * (`use-annonce-detail.ts`) : jamais celle du fil, qui est déjà affichée
  * ailleurs. Aucune quand la personne est sans pub ou qu'aucune ne vient.
  *
+ * ═══ Sans compte ═══
+ *
+ * L'offre se lit, « Voir l'annonce d'origine » s'ouvre — sans rien noter.
+ * Garder et écarter passent par la porte : la feuille de connexion monte,
+ * et le geste se fait tout seul une fois connecté (`useReprise`).
+ *
  * ═══ Le signet attend le serveur ═══
  *
  * La V1 basculait le signet en local et ne l'enregistrait nulle part. Ici,
@@ -31,6 +37,7 @@ import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useState } from "react";
 import { Linking, Platform, Share } from "react-native";
 
+import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
 import { useAnnonceDetail } from "@/features/publicite/hooks/use-annonce-detail";
 import type { NativeAd } from "@/features/publicite/api/publicite.api";
 import { ErreurApi } from "@/lib/http";
@@ -78,6 +85,7 @@ function messageDErreur(cause: unknown): string {
 export function useDetailOffre(): DetailOffre {
   const { id } = useLocalSearchParams<{ id: string }>();
   const connue = offreConnue(id);
+  const { exiger, invite } = usePorte();
 
   const [offre, setOffre] = useState<Offre | null>(connue ?? null);
   const [chargement, setChargement] = useState(connue === undefined);
@@ -120,12 +128,13 @@ export function useDetailOffre(): DetailOffre {
 
   const basculerSignet = useCallback(() => {
     if (offre === null || enregistrement) return;
+    if (!exiger("garder", { cle: "offre.garder", charge: offre.id })) return;
     setEnregistrement(true);
     garderOffre(offre.id, !offre.enregistree)
       .then((enregistree) => setOffre({ ...offre, enregistree }))
       .catch((cause: unknown) => console.warn("[karria] signet non enregistré", cause))
       .finally(() => setEnregistrement(false));
-  }, [offre, enregistrement]);
+  }, [offre, enregistrement, exiger]);
 
   const partager = useCallback(() => {
     if (offre === null) return;
@@ -136,11 +145,11 @@ export function useDetailOffre(): DetailOffre {
 
   const postuler = useCallback(() => {
     if (offre?.lienCandidature == null) return;
-    noterCandidatureOuverte(offre.id);
+    if (!invite) noterCandidatureOuverte(offre.id);
     WebBrowser.openBrowserAsync(offre.lienCandidature).catch((cause: unknown) =>
       console.warn("[karria] page de candidature impossible à ouvrir", cause),
     );
-  }, [offre]);
+  }, [offre, invite]);
 
   const ouvrirCarte = useCallback(() => {
     if (offre === null) return;
@@ -164,13 +173,22 @@ export function useDetailOffre(): DetailOffre {
 
   const ecarter = useCallback(() => {
     if (offre === null) return;
+    if (!exiger("ecarter", { cle: "offre.ecarter", charge: offre.id })) return;
     // On repart tout de suite : l'offre quitte le fil côté serveur, et le
     // fil se relit à la prochaine actualisation.
     ecarterOffre(offre.id).catch((cause: unknown) =>
       console.warn("[karria] offre non écartée", cause),
     );
     retour();
-  }, [offre, retour]);
+  }, [offre, retour, exiger]);
+
+  // Connecté après avoir voulu garder ou écarter cette offre : on le fait.
+  useReprise("offre.garder", (charge) => {
+    if (charge === id) basculerSignet();
+  });
+  useReprise("offre.ecarter", (charge) => {
+    if (charge === id) ecarter();
+  });
 
   const recharger = useCallback(() => {
     setChargement(offreConnue(id) === undefined);

@@ -3,7 +3,8 @@
  *
  * ═══ Trois destinations ═══
  *
- * - personne de connecté → l'accueil ;
+ * - personne de connecté → l'accueil — sauf si la personne a déjà choisi
+ *   de découvrir sans compte : le fil, en lecture (règle 5.1.1 v) ;
  * - connecté, et la question des notifications n'a jamais été posée sur
  *   cette installation → l'écran qui la pose ;
  * - connecté, sinon → les offres du jour.
@@ -27,12 +28,30 @@ import { useEffect, useState } from "react";
 
 import { useSession } from "@/features/auth/hooks/use-session";
 import { fautIlProposerLesNotifications } from "@/features/notifications/services/notifications";
+import { aChoisiDeDecouvrir } from "@/lib/invite";
 
 export function useAiguillage(): Href | null {
   const { etat } = useSession();
   // Seule la destination d'une personne connectée se décide dans un effet :
   // l'accueil se déduit de l'état sans attendre, et sans rendu de plus.
   const [connecteVers, setConnecteVers] = useState<Href | null>(null);
+  const [anonymeVers, setAnonymeVers] = useState<Href | null>(null);
+
+  useEffect(() => {
+    if (etat !== "anonyme") return;
+    let vivant = true;
+    aChoisiDeDecouvrir().then(
+      (invite) => {
+        if (vivant) setAnonymeVers(invite ? "/offres" : "/bienvenue");
+      },
+      () => {
+        if (vivant) setAnonymeVers("/bienvenue");
+      },
+    );
+    return () => {
+      vivant = false;
+    };
+  }, [etat]);
 
   useEffect(() => {
     if (etat !== "connecte") return;
@@ -52,6 +71,6 @@ export function useAiguillage(): Href | null {
     };
   }, [etat]);
 
-  if (etat === "anonyme") return "/bienvenue";
+  if (etat === "anonyme") return anonymeVers;
   return etat === "connecte" ? connecteVers : null;
 }

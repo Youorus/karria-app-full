@@ -97,7 +97,11 @@ async function ouvrirDansLeNavigateur(session: SessionPaiement): Promise<void> {
   await WebBrowser.openAuthSessionAsync(session.adresse, RETOUR);
 }
 
-export function useSoutien(): Soutien {
+/**
+ * `actif` à faux (un invité) : rien n'est lu — le catalogue et les droits
+ * sont ceux d'un compte, et le serveur refuserait.
+ */
+export function useSoutien(actif = true): Soutien {
   const [catalogue, setCatalogue] = useState<Catalogue | null>(null);
   const [facturation, setFacturation] = useState<Facturation | null>(null);
   const [choix, setChoix] = useState<Tasses>(2);
@@ -123,6 +127,7 @@ export function useSoutien(): Soutien {
 
   useFocusEffect(
     useCallback(() => {
+      if (!actif) return undefined;
       let vivant = true;
       lireCatalogue(Platform.OS).then(
         (lu) => {
@@ -142,7 +147,7 @@ export function useSoutien(): Soutien {
       return () => {
         vivant = false;
       };
-    }, []),
+    }, [actif]),
   );
 
   const offreChoisie = catalogue?.cafes.find((c) => c.tasses === choix) ?? null;

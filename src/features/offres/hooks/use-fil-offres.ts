@@ -31,6 +31,14 @@
  * toutes les deux secondes, en un seul appel, jamais à la carte : c'est
  * ce qui fait tomber « Nouvelle » et alimente « Non vues ».
  *
+ * ═══ Sans compte ═══
+ *
+ * Le fil se lit tel quel (le serveur le sert sans session, en
+ * `all_offers`). Mais rien ne s'écrit : les offres vues ne partent pas, et
+ * « garder » passe par la porte — la feuille de connexion monte, puis le
+ * signet se pose tout seul une fois connecté (`useReprise`), et le fil se
+ * relit avec l'état de la personne.
+ *
  * ═══ Une seule requête à la fois ═══
  *
  * `jeton` numérote chaque chargement. Une réponse arrivée après un
@@ -40,6 +48,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
 import { ErreurApi } from "@/lib/http";
 import {
   garderOffre,
@@ -100,6 +109,7 @@ function messageDErreur(cause: unknown): string {
 }
 
 export function useFilOffres(): FilOffres {
+  const { exiger, invite } = usePorte();
   const [offres, setOffres] = useState<Offre[]>([]);
   const [total, setTotal] = useState(0);
   const [mode, setMode] = useState<ModeDuFil>("toutes");
@@ -176,13 +186,15 @@ export function useFilOffres(): FilOffres {
 
   const signalerVisibles = useCallback(
     (ids: string[]) => {
+      // Un invité n'a pas d'état : rien à noter, et le serveur refuserait.
+      if (invite) return;
       for (const id of ids) {
         if (!envoyees.current.has(id)) aEnvoyer.current.add(id);
       }
       if (aEnvoyer.current.size === 0 || minuteurVues.current !== null) return;
       minuteurVues.current = setTimeout(envoyerLesVues, DELAI_VUES_MS);
     },
-    [envoyerLesVues],
+    [envoyerLesVues, invite],
   );
 
   // Ce qui reste à envoyer part quand l'écran se démonte.
@@ -228,6 +240,7 @@ export function useFilOffres(): FilOffres {
 
   const garder = useCallback(
     (offre: Offre) => {
+      if (!exiger("garder", { cle: "fil.garder", charge: offre.id })) return;
       // Optimiste : le signet bascule à l'instant. Si le serveur refuse, il
       // revient — et l'on journalise, sans interrompre le défilement.
       remplacer(offre.id, { enregistree: !offre.enregistree });
@@ -238,8 +251,24 @@ export function useFilOffres(): FilOffres {
           remplacer(offre.id, { enregistree: offre.enregistree });
         });
     },
-    [remplacer],
+    [remplacer, exiger],
   );
+
+  // Connecté après avoir voulu garder : le signet se pose tout seul.
+  useReprise("fil.garder", (charge) => {
+    const offre = offres.find((o) => o.id === charge);
+    if (offre !== undefined) garder(offre);
+  });
+  // La session vient de s'ouvrir : l'état d'une personne n'est pas celui
+  // d'un invité, le fil se relit (une copie des filtres suffit à relancer).
+  const etaitInvite = useRef(invite);
+  useEffect(() => {
+    if (etaitInvite.current && !invite) {
+      setChargement(true);
+      setFiltres((anciens) => ({ ...anciens }));
+    }
+    etaitInvite.current = invite;
+  }, [invite]);
 
   const marquerOuverte = useCallback(
     (offre: Offre) => remplacer(offre.id, { nonOuverte: false }),

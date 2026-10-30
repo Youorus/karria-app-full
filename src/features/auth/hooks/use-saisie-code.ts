@@ -16,6 +16,13 @@
  * pendant que le serveur répond. Le bouton « Valider » reste pour
  * retenter le même code après un refus.
  *
+ * ═══ Revenir, ou repartir ═══
+ *
+ * Venu de l'accueil, le code juste rejoue l'aiguillage (`/`). Venu de
+ * l'invitation du mode invité — une intention attend —, on **revient**
+ * seulement : la pile de l'espace connecté est intacte dessous, et l'écran
+ * qui avait demandé la connexion reprend son geste.
+ *
  * ═══ Pourquoi un hook et pas l'écran ═══
  *
  * Chez Zoumani, cet effet vivait dans l'écran. C'est précisément ce que
@@ -24,8 +31,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useRouter } from "expo-router";
+
 import { SIMULATION } from "@/lib/config";
 import { CODE_SIMULATION } from "@/lib/dev/serveur-simule";
+import { intentionEnAttente } from "@/lib/intention";
 import { useNavigationUnique } from "@/lib/navigation";
 import type { ErreurLisible } from "../services/erreurs-auth";
 import { useParcours } from "./parcours-connexion";
@@ -61,15 +71,17 @@ export function useSaisieCode(): SaisieCode {
     recommencer: oublierParcours,
   } = useParcours();
   const { quitterLeParcours, remplacer } = useNavigationUnique();
+  const router = useRouter();
   const [code, setCode] = useState("");
   const dernierEnvoye = useRef<string | null>(null);
 
   const valider = useCallback(async () => {
     dernierEnvoye.current = code;
     if (await validerCode(code)) {
-      quitterLeParcours("/");
+      if (intentionEnAttente() !== null && router.canDismiss()) router.dismissAll();
+      else quitterLeParcours("/");
     }
-  }, [code, validerCode, quitterLeParcours]);
+  }, [code, validerCode, quitterLeParcours, router]);
 
   useEffect(() => {
     if (code.length < LONGUEUR_CODE || enCours) return;

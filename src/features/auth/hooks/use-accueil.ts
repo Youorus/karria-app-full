@@ -17,6 +17,7 @@
 import { useLocalSearchParams } from "expo-router";
 import { useCallback } from "react";
 
+import { retenirDecouverte } from "@/lib/invite";
 import { useNavigationUnique } from "@/lib/navigation";
 import { ouvrirDocument, type Document } from "../services/documents";
 import { useConnexionSociale, type ConnexionSociale } from "./use-connexion-sociale";
@@ -24,6 +25,8 @@ import { PARAMETRE_ADIEU } from "./use-session";
 
 export interface Accueil extends ConnexionSociale {
   continuerParEmail: () => void;
+  /** Entrer sans compte : le fil des offres, en lecture (règle 5.1.1 v). */
+  decouvrir: () => void;
   lire: (document: Document) => void;
   /** Vrai juste après la suppression d'un compte : on dit au revoir. */
   adieu: boolean;
@@ -31,15 +34,22 @@ export interface Accueil extends ConnexionSociale {
 
 export function useAccueil(): Accueil {
   const sociale = useConnexionSociale();
-  const { pousser } = useNavigationUnique();
+  const { pousser, remplacer } = useNavigationUnique();
   const parametres = useLocalSearchParams<{ [PARAMETRE_ADIEU]?: string }>();
 
   const continuerParEmail = useCallback(() => pousser("/email"), [pousser]);
+  // `remplacer`, pas `pousser` : l'accueil ne reste pas sous le fil, sinon le
+  // geste de retour ramènerait sur une porte qu'on a déjà franchie.
+  const decouvrir = useCallback(() => {
+    void retenirDecouverte();
+    remplacer("/offres");
+  }, [remplacer]);
   const lire = useCallback((document: Document) => void ouvrirDocument(document), []);
 
   return {
     ...sociale,
     continuerParEmail,
+    decouvrir,
     lire,
     adieu: parametres[PARAMETRE_ADIEU] === "1",
   };

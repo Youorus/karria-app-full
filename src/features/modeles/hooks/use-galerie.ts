@@ -5,6 +5,9 @@
  * la seconde peut échouer sans priver la galerie : on affiche alors les
  * modèles sans coche plutôt que pas de modèles du tout.
  *
+ * Sans compte, la galerie se lit telle quelle (le serveur la sert sans
+ * session) ; « les miens » n'existe pas, on ne le demande pas.
+ *
  * Un lien peut ouvrir la galerie sur une catégorie
  * (`karria://modeles?categorie=étudiant`) : une notification « de nouveaux
  * modèles pour ton premier emploi » mène droit à eux.
@@ -14,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { useWindowDimensions } from "react-native";
 
+import { usePorte } from "@/features/auth/hooks/use-porte";
 import { ErreurApi } from "@/lib/http";
 import { lireMesModeles, lireModeles } from "../api/modeles.api";
 import {
@@ -52,6 +56,7 @@ function messageDErreur(cause: unknown): string {
 
 export function useGalerie(): Galerie {
   const { width } = useWindowDimensions();
+  const { invite } = usePorte();
   const [tous, setTous] = useState<Modele[]>([]);
   const [possedes, setPossedes] = useState<Set<string>>(new Set());
   const { categorie } = useLocalSearchParams<{ categorie?: string }>();
@@ -67,10 +72,12 @@ export function useGalerie(): Galerie {
     let vivant = true;
     Promise.all([
       lireModeles(),
-      lireMesModeles().catch((cause: unknown) => {
-        console.warn("[karria] modèles possédés indisponibles", cause);
-        return new Set<string>();
-      }),
+      invite
+        ? Promise.resolve(new Set<string>())
+        : lireMesModeles().catch((cause: unknown) => {
+            console.warn("[karria] modèles possédés indisponibles", cause);
+            return new Set<string>();
+          }),
     ])
       .then(
         ([modeles, miens]) => {
@@ -92,7 +99,7 @@ export function useGalerie(): Galerie {
     return () => {
       vivant = false;
     };
-  }, [tentative]);
+  }, [tentative, invite]);
 
   const puces = useMemo(
     () =>
