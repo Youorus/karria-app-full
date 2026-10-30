@@ -3,7 +3,69 @@
 > Document de passation. À lire en premier par toute personne ou IA qui
 > reprend le travail, avec `AGENTS.md`. Mis à jour à chaque fin de session.
 
-**Dernière mise à jour : 2026-10-29 (soir)**
+**Dernière mise à jour : 2026-10-30**
+
+## Session du 2026-10-30 — mode invité (5.1.1 v) et consentement à l'IA (5.1.2 i)
+
+Commit `f8a6344` sur `main` (`karria-app-full`), API `1192117` sur `Karria-api-full`
+(déployée, migration 13 appliquée). `npm run check` vert (285 tests),
+`npx expo export --platform ios` produit un paquet.
+
+**Mode invité** — Apple avait refusé Karria pour la connexion exigée au lancement :
+
+- Accueil : « Commencer » (feuille de connexion) et **« Découvrir les offres »**
+  (`useAccueil.decouvrir`, choix retenu dans `lib/invite.ts` ; à l'ouverture suivante,
+  l'aiguillage ouvre le fil ; la déconnexion efface le choix).
+- `app/(app)/_layout.tsx` ne redirige plus sans session : un invité lit le fil
+  (production, `GET /job-matches/me` sans jeton → `all_offers`), le détail et « Voir
+  l'annonce d'origine », la galerie et le détail d'un modèle. Rien n'est écrit : pas
+  de « vu », pas d'interaction, pas de vue de modèle, pas de lecture de `/payments`.
+  La feuille de filtres cache l'« Affichage » (ces filtres parlent d'un compte).
+- **La porte** (`features/auth/hooks/use-porte.ts`, `porte-store.ts`,
+  `services/porte.ts`) : `exiger(raison, intention)` ouvre l'invitation
+  (`components/invitation-connexion.tsx`, feuille `FeuilleConnexion` partagée avec
+  l'accueil : orbe, ce qu'un compte apporte, e-mail / Google / Apple, « Pas
+  maintenant ») et retient l'intention (`lib/intention.ts`). Après la connexion,
+  `useReprise(cle, action)` rejoue le geste là où l'on était : garder (fil et
+  détail), écarter, Karria, créer / importer le CV, obtenir un modèle. Le parcours
+  e-mail **revient** (`dismissAll`) au lieu de rejouer l'aiguillage ; Google/Apple
+  ferment seulement la feuille (`useConnexionSociale({ apresConnexion })`).
+- Profil invité (`components/profil-invite.tsx`), Paramètres invité (apparence,
+  documents, version, « Se connecter »). `useSoutien(actif)` ne lit rien sans compte.
+- AdMob : inchangé, les mêmes règles de consentement UMP s'appliquent à l'invité.
+
+**Consentement à l'IA** — contrat `docs/contrat-api-consentement-ia.md` :
+
+- Store `features/auth/services/consentement-ia.ts` (état recopié depuis `GET
+/auth/me` au profil et par les routes `/auth/me/ai-consent`), `useActionIa()` :
+  `avecConsentement(usage, action)` devant Karria (`use-conversation`),
+  l'interprétation, la dictée (avant d'allumer le micro), la photo améliorée
+  (`use-creation-cv`) et l'import (`use-import-cv`, avant le sélecteur) ; un `403
+ai_consent_required` du serveur rouvre la feuille et rejoue le geste.
+- Feuille `components/feuille-consentement-ia.tsx` (orbe ; « Ce qui part » avec
+  l'outil courant en tête ; « Chez qui, et pourquoi » avec les fournisseurs **du
+  serveur** ; « Ce que je ne fais jamais » + lien politique ; « J'accepte et je
+  continue » / « Pas maintenant »). Montée une fois dans `(app)/_layout.tsx`, comme
+  l'invitation. Paramètres → « Karria et l'IA » = la même feuille en consultation
+  (date, version, « Retirer mon consentement »).
+- Faux serveur : `lib/dev/consentement-simule.ts` (routes `ai-consent`, porte sur
+  `/cv/draft/interpret`, `/voice/transcribe`, `/cv/import`, `/cv/photo?enhance`,
+  `/assistant/messages`).
+- Correctif trouvé sur le simulateur : l'instantané de `useSyncExternalStore` doit être
+  **référentiellement stable** (un objet neuf à chaque lecture = boucle de rendu).
+
+**Vérifié sur le simulateur iPhone 17 (captures dans le rapport de session)** :
+accueil avec « Découvrir les offres », fil invité contre la **production** (210 586
+offres), invitation à se connecter (depuis l'orbe ✦), feuille de consentement (en
+simulation, ouverte par l'inspecteur Hermes faute de pouvoir taper — pas de permission
+d'accessibilité pour `osascript`). **Non vérifié à l'écran** : la reprise du geste après
+une vraie connexion (il faut un code e-mail ou Google/Apple réel — Marc), la feuille
+en mode clair, Android. Deux plantages pendant la session venaient de l'inspecteur
+(`hermes::vm::Debugger`, segfault sur une expression qui lève) — pas de l'app.
+
+**Marc doit** : tester la reprise après connexion (garder une offre en invité, se
+connecter, vérifier le signet) ; relire les textes de la porte (`services/porte.ts`) et
+de la feuille d'IA ; héberger `https://karria.fr/confidentialite` (le lien de la feuille).
 
 ## Session du 2026-10-29 (suite) — paiements Stripe : sans pub, cafés, modèles Premium
 
@@ -188,7 +250,7 @@ vivante, animations.
 
 | Zone                       | État                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Connexion                  | Google, Apple, code e-mail ; session à rotation (`lib/http.ts`, `lib/session.ts`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Connexion                  | Google, Apple, code e-mail ; session à rotation (`lib/http.ts`, `lib/session.ts`). **Mode invité** (2026-10-30) : le fil, le détail et la galerie se lisent sans compte ; la porte (`use-porte.ts`) demande un compte au geste et le reprend après. **Consentement à l'IA** avant le premier outil d'IA (`contrat-api-consentement-ia.md`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Notifications              | Écran d'activation à la 1re connexion. Enregistrement de l'appareil à chaque ouverture, retrait à la déconnexion. Contrat v1 typé (`docs/contrat-notifications.md`), routeur + aiguilleur, bannière interne, canaux, pastille (`features/notifications`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Offres                     | **Branchées sur la production** (`docs/contrat-api-offres.md`) : identifiants UUID, deux modes du fil (toutes les offres récentes / recherche) ; sélecteur « Ma recherche / Toutes les offres » sous l'en-tête dès que le serveur rend un `criteria_summary`. Changer de vue ne change que le paramètre `mode` (`all_offers` / `search`) de `GET /job-matches/me` : les critères restent, **les alertes restent actives** (plus de `DELETE`/`PUT /search/criteria`, plus de stockage sur l'appareil — `recherche-en-pause.ts` supprimé le 2026-10-24). Une nouvelle recherche Karria remet le mode « déduit ». Offres vues envoyées par lots, écarter une offre depuis le détail. Pas d'analyse par offre dans la V2. La feuille de filtres reste celle de la V1.                                                                                                                                                                                                                                                                                                                                                                         |
 | Karria                     | `POST /assistant/messages` au contrat `docs/contrat-api-recherche.md` : statut, réponses rapides et élargissements comptés en capsules sous la réponse, « Voir les N offres » referme le rideau sur un fil rechargé.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -218,7 +280,8 @@ vivante, animations.
 
 Contrats en prose (ils font foi pour l'API) : `docs/contrat-api-cv.md`,
 `docs/contrat-api-appareils.md`, `docs/contrat-api-compte.md`,
-`docs/contrat-api-offres.md`, `docs/contrat-api-recherche.md` (ces deux
+`docs/contrat-api-offres.md`, `docs/contrat-api-consentement-ia.md`,
+`docs/contrat-api-recherche.md` (ces deux
 derniers sont tenus par l'agent du backend ; les relire avant toute
 modification du fil ou de Karria). Le faux serveur des offres est
 `lib/dev/offres-simule.ts`.
