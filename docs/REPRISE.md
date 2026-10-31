@@ -5,6 +5,28 @@
 
 **Dernière mise à jour : 2026-10-30**
 
+## Session du 2026-10-31 — sobriété visuelle, orbe unique, latence de l'aura
+
+- **Plus de pastilles d'icônes** (demande de Marc : « ça fait très IA ») : les listes de l'invitation,
+  de la feuille de connexion, du consentement IA, de l'activation des notifications et de la
+  suppression de compte sont des phrases simples séparées d'un filet. `GAINS`, `RAISONS`,
+  `CE_QUI_DISPARAIT` sont désormais des `string[]`. Les indicateurs fonctionnels (coche, cadenas
+  des modèles, boutons du carrousel) restent.
+- **Une seule orbe** : `EcranAVenir` (onglet Candidatures) utilise `OrbeVivante` + `SymboleKarria`
+  comme le reste de l'app ; `components/orbe.tsx` (orbe SVG dégradée) supprimé. Règle : toute
+  apparition de Karria passe par `OrbeVivante`.
+- **Latence à l'ouverture** : l'aura animait `cx`/`cy` de cercles SVG plein écran via
+  `useAnimatedProps` → react-native-svg redessinait tout le SVG à chaque image, au processeur sur le
+  fil principal iOS. Chaque nappe est maintenant un SVG dessiné une fois dans une `Animated.View`
+  déplacée par `transform` (compositeur seul). Démarrage vérifié : aucune attente réseau
+  (session et aiguillage = lectures locales). À noter : un build **debug** reste bien plus lent que
+  Release — juger la fluidité sur Release.
+- **iPhone de Marc** (« Iph Marc (2) », iPhone 13) : build Release installé (API `api.karria.fr`).
+  `expo run:ios --device` échoue en Wi-Fi au moment d'installer (NWError 60) : compiler avec
+  `npx expo run:ios --device 00008110-000909A43EF0401E --configuration Release`, puis installer avec
+  `xcrun devicectl device install app --device B4C52085-EEC2-5014-81EC-B499370CEDD2 <Karria.app>`.
+- Commit `6259695` ; 285 tests verts, tsc et eslint propres.
+
 ## Session du 2026-10-30 — mode invité (5.1.1 v) et consentement à l'IA (5.1.2 i)
 
 Commit `f8a6344` sur `main` (`karria-app-full`), API `1192117` sur `Karria-api-full`
