@@ -29,7 +29,13 @@
  * s'ouvre.
  */
 
-import { FlatList, KeyboardAvoidingView, Platform, Pressable } from "react-native";
+import {
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 
@@ -40,7 +46,7 @@ import { OrbeVivante } from "@/components/orbe-vivante";
 import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
-import { VStack } from "@/components/ui/vstack";
+import { useClavierOuvert } from "@/hooks/use-clavier-ouvert";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import { BulleMessage } from "./bulle-message";
@@ -74,6 +80,7 @@ interface Props {
 
 export function PanneauAgent({ ouvert, onFermer, onRecherche }: Props) {
   const couleurs = useCouleurs();
+  const clavierOuvert = useClavierOuvert();
   const {
     fil,
     brouillon,
@@ -118,14 +125,25 @@ export function PanneauAgent({ ouvert, onFermer, onRecherche }: Props) {
           </HStack>
 
           {vierge ? (
-            <VStack space="xl" className="flex-1 items-center justify-center px-6">
-              {/* La boîte de l'orbe déborde de moitié (halo, particules) :
+            // Défilante : quand le clavier monte, l'accueil n'a plus la place
+            // de tenir ; fixe, il débordait sous le compositeur.
+            <ScrollView
+              className="flex-1"
+              contentContainerClassName="grow items-center justify-center gap-6 px-6 py-4"
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Clavier ouvert, l'orbe cède sa place au titre et aux
+                  suggestions. Sa boîte déborde de moitié (halo, particules) :
                   la marge négative rend l'espace au titre. */}
-              <Box className="-my-12">
-                <OrbeVivante taille={110} active={active}>
-                  <SymboleKarria taille={44} teinte="reflet" />
-                </OrbeVivante>
-              </Box>
+              {clavierOuvert ? null : (
+                <Box className="-my-12">
+                  <OrbeVivante taille={110} active={active}>
+                    <SymboleKarria taille={44} teinte="reflet" />
+                  </OrbeVivante>
+                </Box>
+              )}
               <Texte
                 accessibilityRole="header"
                 className="text-center font-display text-title-lg text-foreground"
@@ -136,7 +154,7 @@ export function PanneauAgent({ ouvert, onFermer, onRecherche }: Props) {
                 </Texte>
               </Texte>
               <Suggestions suggestions={suggestions} onChoisir={envoyer} />
-            </VStack>
+            </ScrollView>
           ) : (
             <FlatList
               inverted
