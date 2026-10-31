@@ -64,6 +64,34 @@ sur son iPhone : partiels en français, ponctuation, ✓ puis correction, limite
 permission, et Android (bip de début/fin du `SpeechRecognizer`, modèle hors-ligne fr à
 télécharger sur certains appareils).
 
+**Fin du travail (relecture + vérification) faite par Opus — à relire par Fable.** Corrections
+de la relecture (commits `fix(dictee)` sur `main`) :
+
+- **Rideau refermé micro ouvert** : `PanneauAgent` reste monté derrière le rideau → la dictée
+  continuait d'écouter. `useEcranAssistant(ouvert, …)` annule la dictée dès que le rideau se
+  ferme (`RideauAgent` passe `ouvert`).
+- **Session audio iOS** : le module la laisse active en `playAndRecord`/`measurement` (baisse le
+  son de ce qui joue ensuite). Rendue (`setAudioSessionActiveIOS(false)`) à l'événement `end`,
+  même après une annulation (`systemeEngage`), et au démontage. Le délai de clôture (2,5 s)
+  coupe aussi le moteur (`abort`). Repli serveur : `setAudioModeAsync({allowsRecording:false})`
+  à l'arrêt, en échec, et au démontage en plein enregistrement.
+- **Autorisation de la reconnaissance refusée, micro permis** : repli serveur (avec l'accord
+  IA) au lieu du message « va dans les Réglages ».
+- **`useMicro`** : `useAudioRecorderState` interrogeait le natif toutes les 80 ms en permanence
+  (panneau monté à vie) et rendait l'écran 12×/s pendant le repli ; remplacé par une mesure
+  pendant l'enregistrement seulement, écrite dans la valeur partagée `niveau`.
+- CV : écrire efface le message du micro (comme l'agent). Texte d'autorisation iOS : retiré
+  « sur ton téléphone » (iOS affiche juste au-dessus « les données seront envoyées à Apple »).
+
+**Vérifié sur simulateur** (iPhone 17, build debug du worktree, Metro 8082) : le module natif
+est lié, l'écran assistant s'ouvre, l'appui micro passe en zone d'écoute (« J'ouvre le
+micro… ») et iOS demande la reconnaissance vocale avec notre texte. **Pas pu aller plus loin** :
+aucun outil pour toucher l'écran du simulateur (pas d'idb, osascript sans accès
+d'accessibilité) — transcription en direct, ✓, relecture et repli serveur restent à éprouver
+sur l'iPhone. Remarque hors périmètre : en invité, `karria://offres?karria=1` déclenche
+« Cannot update a component (InvitationConnexion…) while rendering » (`ouvrirPorte` appelé
+pendant le rendu dans `use-ecran-offres`).
+
 ## Session du 2026-10-31 — sobriété visuelle, orbe unique, latence de l'aura
 
 - **Plus de pastilles d'icônes** (demande de Marc : « ça fait très IA ») : les listes de l'invitation,
