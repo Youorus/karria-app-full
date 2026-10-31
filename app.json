@@ -80,7 +80,7 @@
         "expo-speech-recognition",
         {
           "microphonePermission": "Karria t'écoute quand tu préfères parler plutôt qu'écrire : pour lui dire ce que tu cherches, ou rédiger ton CV avec toi.",
-          "speechRecognitionPermission": "Karria écrit ce que tu dis pendant que tu parles, sur ton téléphone, pour que tu puisses le relire avant de l'envoyer."
+          "speechRecognitionPermission": "Karria écrit ce que tu dis pendant que tu parles, pour que tu puisses le relire et le corriger avant de l'envoyer."
         }
       ],
       [
