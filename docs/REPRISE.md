@@ -5,6 +5,52 @@
 
 **Dernière mise à jour : 2026-10-31**
 
+## Session du 2026-10-31 (suite) — « tri rapide et filtres par mode » — FAIT PAR OPUS, À RELIRE PAR FABLE
+
+**Demande de Marc** (écran « Pour toi ») : « si je filtre, il filtre sur toutes les offres
+alors que je suis sur ma recherche » ; un tri rapide sur l'écran, sobre.
+
+**Cause du bug** : surtout **côté API** (ADR-0027 de `karria_api_v2`) — un jeton d'accès
+expiré (15 min) sur `/job-matches/me` était servi en **invité** (tout le corpus, 200, sans
+401 donc sans renouvellement). Corrigé côté serveur : `401 session_expired`, que `lib/http.ts`
+renouvelle et rejoue (aucune mise à jour de l'app nécessaire pour ce point). Côté app, deux
+défauts aggravants corrigés : options de filtre lues **sans** `mode` (et jamais relues au
+changement de vue ou à la connexion), filtres **partagés** entre les deux vues.
+
+**Livré** :
+
+- `hooks/use-fil-offres.ts` — réglages **par vue** (`reglages: Record<ModeDuFil, {filtres,
+  tri}>`) : filtrer « Ma recherche » ne touche pas « Toutes les offres » ; repasser d'une vue
+  à l'autre retrouve ses réglages (choix documenté en en-tête : le plus prévisible, rien ne
+  fuit d'une vue à l'autre, rien n'est perdu). Options lues avec le **mode servi**, relues au
+  changement de vue, à la connexion (`relance`) et à « tirer pour actualiser ». Une nouvelle
+  recherche de Karria remet à zéro les réglages de « Ma recherche » seulement et demande
+  `mode=search`. `tri` à `null` = défaut du mode, **non envoyé** (pas de double chargement au
+  démarrage). `422 nearest_unavailable` → « Plus proches » retiré des deux vues, rechargement.
+- `api/offres.api.ts` — `parametresDuFil(…, tri)` → `sort=relevance|fresh|nearest` ;
+  `lireOptionsDeFiltre(mode)` ; `Fil.tri`, `Fil.procheDisponible` ; `Offre.distanceKm`
+  (tolère un serveur sans ces champs).
+- `components/rangee-tri.tsx` — sous le sélecteur de vue : trois mots séparés de « · »,
+  actif en gras, sans pastille ni icône ; `radiogroup`/`radio` + `checked` ; `hitSlop` pour
+  44 pt. Choix : recherche → Pertinence · Plus récentes · Plus proches ; « Toutes les
+  offres » → Plus récentes · Plus proches ; « Plus proches » caché sans recherche localisée ;
+  rangée cachée s'il ne reste qu'un choix (invité). **Pas de retour haptique** : le projet
+  n'a pas `expo-haptics`, et l'ajouter serait un module natif (non fait).
+- `hooks/use-ecran-offres.ts` — le repli « à explorer » ne vaut **qu'en Pertinence** ; en
+  « Plus récentes » / « Plus proches », tout le fil retenu s'affiche dans l'ordre demandé (la
+  pastille « À explorer » reste sur la carte). Sous-titre « les plus proches d'abord » en
+  « Toutes les offres ».
+- `carte-offre.tsx` — « Persan · à 6 km » en tri « Plus proches » (`libelleDistance`,
+  au km, « à moins d'1 km »), la distance ne se coupe jamais.
+- Serveur simulé : `sort` (dont `422 nearest_unavailable`), `nearest_available`,
+  `distance_km`, `filter-options?mode=`.
+- Contrat `docs/contrat-api-offres.md` : « Le tri », « Session expirée », champs nouveaux.
+- Tests : `use-fil-offres.test.tsx` (premiers tests de hook du fil : filtres par vue, options
+  par mode, tri envoyé, repli 422), simulé, `libelleDistance`. `npm run check` vert.
+
+**Aucun module natif ajouté.** **Non vérifié** : l'écran n'a pas été lancé (ni simulateur ni
+iPhone) — rendu de la rangée, alignement avec le résumé, distance sur la carte à contrôler.
+
 ## Session du 2026-10-31 (suite) — « Parler à l'équipe » — ÉCRIT PAR OPUS, À RELIRE PAR FABLE
 
 **Demande de Marc** : depuis le Profil, un bouton flottant « Parler à l'équipe » ouvre un
