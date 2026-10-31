@@ -5,6 +5,64 @@
 
 **Dernière mise à jour : 2026-10-31**
 
+## Session du 2026-10-31 (suite) — « Parler à l'équipe » — ÉCRIT PAR OPUS, À RELIRE PAR FABLE
+
+**Demande de Marc** : depuis le Profil, un bouton flottant « Parler à l'équipe » ouvre un
+échange avec les **humains** de l'équipe (pas l'IA) : texte, message vocal, images /
+captures ; réponses en direct, notification à chaque réponse ; sobre, aura, aucune pastille
+d'icône ni badge « IA », pas d'orbe (c'est le visage de Karria l'IA).
+
+**Nouveau domaine `src/features/equipe/`** (API : module `support` de `karria_api_v2`,
+ADR-0026 ; contrat `docs/contrat-api-equipe.md`) :
+
+- `components/bouton-parler-equipe.tsx` — capsule en verre au-dessus de la barre d'onglets,
+  à droite, sur le Profil (invité compris : la porte `equipe` s'ouvre, puis l'échange par
+  `useReprise`). Point bleu discret quand l'équipe a répondu (`GET /support/me/unread`,
+  relu au focus et au retour au premier plan). Le défilement du Profil réserve `pb-56`.
+- `screens/ecran-equipe.tsx` + `hooks/use-ecran-equipe.ts` — route `/equipe` (pile de
+  `(app)`), `FlatList` inversée, accueil « Un mot pour l'équipe » en tête, séparateurs de
+  jour, réponses signées « L'équipe Karria ». Envois **optimistes** (estompés), en échec :
+  raison + toucher pour réessayer / « Retirer » (le fichier local est gardé jusqu'au succès).
+- **Temps réel** — `hooks/use-direct-equipe.ts` + `ouvrirFlux` (`api/equipe.api.ts`) :
+  WebSocket natif de React Native, `Authorization` en en-tête (3ᵉ argument du constructeur),
+  `since` = dernier message connu. Ouvert seulement écran affiché + premier plan + session ;
+  reconnexion 1→30 s ; `4401` → une seule nouvelle tentative (l'ouverture relit d'abord
+  `/support/me/unread`, ce qui renouvelle la session). Retour au premier plan : relecture
+  complète du fil (repli, URL signées neuves) + `POST /support/me/read`. Chaque réponse reçue
+  en direct envoie `{"type":"read"}` sur le flux : le serveur ne pousse pas de notification
+  pour ce qu'on lit déjà. Fusion par identifiant (`services/fil.ts`) : le flux renvoie aussi
+  nos propres messages.
+- **Vocal** — `hooks/use-vocal.ts` (`expo-audio`, `HIGH_QUALITY` → `.m4a` envoyé en
+  `audio/mp4`, durée envoyée, arrêt et envoi automatiques à 5 min, < 0,8 s ignoré) ;
+  lecture par **un seul** lecteur partagé (`use-lecteur-vocal.ts`), onde en classes du thème.
+- **Images** — `hooks/use-image-equipe.ts` (galerie ou appareil photo, sans recadrage,
+  qualité 0,85 → JPEG) ; aperçu plein écran avant envoi (`apercu-image.tsx`) ; toucher une
+  image du fil l'agrandit.
+- **Notification** `support` (contrat v1) → pile `["/profil", "/equipe"]`, canal `compte` ;
+  la bannière interne se tait si l'échange est ouvert (`services/presence.ts`, lu par
+  `use-centre-notifications.ts`). `docs/contrat-notifications.md` à jour.
+- Faux serveur `src/lib/dev/equipe-simule.ts` (routes `/support/` + flux en mémoire :
+  « l'équipe » répond 3,5 s après chaque message) ; `/support/` ajouté à `SERVI_PAR_LA_V2` ;
+  `ouvrirFluxSimule` a son double dans `absent-en-production.ts`.
+- Icônes `bulle`, `lecture`, `pause` ; porte `equipe` (« Écris à l'équipe »).
+- `app.json` : textes d'autorisation micro / photos / appareil photo élargis à l'équipe
+  (Info.plist : **à reprendre au prochain build natif**, aucun module natif ajouté —
+  `expo-audio`, `expo-image-picker`, `expo-image` étaient déjà là).
+
+**Vérifié** : `npm run check` vert (tsc, eslint, prettier, 41 suites / 329 tests Jest),
+`npx expo export --platform ios` (dev et production) produit un paquet. **Non vérifié** :
+l'écran n'a **pas** été lancé sur simulateur ni appareil (rendu, clavier, enregistrement et
+lecture audio, WebSocket réel depuis le téléphone). Côté API, le WebSocket de production
+répond bien (fermeture `4401` sans session valide à travers Traefik).
+
+**Comment l'équipe répond** : console `https://api.karria.fr/api/v1/internal/support/console`
+(jeton `SUPPORT__ADMIN_TOKEN`, voir `karria_api_v2/docs/REPRISE.md`) ; un courriel part à
+`mtakoumba@gmail.com` à chaque nouveau message (une fois par rafale).
+
+**Reste** : relecture par Fable ; essai réel sur iPhone (vocal enregistré puis écouté dans la
+console, image depuis la galerie, réponse en direct, notification écran fermé) ; textes
+d'autorisation au prochain build.
+
 ## Session du 2026-10-31 (suite) — dictée immersive, transcription en direct
 
 **Demande de Marc** : un message vocal à Karria au niveau de ChatGPT voix / Siri — l'animation

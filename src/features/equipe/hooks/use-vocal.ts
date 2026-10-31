@@ -1,10 +1,10 @@
 /**
  * Enregistrer un message vocal pour l'équipe.
  *
- * ═══ Pourquoi pas le micro du CV (`features/cv/hooks/use-micro.ts`) ═══
+ * ═══ Pourquoi pas la dictée (`features/dictee/`) ═══
  *
- * Le micro du CV dicte à Karria : il rend un fichier qu'on **transcrit**,
- * et ses messages parlent à la place de Karria (« écris-moi plutôt »). Ici
+ * La dictée parle à Karria : elle rend un **texte** (transcrit sur le
+ * téléphone ou par le serveur), à relire avant l'envoi. Ici
  * le fichier **est** le message : il faut sa durée (le serveur la borne à
  * cinq minutes), un arrêt automatique à la limite, et l'abandon sans
  * envoi. Deux usages, deux hooks ; ce qu'ils partagent — `expo-audio` —
