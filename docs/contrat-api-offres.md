@@ -65,9 +65,12 @@ feuille de connexion pour garder, écarter ou parler à Karria.
   paginées. `score_normalized`,
   `match_quality`, `origin` valent `null`, `reasons` est vide.
 - `search` — une recherche existe (`criteria_summary` la résume en une
-  ligne) : les offres retenues pour elle, triées par pertinence (`sort=
-relevance`, défaut) ou par fraîcheur (`sort=fresh`). Les mêmes filtres
-  s'appliquent par-dessus.
+  ligne) : les offres retenues pour elle, par pertinence par défaut. Les
+  mêmes filtres s'appliquent par-dessus.
+
+Les filtres s'appliquent **toujours au mode servi** ; l'app garde des
+filtres et un tri **par vue** (« Ma recherche » / « Toutes les offres ») et
+lit les options de la feuille avec le `mode` de la vue affichée.
 
 Par défaut, le mode se **déduit** des critères. L'app peut aussi le
 **demander** par le paramètre `mode` (voir ci-dessous) : `mode=all_offers`
@@ -81,6 +84,37 @@ La réponse rend toujours le `mode` **réellement servi** (`search` demandé
 sans critères → `all_offers`) et `criteria_summary` dès que des critères
 existent, même en `all_offers`.
 
+## Le tri (2026-10-31, ADR-0027 de `karria_api_v2`)
+
+`sort` fixe l'ordre, **en base** (pagination comprise) :
+
+- `relevance` (défaut) — le score de la recherche, puis la date. Sans
+  recherche (`all_offers`), il n'y a pas de pertinence : la page est servie
+  en `fresh` et le dit (`sort: "fresh"`).
+- `fresh` — les plus récemment publiées d'abord, dans les deux modes.
+- `nearest` — du plus proche au plus loin du **lieu de la recherche**
+  (`criteria.location`, déjà géocodé), dans les deux modes ; les offres sans
+  coordonnées en dernier ; à distance égale, la plus récente puis
+  l'identifiant (pagination stable). Distance à vol d'oiseau (haversine).
+  Sans recherche localisée (« Toute la France », télétravail seul, pas de
+  recherche) **ou sans session** : `422 invalid_input`, `details.reason =
+nearest_unavailable`, `field = sort`.
+
+La réponse dit d'avance ce qui est possible (`nearest_available`) et l'ordre
+servi (`sort`) ; chaque `JobMatch` porte `distance_km` dès qu'un lieu de
+référence existe. L'app n'envoie `sort` que si la personne a choisi autre
+chose que l'ordre par défaut de la vue, cache « Plus proches » quand
+`nearest_available` est faux, et revient à l'ordre par défaut sur un `422
+nearest_unavailable` (la recherche a perdu son lieu entre-temps).
+
+## Session expirée (2026-10-31)
+
+Les routes du fil admettent l'absence de session (invité), **pas** un jeton
+refusé : un `Authorization: Bearer` expiré ou révoqué répond `401
+unauthenticated` (`details.reason = session_expired`), que l'app renouvelle
+puis rejoue. Avant ce correctif, le jeton expiré (15 min) valait une lecture
+anonyme : le fil de recherche devenait le corpus entier au premier filtre posé.
+
 La recherche elle-même se change en parlant à Karria (contrat
 `contrat-api-recherche.md`) ou par `PUT/DELETE /search/criteria`.
 
@@ -92,8 +126,8 @@ Paramètres de requête, tous facultatifs et combinables (les listes en CSV) :
 | ----------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `limit`           | 1–50, défaut 20                                                      | taille de page                                                                                                                   |
 | `offset`          | ≥ 0                                                                  | décalage ; `has_next` dit s'il reste des pages                                                                                   |
-| `sort`            | `relevance` \| `fresh`                                               | mode `search` seulement ; `all_offers` est toujours par fraîcheur                                                                |
-| `saved_only`      | bool                                                                 | les offres gardées (toutes, même expirées)                                                                                       |
+| `sort`            | `relevance` \| `fresh` \| `nearest`                                  | voir « Le tri » ; `nearest` sans recherche localisée → `422 nearest_unavailable`                                                 |
+| `saved_only`      | bool                                                                 | les offres gardées (toutes, même expirées, **quelle que soit la vue**) ; les autres filtres et le tri s'y appliquent              |
 | `unseen_only`     | bool                                                                 | jamais affichées                                                                                                                 |
 | `unapplied_only`  | bool                                                                 | pas encore postulées                                                                                                             |
 | `contract_types`  | CSV de `cdi, cdd, interim, alternance, stage, freelance, saisonnier` |                                                                                                                                  |
@@ -115,7 +149,9 @@ Réponse :
   "offset": 0,
   "has_next": true,
   "mode": "all_offers",
-  "criteria_summary": null
+  "criteria_summary": null,
+  "sort": "fresh",
+  "nearest_available": false
 }
 ```
 
@@ -137,6 +173,7 @@ Réponse :
   "saved": false,
   "applied": false,
   "dismissed": false,
+  "distance_km": 4.2,
   "job_offer": {
     "id": "uuid",
     "title": "Cuisinier H/F",
@@ -172,7 +209,9 @@ Réponse :
 ```
 
 `match_quality` : `high` (« Très alignée »), `medium`, `low` (« À explorer »),
-`null` hors recherche. `remote`, `schedule`, `experience`, `contract_type`,
+`null` hors recherche. `distance_km` : distance au lieu de la recherche (km, au
+dixième), `null` sans recherche localisée ou sans coordonnées — dans le fil
+seulement, pas dans le détail. `remote`, `schedule`, `experience`, `contract_type`,
 `company`, `city` valent `null` quand l'annonce ne le dit pas.
 
 ### Le logo de l'entreprise (2026-10-25)
@@ -247,8 +286,8 @@ l'apprentissage du classement (ADR-0019). Les envoyer quand on les connaît.
 
 | Code HTTP | `error.code`      | Quand                                                                         |
 | --------- | ----------------- | ----------------------------------------------------------------------------- |
-| 401       | `unauthenticated` | session absente sur une route qui l'exige ; `account_required` pour un filtre personnel sans compte |
+| 401       | `unauthenticated` | session absente sur une route qui l'exige ; `account_required` pour un filtre personnel sans compte ; `session_expired` pour un jeton présenté mais refusé |
 | 403       | `forbidden`       | `ai_consent_required` sur `POST /assistant/messages` (voir `contrat-api-consentement-ia.md`) |
 | 429       | `rate_limited`    | `anonymous_rate_limited` (lecture sans compte, `retry_after`) ; `assistant_rate_limited` |
 | 404       | `offer_not_found` | `{id}` inconnu                                                                |
-| 422       | `invalid_input`   | paramètre hors bornes, `interaction_empty`, lieu incomplet (`lat` sans `lng`) |
+| 422       | `invalid_input`   | paramètre hors bornes, `interaction_empty`, lieu incomplet (`lat` sans `lng`), `nearest_unavailable` |

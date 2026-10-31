@@ -12,6 +12,7 @@ import {
   contratCourt,
   ilYa,
   initiales,
+  libelleDistance,
   libelleExperience,
   libelleHoraires,
   libelleSource,
@@ -123,5 +124,23 @@ describe("Le contrat abrégé", () => {
   it("reconnaît le CDI intérimaire avant l'intérim, et laisse l'inconnu tel quel", () => {
     expect(contratCourt("CDI intérimaire")).toBe("CDI intérimaire");
     expect(contratCourt("Contrat de chantier")).toBe("Contrat de chantier");
+  });
+});
+
+describe("La distance (tri « Plus proches »)", () => {
+  it("se lit au kilomètre, sans décimale", () => {
+    expect(libelleDistance(12.4)).toBe("à 12 km");
+    expect(libelleDistance(12.6)).toBe("à 13 km");
+    expect(libelleDistance(1)).toBe("à 1 km");
+  });
+
+  it("dit « moins d'1 km » plutôt que « 0 km »", () => {
+    expect(libelleDistance(0)).toBe("à moins d'1 km");
+    expect(libelleDistance(0.4)).toBe("à moins d'1 km");
+  });
+
+  it("se tait sans distance connue", () => {
+    expect(libelleDistance(null)).toBeNull();
+    expect(libelleDistance(Number.NaN)).toBeNull();
   });
 });

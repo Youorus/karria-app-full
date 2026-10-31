@@ -6,11 +6,12 @@
  *
  * - `GET /job-matches/me` : le fil paginé. Sans recherche, toutes les
  *   offres actives, les plus récentes d'abord ; avec une recherche, les
- *   offres retenues, par pertinence. Les filtres de la V1 (`saved_only`,
- *   `unseen_only`, `unapplied_only`, `contract_types`, `cities`,
- *   `published_after`) s'appliquent par-dessus.
- * - `GET /job-matches/me/filter-options` : contrats et villes du fil,
- *   avec leurs effectifs.
+ *   offres retenues, par pertinence. `sort` change l'ordre (`fresh`,
+ *   `nearest`). Les filtres de la V1 (`saved_only`, `unseen_only`,
+ *   `unapplied_only`, `contract_types`, `cities`, `published_after`)
+ *   s'appliquent par-dessus, dans le mode demandé.
+ * - `GET /job-matches/me/filter-options?mode=` : contrats et villes du
+ *   fil **de ce mode**, avec leurs effectifs.
  * - `GET /job-matches/{id}` : l'offre complète (`description`).
  * - `POST /job-matches/me/seen` : les offres passées à l'écran, par lots.
  * - `PATCH /job-matches/{id}/interaction` : garder, ouvrir, postuler,
@@ -40,7 +41,23 @@ import type {
   Offre,
   OptionsDeFiltre,
   OptionsDeFiltreBrutes,
+  Tri,
+  TriBrut,
 } from "../types/offres.types";
+
+const VERS_TRI: Record<TriBrut, Tri> = {
+  relevance: "pertinence",
+  fresh: "recentes",
+  nearest: "proches",
+};
+const DEPUIS_TRI: Record<Tri, TriBrut> = {
+  pertinence: "relevance",
+  recentes: "fresh",
+  proches: "nearest",
+};
+
+const versModeBrut = (mode: ModeDuFil) =>
+  mode === "recherche" ? "search" : "all_offers";
 
 export function versOffre(brut: MatchBrut): Offre {
   const offre = brut.job_offer;
@@ -68,6 +85,7 @@ export function versOffre(brut: MatchBrut): Offre {
     lienCandidature: offre.apply_url ?? offre.origin_url ?? null,
     latitude: offre.latitude,
     longitude: offre.longitude,
+    distanceKm: brut.distance_km ?? null,
     enregistree: brut.saved,
     postulee: brut.applied,
     qualite: qualite(brut.match_quality),
@@ -79,24 +97,29 @@ export function versOffre(brut: MatchBrut): Offre {
   };
 }
 
-/** La requête du fil. Le tri n'est pas envoyé : sans recherche, l'API trie
- *  toujours par fraîcheur, et avec une recherche par pertinence — ce qu'on
- *  veut dans les deux cas. `maintenant` est passé pour garder la fonction
+/** La requête du fil. `maintenant` est passé pour garder la fonction
  *  pure : la période de la V1 devient un instant `published_after`.
  *
  *  `demande` est le mode voulu par la personne (« Toutes les offres » /
  *  « Ma recherche ») ; absent, le serveur le déduit des critères.
  *  `all_offers` garde la recherche et ses alertes : c'est tout ce qu'il
- *  faut pour « mettre en pause » son affichage. */
+ *  faut pour « mettre en pause » son affichage.
+ *
+ *  `tri` absent (`null`) : l'ordre par défaut du mode servi — pertinence
+ *  pour une recherche, date sinon. C'est ce que l'écran envoie tant que la
+ *  personne n'a rien choisi : le premier chargement ne connaît pas encore
+ *  le mode, et ne doit pas en présumer l'ordre. */
 export function parametresDuFil(
   filtres: Filtres,
   offset: number,
   limit: number,
   maintenant: Date,
   demande: ModeDuFil | null = null,
+  tri: Tri | null = null,
 ): string {
   const p = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-  if (demande !== null) p.set("mode", demande === "recherche" ? "search" : "all_offers");
+  if (demande !== null) p.set("mode", versModeBrut(demande));
+  if (tri !== null) p.set("sort", DEPUIS_TRI[tri]);
   if (filtres.sauvegardees) p.set("saved_only", "true");
   if (filtres.nonVues) p.set("unseen_only", "true");
   if (filtres.nonPostulees) p.set("unapplied_only", "true");
@@ -113,22 +136,36 @@ export async function lireFil(
   filtres: Filtres,
   offset: number,
   demande: ModeDuFil | null = null,
+  tri: Tri | null = null,
   limit = 20,
 ): Promise<Fil> {
   const brut = await http.get<FilBrut>(
-    `/job-matches/me?${parametresDuFil(filtres, offset, limit, new Date(), demande)}`,
+    `/job-matches/me?${parametresDuFil(filtres, offset, limit, new Date(), demande, tri)}`,
   );
+  const mode: ModeDuFil = brut.mode === "search" ? "recherche" : "toutes";
   return {
     offres: brut.items.map(versOffre),
     total: brut.count,
     suivantes: brut.has_next,
-    mode: brut.mode === "search" ? "recherche" : "toutes",
+    mode,
     resumeRecherche: brut.criteria_summary,
+    // Un serveur d'avant le tri (ADR-0027) ne rend ni `sort` ni
+    // `nearest_available` : l'ordre par défaut du mode, sans « Plus proches ».
+    tri: brut.sort
+      ? VERS_TRI[brut.sort]
+      : mode === "recherche"
+        ? "pertinence"
+        : "recentes",
+    procheDisponible: brut.nearest_available ?? false,
   };
 }
 
-export async function lireOptionsDeFiltre(): Promise<OptionsDeFiltre> {
-  const brut = await http.get<OptionsDeFiltreBrutes>("/job-matches/me/filter-options");
+/** Les contrats et les villes du fil **du mode affiché** : la feuille de
+ *  filtres ne propose que ce que la vue courante contient. */
+export async function lireOptionsDeFiltre(mode: ModeDuFil): Promise<OptionsDeFiltre> {
+  const brut = await http.get<OptionsDeFiltreBrutes>(
+    `/job-matches/me/filter-options?mode=${versModeBrut(mode)}`,
+  );
   const versOption = (o: { value: string; label: string; count: number }) => ({
     valeur: o.value,
     libelle: o.label,

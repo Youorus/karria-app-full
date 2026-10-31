@@ -7,7 +7,8 @@
  *    teinte qui tourne de l'angle d'or d'une carte à l'autre —, le nom de
  *    l'entreprise en capitales espacées, « Nouvelle » et le point bleu des
  *    offres jamais ouvertes, le titre sur deux lignes, et le signet.
- * 2. Le lieu, et le temps écoulé à droite.
+ * 2. Le lieu, et le temps écoulé à droite. Trié « Plus proches », le
+ *    lieu dit aussi sa distance : « Persan · à 6 km ».
  * 3. Les pastilles : « Très alignée » / « À explorer », le contrat, le
  *    télétravail quand l'annonce le dit, le salaire en vert sur vert pâle.
  * 4. En mode recherche, ce que l'offre confirme de la demande
@@ -51,6 +52,8 @@ const RESSORT = { damping: 22, stiffness: 250 };
 interface Props {
   offre: Offre;
   rang: number;
+  /** « à 12 km » : en tri « Plus proches » seulement. */
+  distance?: string | null;
   maintenant: Date;
   onOuvrir: () => void;
   onGarder: () => void;
@@ -84,7 +87,14 @@ function Pastille({
   );
 }
 
-export function CarteOffre({ offre, rang, maintenant, onOuvrir, onGarder }: Props) {
+export function CarteOffre({
+  offre,
+  rang,
+  distance = null,
+  maintenant,
+  onOuvrir,
+  onGarder,
+}: Props) {
   const couleurs = useCouleurs();
   const reduit = useReducedMotion();
   const echelle = useSharedValue(1);
@@ -164,11 +174,20 @@ export function CarteOffre({ offre, rang, maintenant, onOuvrir, onGarder }: Prop
               <HStack space="xs" className="flex-1 items-center">
                 <Icone nom="lieu" couleur={couleurs.estompe} taille={12} />
                 <Texte
-                  className="flex-1 text-footnote text-muted-foreground"
+                  className="shrink text-footnote text-muted-foreground"
                   numberOfLines={1}
                 >
                   {offre.lieu ?? "Lieu non précisé"}
                 </Texte>
+                {/* La distance ne se coupe jamais : c'est elle qu'on a demandée. */}
+                {distance !== null ? (
+                  <Texte
+                    className="text-footnote text-muted-foreground"
+                    numberOfLines={1}
+                  >
+                    · {distance}
+                  </Texte>
+                ) : null}
               </HStack>
               <Texte className="text-footnote text-foreground-faint">{temps}</Texte>
             </HStack>

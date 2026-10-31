@@ -9,6 +9,23 @@
  * fil reste ainsi d'abord une sélection, pas un catalogue. Sans
  * recherche, il n'y a pas de pertinence : tout s'affiche, du plus récent.
  *
+ * Le repli n'a de sens que trié par **pertinence** : c'est elle qui met
+ * les offres « à explorer » en queue. Trié par date ou par distance, le
+ * fil montre toutes les offres retenues dans cet ordre, sans repli —
+ * sinon une offre « à explorer » publiée ce matin, ou à 2 km, resterait
+ * cachée derrière un bouton alors qu'on vient de demander les plus
+ * récentes ou les plus proches. La pastille « À explorer » de la carte
+ * suffit à la distinguer.
+ *
+ * ═══ Le tri rapide ═══
+ *
+ * Une rangée de mots sous le sélecteur de vue : « Pertinence · Plus
+ * récentes · Plus proches ». « Pertinence » n'existe qu'en recherche ;
+ * « Plus proches » seulement si la recherche a un lieu — le serveur le dit
+ * (`procheDisponible`) et mesure depuis ce lieu. Une rangée d'un seul choix
+ * ne s'affiche pas (un invité, ou « Toutes les offres » sans lieu). En
+ * « Plus proches », chaque carte dit sa distance (« à 12 km »).
+ *
  * ═══ Le bouton ✦ change de rôle au défilement ═══
  *
  * En haut du fil, il ouvre Karria ; une fois la liste défilée, il ramène
@@ -41,12 +58,14 @@ import { useAnnoncesDeListe } from "@/features/publicite/hooks/use-annonces-de-l
 import { entrelacer, REGLE_DU_FIL } from "@/features/publicite/services/regles-publicite";
 import { useNavigationUnique } from "@/lib/navigation";
 import { noterDetailOuvert } from "../api/offres.api";
-import type { Offre } from "../types/offres.types";
+import { libelleDistance } from "../services/presentation";
+import type { Offre, Tri } from "../types/offres.types";
 import { memoriser } from "./memoire-offres";
 import { useFilOffres, type FilOffres, type VueDuFil } from "./use-fil-offres";
 
 export type ElementDuFil =
-  | { type: "offre"; offre: Offre; rang: number }
+  /** `distance` : « à 12 km », en tri « Plus proches » seulement. */
+  | { type: "offre"; offre: Offre; rang: number; distance: string | null }
   /** Une annonce native déjà chargée (`features/publicite`). */
   | { type: "annonce"; emplacement: number; annonce: NativeAd }
   | { type: "plus"; nombre: number }
@@ -64,6 +83,13 @@ export interface EcranOffres extends FilOffres {
     resume: string | null;
     desactive: boolean;
     onChanger: (vue: VueDuFil) => void;
+  } | null;
+  /** La rangée de tri, ou rien quand un seul ordre est possible. */
+  rangeeTri: {
+    choix: { tri: Tri; libelle: string }[];
+    actif: Tri;
+    desactive: boolean;
+    onChanger: (tri: Tri) => void;
   } | null;
   filtresActifs: number;
   feuilleFiltres: boolean;
@@ -88,6 +114,12 @@ export interface EcranOffres extends FilOffres {
 }
 
 const nombre = (n: number) => n.toLocaleString("fr-FR");
+
+const LIBELLES_TRI: Record<Tri, string> = {
+  pertinence: "Pertinence",
+  recentes: "Plus récentes",
+  proches: "Plus proches",
+};
 
 export function useEcranOffres(): EcranOffres {
   const { exiger, invite } = usePorte();
@@ -139,18 +171,34 @@ export function useEcranOffres(): EcranOffres {
     vue,
     aUneRecherche,
     changerDeVue,
+    tri,
+    procheDisponible,
+    changerDeTri,
   } = fil;
 
+  // Le repli « à explorer » ne vaut qu'en pertinence (voir l'en-tête).
+  const replie = tri === "pertinence";
+  const estPrincipale = useCallback(
+    (o: Offre) => !replie || o.qualite !== "basse",
+    [replie],
+  );
   // Les annonces se glissent parmi les offres principales seulement, et
   // n'existent dans la liste qu'une fois chargées (aucun trou).
-  const nombrePrincipales = offres.filter((o) => o.qualite !== "basse").length;
+  const nombrePrincipales = offres.filter(estPrincipale).length;
   const annonces = useAnnoncesDeListe(nombrePrincipales, REGLE_DU_FIL);
 
   const elements = useMemo<ElementDuFil[]>(() => {
-    const principales = offres.filter((o) => o.qualite !== "basse");
-    const autres = offres.filter((o) => o.qualite === "basse");
+    const principales = offres.filter(estPrincipale);
+    const autres = offres.filter((o) => !estPrincipale(o));
+    const distance = (o: Offre) =>
+      tri === "proches" ? libelleDistance(o.distanceKm) : null;
     const liste = entrelacer<ElementDuFil>(
-      principales.map((offre, rang) => ({ type: "offre", offre, rang })),
+      principales.map((offre, rang) => ({
+        type: "offre",
+        offre,
+        rang,
+        distance: distance(offre),
+      })),
       new Map(
         [...annonces].map(([emplacement, annonce]) => [
           emplacement,
@@ -168,9 +216,10 @@ export function useEcranOffres(): EcranOffres {
         type: "offre" as const,
         offre,
         rang: principales.length + i,
+        distance: distance(offre),
       })),
     ];
-  }, [offres, autresVisibles, annonces]);
+  }, [offres, autresVisibles, annonces, estPrincipale, tri]);
 
   const sousTitre = chargement
     ? "Recherche en cours…"
@@ -178,11 +227,28 @@ export function useEcranOffres(): EcranOffres {
       ? "Aucune offre pour le moment"
       : mode === "recherche"
         ? `${nombre(total)} offre${total > 1 ? "s" : ""} pour toi`
-        : `${nombre(total)} offres, les plus récentes d'abord`;
+        : tri === "proches"
+          ? `${nombre(total)} offres, les plus proches d'abord`
+          : `${nombre(total)} offres, les plus récentes d'abord`;
 
   const selecteur = aUneRecherche
     ? { vue, resume: resumeRecherche, desactive: chargement, onChanger: changerDeVue }
     : null;
+
+  const choixDeTri: Tri[] = [
+    ...(mode === "recherche" ? (["pertinence"] as const) : []),
+    "recentes",
+    ...(procheDisponible ? (["proches"] as const) : []),
+  ];
+  const rangeeTri =
+    choixDeTri.length > 1
+      ? {
+          choix: choixDeTri.map((t) => ({ tri: t, libelle: LIBELLES_TRI[t] })),
+          actif: tri,
+          desactive: chargement,
+          onChanger: changerDeTri,
+        }
+      : null;
 
   const filtresActifs =
     filtres.contrats.length +
@@ -242,6 +308,7 @@ export function useEcranOffres(): EcranOffres {
     elements,
     sousTitre,
     selecteur,
+    rangeeTri,
     filtresActifs,
     feuilleFiltres,
     ouvrirFiltres: useCallback(() => setFeuilleFiltres(true), []),

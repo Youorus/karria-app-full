@@ -584,6 +584,29 @@ function score(o: OffreSimulee, c: Criteres): number {
   return Math.min(1, (dansTitre * 2 + dansTexte) / (mots.length * 3) + 0.15);
 }
 
+/** Distance haversine en km, au dixième — la même que le serveur. */
+function kmEntre(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const a =
+    Math.sin(rad(lat2 - lat1) / 2) ** 2 +
+    Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(rad(lon2 - lon1) / 2) ** 2;
+  return Math.round(12742 * Math.asin(Math.min(1, Math.sqrt(a))) * 10) / 10;
+}
+
+/** Le point d'où mesurer « Plus proches » : le lieu géocodé de la recherche. */
+function pointDeReference(): { latitude: number; longitude: number } | null {
+  const lieu = etat.criteres?.location ?? null;
+  if (lieu === null || lieu.latitude === null || lieu.longitude === null) return null;
+  return { latitude: lieu.latitude, longitude: lieu.longitude };
+}
+
+function distanceDe(o: OffreSimulee): number | null {
+  const point = pointDeReference();
+  return point === null
+    ? null
+    : kmEntre(point.latitude, point.longitude, o.latitude, o.longitude);
+}
+
 function dansLaZone(o: OffreSimulee, c: Criteres): boolean {
   if (c.whole_france) return true;
   if (c.remote.includes("teletravail") && o.remote === "teletravail") return true;
@@ -636,6 +659,7 @@ function versMatch(o: OffreSimulee, s: number | null, detail = false) {
     match_quality: s === null ? null : s >= 0.8 ? "high" : s >= 0.55 ? "medium" : "low",
     reasons: c !== null && s !== null ? raisons(o, c) : [],
     origin: s === null ? null : "search",
+    distance_km: distanceDe(o),
     is_new: o.heures < NOUVELLE_HEURES && !e.seen,
     feed_seen: e.seen,
     detail_opened: e.opened,
@@ -714,8 +738,28 @@ function filDesMatchs(chemin: string): Response {
       (depuis === null || ilYa(offre.heures) >= depuis)
     );
   });
-  if (p.get("sort") === "fresh" || !parRecherche) {
+  const tri = p.get("sort") ?? "relevance";
+  if (!["relevance", "fresh", "nearest"].includes(tri)) {
+    return erreur(422, "invalid_input", "Tri inconnu.", { field: "sort" });
+  }
+  const point = pointDeReference();
+  if (tri === "nearest" && point === null) {
+    return erreur(
+      422,
+      "nearest_unavailable",
+      "Le tri par distance demande une recherche avec un lieu.",
+      {
+        field: "sort",
+      },
+    );
+  }
+  if (tri === "fresh" || tri === "nearest" || !parRecherche) {
     liste = [...liste].sort((a, b) => a.offre.heures - b.offre.heures);
+  }
+  if (tri === "nearest") {
+    liste = [...liste].sort(
+      (a, b) => (distanceDe(a.offre) ?? 0) - (distanceDe(b.offre) ?? 0),
+    );
   }
   const page = liste.slice(offset, offset + limit);
   return json(200, {
@@ -726,11 +770,17 @@ function filDesMatchs(chemin: string): Response {
     has_next: offset + page.length < liste.length,
     mode: parRecherche ? "search" : "all_offers",
     criteria_summary: etat.criteres === null ? null : resumeDesCriteres(etat.criteres),
+    sort: tri === "relevance" && !parRecherche ? "fresh" : tri,
+    nearest_available: point !== null,
   });
 }
 
-function optionsDeFiltre(): Response {
-  const base = baseDuFil().map(({ offre }) => offre);
+/** Les contrats et villes **du mode demandé** (`mode=all_offers` : tout le
+ *  corpus, même avec une recherche), comme le serveur. */
+function optionsDeFiltre(chemin: string): Response {
+  const demande = new URLSearchParams(chemin.split("?")[1] ?? "").get("mode");
+  const parRecherche = etat.criteres !== null && demande !== "all_offers";
+  const base = baseDuFil(parRecherche).map(({ offre }) => offre);
   const compter = (cle: (o: OffreSimulee) => string) => {
     const comptes = new Map<string, number>();
     for (const o of base) comptes.set(cle(o), (comptes.get(cle(o)) ?? 0) + 1);
@@ -1157,7 +1207,7 @@ export function repondreOffres(
   const route = `${methode} ${sansRequete}`;
 
   if (route === "GET /job-matches/me") return filDesMatchs(chemin);
-  if (route === "GET /job-matches/me/filter-options") return optionsDeFiltre();
+  if (route === "GET /job-matches/me/filter-options") return optionsDeFiltre(chemin);
   if (route === "POST /job-matches/me/seen") return marquerVues(corps);
   const match = routeDeMatch(methode, sansRequete, corps);
   if (match !== null) return match;

@@ -187,6 +187,17 @@ export function ilYa(iso: string, maintenant: Date): string {
   return ans <= 1 ? "il y a environ 1 an" : `il y a environ ${ans} ans`;
 }
 
+/**
+ * « à 12 km » — la distance au lieu de la recherche, montrée quand le fil
+ * est trié « Plus proches ». Au kilomètre : un dixième ne dit rien d'un
+ * trajet, et la distance est à vol d'oiseau.
+ */
+export function libelleDistance(km: number | null): string | null {
+  if (km === null || !Number.isFinite(km) || km < 0) return null;
+  if (km < 1) return "à moins d'1 km";
+  return `à ${Math.round(km).toLocaleString("fr-FR")} km`;
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Qualité et partage
 // ─────────────────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@
  *
  * - « tirer pour actualiser » recharge depuis le début ;
  * - arrivé en bas, la page suivante se charge seule (défilement infini) ;
- * - changer un filtre recharge depuis le début.
+ * - changer un filtre ou le tri recharge depuis le début.
  *
  * ═══ Deux modes, décidés par le serveur ═══
  *
@@ -43,7 +43,9 @@
  *
  * `jeton` numérote chaque chargement. Une réponse arrivée après un
  * nouveau chargement — filtre changé pendant l'attente — est ignorée :
- * sans cela, l'ancienne liste écraserait la nouvelle.
+ * sans cela, l'ancienne liste écraserait la nouvelle. La page suivante
+ * suit la même règle : changer de tri en plein défilement jette la suite
+ * de l'ancien ordre.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -62,6 +64,7 @@ import {
   type ModeDuFil,
   type Offre,
   type OptionsDeFiltre,
+  type Tri,
 } from "../types/offres.types";
 import { memoriser } from "./memoire-offres";
 
@@ -71,6 +74,33 @@ const DELAI_VUES_MS = 2_000;
 
 /** La vue choisie : la recherche en cours, ou tout le corpus. */
 export type VueDuFil = "pour_toi" | "toutes";
+
+/** Ce que la personne a choisi pour une vue. `tri` à `null` : l'ordre par
+ *  défaut du mode servi, non envoyé. */
+interface Reglage {
+  filtres: Filtres;
+  tri: Tri | null;
+}
+
+const REGLAGE_PAR_DEFAUT: Reglage = { filtres: FILTRES_PAR_DEFAUT, tri: null };
+const REGLAGES_PAR_DEFAUT: Record<ModeDuFil, Reglage> = {
+  recherche: REGLAGE_PAR_DEFAUT,
+  toutes: REGLAGE_PAR_DEFAUT,
+};
+
+/** L'ordre qu'on sert quand la personne n'a rien choisi. */
+export const triParDefaut = (mode: ModeDuFil): Tri =>
+  mode === "recherche" ? "pertinence" : "recentes";
+
+const triImpossible = (cause: unknown) =>
+  cause instanceof ErreurApi && cause.raison === "nearest_unavailable";
+
+/** Sans lieu de recherche, « Plus proches » ne vaut plus dans aucune vue. */
+function sansProches(reglages: Record<ModeDuFil, Reglage>): Record<ModeDuFil, Reglage> {
+  const retirer = (r: Reglage): Reglage =>
+    r.tri === "proches" ? { ...r, tri: null } : r;
+  return { recherche: retirer(reglages.recherche), toutes: retirer(reglages.toutes) };
+}
 
 export interface FilOffres {
   offres: Offre[];
@@ -85,11 +115,19 @@ export interface FilOffres {
   actualisation: boolean;
   chargementSuite: boolean;
   erreur: string | null;
+  /** Les filtres de la vue affichée. */
   filtres: Filtres;
+  /** Les contrats et villes de la vue affichée. */
   options: OptionsDeFiltre;
+  /** L'ordre de la vue affichée. */
+  tri: Tri;
+  /** « Plus proches » est possible (recherche localisée). */
+  procheDisponible: boolean;
   actualiser: () => void;
   chargerLaSuite: () => void;
   appliquerFiltres: (filtres: Filtres) => void;
+  /** Change l'ordre de la vue affichée ; recharge depuis le début. */
+  changerDeTri: (tri: Tri) => void;
   /** Garde ou retire une offre, en optimiste comme la V1. */
   garder: (offre: Offre) => void;
   /** Le détail a été ouvert : retire le liseré de la carte. */
@@ -112,17 +150,22 @@ export function useFilOffres(): FilOffres {
   const { exiger, invite } = usePorte();
   const [offres, setOffres] = useState<Offre[]>([]);
   const [total, setTotal] = useState(0);
-  const [mode, setMode] = useState<ModeDuFil>("toutes");
+  // Le mode **servi** ; `null` avant la première réponse.
+  const [modeServi, setModeServi] = useState<ModeDuFil | null>(null);
   const [resumeRecherche, setResumeRecherche] = useState<string | null>(null);
+  const [procheDisponible, setProcheDisponible] = useState(false);
   const [suivantes, setSuivantes] = useState(false);
   const [chargement, setChargement] = useState(true);
   const [actualisation, setActualisation] = useState(false);
   const [chargementSuite, setChargementSuite] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [filtres, setFiltres] = useState<Filtres>(FILTRES_PAR_DEFAUT);
+  const [reglages, setReglages] = useState(REGLAGES_PAR_DEFAUT);
   const [options, setOptions] = useState<OptionsDeFiltre>({ contrats: [], villes: [] });
   // La vue demandée au serveur ; `null` le laisse la déduire des critères.
   const [demande, setDemande] = useState<ModeDuFil | null>(null);
+  // Relance le chargement sans rien changer d'autre (session ouverte,
+  // nouvelle recherche).
+  const [relance, setRelance] = useState(0);
   const jeton = useRef(0);
   // Les offres vues et pas encore envoyées, et celles déjà envoyées (pour
   // ne pas renvoyer dix fois la même en remontant le fil).
@@ -130,32 +173,52 @@ export function useFilOffres(): FilOffres {
   const envoyees = useRef(new Set<string>());
   const minuteurVues = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /** Charge la première page pour ces filtres. Aucun `setState` avant la
-   *  réponse : appelé depuis un effet, il ne déclenche pas de rendu en
-   *  cascade. */
-  const chargerDebut = useCallback((pour: Filtres, voulu: ModeDuFil | null) => {
-    const numero = ++jeton.current;
-    return lireFil(pour, 0, voulu).then(
-      (fil) => {
-        if (numero !== jeton.current) return;
-        memoriser(fil.offres);
-        setOffres(fil.offres);
-        setTotal(fil.total);
-        setMode(fil.mode);
-        setResumeRecherche(fil.resumeRecherche);
-        setSuivantes(fil.suivantes);
-        setErreur(null);
-      },
-      (cause: unknown) => {
-        if (numero !== jeton.current) return;
-        console.warn("[karria] fil indisponible", cause);
-        setErreur(messageDErreur(cause));
-      },
-    );
-  }, []);
+  const mode: ModeDuFil = modeServi ?? "toutes";
+  // La vue dont les réglages partent avec la requête : celle qu'on demande,
+  // sinon celle qu'on affiche. Avant la première réponse, les deux vues
+  // ont les mêmes réglages par défaut : peu importe laquelle.
+  const cle: ModeDuFil = demande ?? mode;
+  const { filtres, tri: triChoisi } = reglages[cle];
+  const tri = triChoisi ?? triParDefaut(mode);
 
-  const chargerOptions = useCallback(() => {
-    lireOptionsDeFiltre().then(setOptions, (cause: unknown) =>
+  /** Charge la première page. Aucun `setState` avant la réponse : appelé
+   *  depuis un effet, il ne déclenche pas de rendu en cascade. */
+  const chargerDebut = useCallback(
+    (pour: Filtres, voulu: ModeDuFil | null, ordre: Tri | null) => {
+      const numero = ++jeton.current;
+      return lireFil(pour, 0, voulu, ordre).then(
+        (fil) => {
+          if (numero !== jeton.current) return;
+          memoriser(fil.offres);
+          setOffres(fil.offres);
+          setTotal(fil.total);
+          setModeServi(fil.mode);
+          setResumeRecherche(fil.resumeRecherche);
+          setProcheDisponible(fil.procheDisponible);
+          setSuivantes(fil.suivantes);
+          setErreur(null);
+        },
+        (cause: unknown) => {
+          if (numero !== jeton.current) return;
+          if (triImpossible(cause)) {
+            // La recherche a perdu son lieu : l'ordre par défaut, et l'on
+            // recharge (le changement de réglage relance l'effet).
+            setProcheDisponible(false);
+            setReglages(sansProches);
+            return;
+          }
+          console.warn("[karria] fil indisponible", cause);
+          setErreur(messageDErreur(cause));
+        },
+      );
+    },
+    [],
+  );
+
+  // Les options suivent la vue **servie** : elles n'existent qu'une fois le
+  // mode connu.
+  const chargerOptions = useCallback((pour: ModeDuFil) => {
+    lireOptionsDeFiltre(pour).then(setOptions, (cause: unknown) =>
       // Sans options, la feuille de filtres n'offre que la période et
       // l'affichage : dégradé, pas cassé.
       console.warn("[karria] options de filtre indisponibles", cause),
@@ -163,10 +226,12 @@ export function useFilOffres(): FilOffres {
   }, []);
 
   useEffect(() => {
-    void chargerDebut(filtres, demande).finally(() => setChargement(false));
-  }, [chargerDebut, filtres, demande]);
+    void chargerDebut(filtres, demande, triChoisi).finally(() => setChargement(false));
+  }, [chargerDebut, filtres, demande, triChoisi, relance]);
 
-  useEffect(chargerOptions, [chargerOptions]);
+  useEffect(() => {
+    if (modeServi !== null) chargerOptions(modeServi);
+  }, [chargerOptions, modeServi, relance]);
 
   const envoyerLesVues = useCallback(() => {
     minuteurVues.current = null;
@@ -208,15 +273,15 @@ export function useFilOffres(): FilOffres {
 
   const actualiser = useCallback(() => {
     setActualisation(true);
-    void chargerDebut(filtres, demande).finally(() => setActualisation(false));
-    chargerOptions();
-  }, [chargerDebut, chargerOptions, filtres, demande]);
+    void chargerDebut(filtres, demande, triChoisi).finally(() => setActualisation(false));
+    if (modeServi !== null) chargerOptions(modeServi);
+  }, [chargerDebut, chargerOptions, filtres, demande, triChoisi, modeServi]);
 
   const chargerLaSuite = useCallback(() => {
     if (!suivantes || chargementSuite || chargement) return;
     const numero = jeton.current;
     setChargementSuite(true);
-    lireFil(filtres, offres.length, demande)
+    lireFil(filtres, offres.length, demande, triChoisi)
       .then((fil) => {
         if (numero !== jeton.current) return;
         memoriser(fil.offres);
@@ -227,12 +292,35 @@ export function useFilOffres(): FilOffres {
         console.warn("[karria] page suivante indisponible", cause),
       )
       .finally(() => setChargementSuite(false));
-  }, [suivantes, chargementSuite, chargement, filtres, offres.length, demande]);
+  }, [
+    suivantes,
+    chargementSuite,
+    chargement,
+    filtres,
+    offres.length,
+    demande,
+    triChoisi,
+  ]);
 
-  const appliquerFiltres = useCallback((nouveaux: Filtres) => {
-    setChargement(true);
-    setFiltres(nouveaux);
-  }, []);
+  const appliquerFiltres = useCallback(
+    (nouveaux: Filtres) => {
+      setChargement(true);
+      setReglages((r) => ({ ...r, [cle]: { ...r[cle], filtres: nouveaux } }));
+    },
+    [cle],
+  );
+
+  const changerDeTri = useCallback(
+    (nouveau: Tri) => {
+      if (nouveau === tri) return;
+      // Le défaut du mode se note `null` : il n'est pas envoyé, et la vue
+      // n'a pas de choix à retenir.
+      const choisi = nouveau === triParDefaut(cle) ? null : nouveau;
+      setChargement(true);
+      setReglages((r) => ({ ...r, [cle]: { ...r[cle], tri: choisi } }));
+    },
+    [cle, tri],
+  );
 
   const remplacer = useCallback((id: string, modif: Partial<Offre>) => {
     setOffres((liste) => liste.map((o) => (o.id === id ? { ...o, ...modif } : o)));
@@ -260,12 +348,12 @@ export function useFilOffres(): FilOffres {
     if (offre !== undefined) garder(offre);
   });
   // La session vient de s'ouvrir : l'état d'une personne n'est pas celui
-  // d'un invité, le fil se relit (une copie des filtres suffit à relancer).
+  // d'un invité — le fil et ses options se relisent.
   const etaitInvite = useRef(invite);
   useEffect(() => {
     if (etaitInvite.current && !invite) {
       setChargement(true);
-      setFiltres((anciens) => ({ ...anciens }));
+      setRelance((n) => n + 1);
     }
     etaitInvite.current = invite;
   }, [invite]);
@@ -275,18 +363,17 @@ export function useFilOffres(): FilOffres {
     [remplacer],
   );
 
-  // Une recherche change tout le fil : on repart de zéro, filtres
-  // compris — ceux de l'ancien fil (une ville, un contrat) n'ont plus de
-  // sens sur le nouveau. Le mode redevient déduit : la recherche que
-  // Karria vient de poser s'affiche, même depuis « Toutes les offres ».
+  // Une recherche change tout le fil de « Ma recherche » : ses filtres et
+  // son tri repartent de zéro — une ville, un contrat de l'ancien fil n'ont
+  // plus de sens sur le nouveau. « Toutes les offres » garde les siens.
+  // La vue passe sur la recherche que Karria vient de poser, même depuis
+  // « Toutes les offres ».
   const rechargerApresRecherche = useCallback(() => {
     setChargement(true);
-    setDemande(null);
-    setFiltres((anciens) =>
-      anciens === FILTRES_PAR_DEFAUT ? { ...anciens } : FILTRES_PAR_DEFAUT,
-    );
-    chargerOptions();
-  }, [chargerOptions]);
+    setDemande("recherche");
+    setReglages((r) => ({ ...r, recherche: REGLAGE_PAR_DEFAUT }));
+    setRelance((n) => n + 1);
+  }, []);
 
   // La vue affichée suit le mode **servi** : `search` demandé sans
   // critères revient en `all_offers`, et le sélecteur le reflète.
@@ -295,8 +382,9 @@ export function useFilOffres(): FilOffres {
   // `all_offers` : c'est lui qui dit si « Ma recherche » existe.
   const aUneRecherche = resumeRecherche !== null;
 
-  // Changer de vue ne touche qu'au paramètre `mode` : les filtres restent,
-  // la recherche et ses alertes aussi.
+  // Changer de vue ne touche qu'au paramètre `mode` : la recherche et ses
+  // alertes restent ; la vue d'arrivée retrouve ses propres filtres et son
+  // tri.
   const changerDeVue = useCallback(
     (cible: VueDuFil) => {
       const voulu: ModeDuFil = cible === "pour_toi" ? "recherche" : "toutes";
@@ -322,9 +410,12 @@ export function useFilOffres(): FilOffres {
     erreur,
     filtres,
     options,
+    tri,
+    procheDisponible,
     actualiser,
     chargerLaSuite,
     appliquerFiltres,
+    changerDeTri,
     garder,
     marquerOuverte,
     signalerVisibles,

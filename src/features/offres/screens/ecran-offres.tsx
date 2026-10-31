@@ -14,7 +14,8 @@
  * comme la V1 — il balaie le fil pour faire apparaître Karria
  * (`RideauAgent`), et le fil revient exactement où on l'avait laissé —
  * rechargé si Karria a cherché entre-temps, avec le sélecteur « Ma
- * recherche / Toutes les offres » sous l'en-tête.
+ * recherche / Toutes les offres » sous l'en-tête, et le tri rapide
+ * (« Pertinence · Plus récentes · Plus proches ») juste dessous.
  *
  * Les cartes qui passent à l'écran sont signalées au hook (`viewability`
  * de la liste) : c'est ce qui fait tomber « Nouvelle ».
@@ -40,6 +41,7 @@ import { useCouleurs } from "@/theme/use-couleurs";
 import { BoutonKarria } from "../components/bouton-karria";
 import { CarteOffre } from "../components/carte-offre";
 import { FeuilleFiltres } from "../components/feuille-filtres";
+import { RangeeTri } from "../components/rangee-tri";
 import { SelecteurVue } from "../components/selecteur-vue";
 import { SqueletteFil } from "../components/squelette-fil";
 import { useEcranOffres, type ElementDuFil } from "../hooks/use-ecran-offres";
@@ -54,6 +56,7 @@ export function EcranOffres() {
     maintenant,
     sousTitre,
     selecteur,
+    rangeeTri,
     mode,
     chargement,
     actualisation,
@@ -111,10 +114,11 @@ export function EcranOffres() {
                 </BoutonEnTeteRond>
               }
             />
-            {selecteur !== null ? (
-              <Box className="px-5 pb-1 pt-1">
-                <SelecteurVue {...selecteur} />
-              </Box>
+            {selecteur !== null || rangeeTri !== null ? (
+              <VStack space="xs" className="px-5 pb-1 pt-1">
+                {selecteur !== null ? <SelecteurVue {...selecteur} /> : null}
+                {rangeeTri !== null ? <RangeeTri {...rangeeTri} /> : null}
+              </VStack>
             ) : null}
 
             {chargement ? (
@@ -137,6 +141,7 @@ export function EcranOffres() {
                     <CarteOffre
                       offre={item.offre}
                       rang={item.rang}
+                      distance={item.distance}
                       maintenant={maintenant}
                       onOuvrir={() => ouvrirOffre(item.offre)}
                       onGarder={() => garder(item.offre)}

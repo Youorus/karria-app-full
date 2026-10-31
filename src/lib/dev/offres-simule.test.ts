@@ -29,6 +29,7 @@ interface Match {
   feed_seen: boolean;
   saved: boolean;
   dismissed: boolean;
+  distance_km: number | null;
   job_offer: {
     id: string;
     summary: null;
@@ -46,6 +47,8 @@ interface Corps {
   has_next: boolean;
   mode: string;
   criteria_summary: string | null;
+  sort: string;
+  nearest_available: boolean;
   contract_types: { value: string; label: string; count: number }[];
   cities: { value: string; count: number }[];
   updated: number;
@@ -251,5 +254,55 @@ describe("La recherche en cours", () => {
     expect(oubli.status).toBe(204);
     const apres = await appeler("GET", "/job-matches/me");
     expect(apres.corps.mode).toBe("all_offers");
+  });
+});
+
+describe("Le tri et les options, par mode (ADR-0027)", () => {
+  const recherche = {
+    job_titles: ["Serveur", "Développeur", "Data engineer"],
+    location: { label: "Paris" },
+  };
+
+  it("sans recherche : « Plus proches » est refusé, la pertinence est servie par date", async () => {
+    const fil = await appeler("GET", "/job-matches/me");
+    expect(fil.corps.sort).toBe("fresh");
+    expect(fil.corps.nearest_available).toBe(false);
+    expect(fil.corps.items[0]!.distance_km).toBeNull();
+
+    const proches = await appeler("GET", "/job-matches/me?sort=nearest");
+    expect(proches.statut).toBe(422);
+    expect(proches.corps.error.details.reason).toBe("nearest_unavailable");
+  });
+
+  it("avec une recherche localisée : du plus proche au plus loin, dans les deux modes", async () => {
+    await appeler("PUT", "/search/criteria", recherche);
+    for (const mode of ["search", "all_offers"]) {
+      const fil = await appeler(
+        "GET",
+        `/job-matches/me?mode=${mode}&sort=nearest&limit=50`,
+      );
+      expect(fil.statut).toBe(200);
+      expect(fil.corps.sort).toBe("nearest");
+      expect(fil.corps.nearest_available).toBe(true);
+      const distances = fil.corps.items.map((m) => m.distance_km ?? Infinity);
+      expect(distances).toEqual([...distances].sort((a, b) => a - b));
+    }
+  });
+
+  it("les options de filtre sont celles du mode demandé", async () => {
+    await appeler("PUT", "/search/criteria", recherche);
+    const total = (o: Corps) => o.cities.reduce((n, c) => n + c.count, 0);
+    const pourLaRecherche = await appeler(
+      "GET",
+      "/job-matches/me/filter-options?mode=search",
+    );
+    const pourTout = await appeler(
+      "GET",
+      "/job-matches/me/filter-options?mode=all_offers",
+    );
+    const fil = await appeler("GET", "/job-matches/me?mode=search");
+
+    expect(total(pourLaRecherche.corps)).toBe(fil.corps.count);
+    expect(total(pourTout.corps)).toBeGreaterThan(total(pourLaRecherche.corps));
   });
 });

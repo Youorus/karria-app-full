@@ -89,10 +89,16 @@ export interface MatchBrut {
   saved: boolean;
   applied: boolean;
   dismissed: boolean;
+  /** Distance au lieu de la recherche, en km au dixième ; `null` sans
+   *  recherche localisée ou sans coordonnées. Dans le fil seulement. */
+  distance_km?: number | null;
   job_offer: OffreBrute;
 }
 
 export type ModeDuFilBrut = "all_offers" | "search";
+
+/** L'ordre du fil côté API (ADR-0027 de `karria_api_v2`). */
+export type TriBrut = "relevance" | "fresh" | "nearest";
 
 export interface FilBrut {
   items: MatchBrut[];
@@ -102,6 +108,10 @@ export interface FilBrut {
   has_next: boolean;
   mode: ModeDuFilBrut;
   criteria_summary: string | null;
+  /** L'ordre servi : `relevance` demandé sans recherche devient `fresh`. */
+  sort?: TriBrut;
+  /** `sort=nearest` est possible (recherche localisée). */
+  nearest_available?: boolean;
 }
 
 export interface OptionBrute {
@@ -154,6 +164,8 @@ export interface Offre {
   lienCandidature: string | null;
   latitude: number | null;
   longitude: number | null;
+  /** Distance au lieu de la recherche (km), `null` si inconnue. */
+  distanceKm: number | null;
   enregistree: boolean;
   postulee: boolean;
   qualite: "haute" | "moyenne" | "basse" | null;
@@ -167,6 +179,13 @@ export interface Offre {
 
 export type ModeDuFil = "toutes" | "recherche";
 
+/**
+ * L'ordre du fil, choisi sur l'écran : « Pertinence » (la recherche
+ * seulement), « Plus récentes », « Plus proches » (une recherche localisée
+ * est nécessaire : la distance se mesure depuis son lieu).
+ */
+export type Tri = "pertinence" | "recentes" | "proches";
+
 export interface Fil {
   offres: Offre[];
   total: number;
@@ -174,6 +193,10 @@ export interface Fil {
   mode: ModeDuFil;
   /** La recherche en cours en une ligne, en mode recherche. */
   resumeRecherche: string | null;
+  /** L'ordre servi. */
+  tri: Tri;
+  /** « Plus proches » est possible. */
+  procheDisponible: boolean;
 }
 
 export interface Option {
