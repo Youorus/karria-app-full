@@ -100,6 +100,10 @@ export const ICONES = {
   question: { ios: "questionmark.circle", android: "help" },
   cocheCercle: { ios: "checkmark.circle", android: "check_circle" },
   main: { ios: "hand.wave", android: "waving_hand" },
+  // « Parler à l'équipe » : écrire aux humains, écouter un vocal.
+  bulle: { ios: "bubble.left", android: "chat_bubble" },
+  lecture: { ios: "play.fill", android: "play_arrow" },
+  pause: { ios: "pause.fill", android: "pause" },
 } as const satisfies Record<string, Paire>;
 
 export type NomIcone = keyof typeof ICONES;

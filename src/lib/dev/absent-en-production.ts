@@ -21,3 +21,9 @@ export function repondreEnSimulation(): Promise<Response> {
     new Error("[karria] le faux serveur a été appelé dans un paquet de production"),
   );
 }
+
+export function ouvrirFluxSimule(): Promise<never> {
+  return Promise.reject(
+    new Error("[karria] le flux simulé a été ouvert dans un paquet de production"),
+  );
+}

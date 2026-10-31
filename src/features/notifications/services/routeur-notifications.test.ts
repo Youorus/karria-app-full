@@ -34,6 +34,7 @@ describe("Chaque type du contrat", () => {
     template: { donnees: { id: ID }, pile: ["/modeles", `/modele/${ID}`] },
     templates: { donnees: {}, pile: ["/modeles"] },
     account: { donnees: {}, pile: ["/profil", "/parametres"] },
+    support: { donnees: {}, pile: ["/profil", "/equipe"] },
   };
 
   it.each(TYPES_NOTIFICATION)("%s mène à sa pile", (type) => {
@@ -48,6 +49,7 @@ describe("Chaque type du contrat", () => {
     expect(canalDe("cv_export")).toBe("documents");
     expect(canalDe("template")).toBe("documents");
     expect(canalDe("account")).toBe("compte");
+    expect(canalDe("support")).toBe("compte");
   });
 });
 

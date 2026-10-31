@@ -30,9 +30,15 @@ Toutes les valeurs sont des **chaînes** (ce qu'Android transmet intact).
 | `template`       | obligatoire | `documents`       | —        | galerie → modèle                        | `karria://modele/{id}`     |
 | `templates`      | interdit    | `documents`       | —        | galerie                                 | `karria://modeles`         |
 | `account`        | interdit    | `compte`          | —        | profil → paramètres                     | `karria://parametres`      |
+| `support`        | interdit    | `compte`          | —        | profil → « Parler à l'équipe »          | `karria://equipe`          |
 
 Le message Expo porte en plus `channelId` et `categoryId` (même valeur que
 le canal) et `badge` quand la colonne le dit.
+
+`support` (2026-10-31, ADR-0026 de l'API) : l'équipe a répondu. Le serveur
+n'en envoie pas si la personne a lu il y a moins de 45 s, ni si une réponse non
+lue l'attend déjà ; au premier plan, l'app tait sa bannière quand l'échange est
+ouvert (`features/equipe/services/presence.ts`). Voir `contrat-api-equipe.md`.
 
 ## Ce que fait l'app d'une charge qu'elle ne comprend pas
 

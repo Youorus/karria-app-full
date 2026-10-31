@@ -21,7 +21,8 @@ export type RaisonConnexion =
   | "notifications"
   | "achat"
   | "modele"
-  | "profil";
+  | "profil"
+  | "equipe";
 
 export interface TextesPorte {
   titre: string;
@@ -64,6 +65,11 @@ const TEXTES: Record<RaisonConnexion, TextesPorte> = {
   modele: {
     titre: "Ce modèle est pour toi",
     phrase: "Avec un compte, il rejoint ta collection et habille ton CV.",
+  },
+  equipe: {
+    titre: "Écris à l'équipe",
+    phrase:
+      "Pour te répondre, on a besoin de savoir à qui : un compte, et notre réponse t'attend ici.",
   },
   profil: {
     titre: "Ton espace t'attend",

@@ -58,6 +58,8 @@ const PILES: Record<TypeNotification, (id: string | null) => readonly string[]> 
   template: (id) => ["/modeles", `/modele/${id}`],
   templates: () => ["/modeles"],
   account: () => ["/profil", "/parametres"],
+  // L'équipe a répondu : l'échange, par-dessus le Profil d'où il s'ouvre.
+  support: () => ["/profil", "/equipe"],
 };
 
 const CANAUX: Record<TypeNotification, CanalNotification> = {
@@ -70,6 +72,7 @@ const CANAUX: Record<TypeNotification, CanalNotification> = {
   template: "documents",
   templates: "documents",
   account: "compte",
+  support: "compte",
 };
 
 export function canalDe(type: TypeNotification): CanalNotification {

@@ -27,6 +27,7 @@ export const TYPES_NOTIFICATION = [
   "template",
   "templates",
   "account",
+  "support",
 ] as const;
 
 export type TypeNotification = (typeof TYPES_NOTIFICATION)[number];

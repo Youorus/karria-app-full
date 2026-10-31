@@ -19,6 +19,14 @@
  * ce qu'un compte apporte, et « Se connecter ». La roue des paramètres
  * reste : l'apparence et les documents ne demandent pas de compte.
  *
+ * ═══ « Parler à l'équipe » ═══
+ *
+ * Une capsule qui flotte au-dessus du contenu, à droite, juste au-dessus
+ * de la barre d'onglets (`features/equipe`) — invité compris : le toucher
+ * ouvre alors la porte de connexion. Un point discret dit qu'une réponse
+ * attend. Le défilement réserve sa hauteur (`pb-56`) pour que la dernière
+ * carte ne finisse pas dessous.
+ *
  * ═══ L'entrée ═══
  *
  * Les cartes montent l'une après l'autre, 70 ms d'écart — le même rythme
@@ -34,6 +42,7 @@ import { Aura } from "@/components/aura";
 import { BoutonEnTeteRond, EnTeteKarria } from "@/components/en-tete-karria";
 import { Icone } from "@/components/icone";
 import { Box } from "@/components/ui/box";
+import { BoutonParlerEquipe } from "@/features/equipe/components/bouton-parler-equipe";
 import { CarteSoutien } from "@/features/soutien/components/carte-soutien";
 import { useCouleurs } from "@/theme/use-couleurs";
 
@@ -54,6 +63,7 @@ export function EcranProfil() {
     soutien,
     ouvrirParametres,
     ouvrirCv,
+    equipe,
   } = useProfil();
 
   const entree = (rang: number) =>
@@ -77,7 +87,7 @@ export function EcranProfil() {
           <ProfilInvite onSeConnecter={seConnecter} />
         ) : (
           <ScrollView
-            contentContainerClassName="gap-8 px-6 pb-36 pt-2"
+            contentContainerClassName="gap-8 px-6 pb-56 pt-2"
             showsVerticalScrollIndicator={false}
           >
             <Animated.View entering={entree(0)}>
@@ -94,6 +104,7 @@ export function EcranProfil() {
           </ScrollView>
         )}
       </SafeAreaView>
+      <BoutonParlerEquipe nonLu={equipe.nonLu} onPress={equipe.ouvrir} />
     </Box>
   );
 }

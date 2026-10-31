@@ -90,6 +90,9 @@ export default function LayoutApp() {
             qu'on ouvre — et le geste de retour reste permis : on doit
             pouvoir y renoncer d'un glissement. */}
         <Stack.Screen name="parametres" />
+        {/* « Parler à l'équipe » s'empile comme les paramètres, depuis le
+            Profil (ou une notification de réponse) : on y va, on revient. */}
+        <Stack.Screen name="equipe" />
         <Stack.Screen
           name="compte/supprimer"
           options={{ animation: "fade_from_bottom", animationDuration: 280 }}

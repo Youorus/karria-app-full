@@ -71,7 +71,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Karria t'écoute quand tu préfères parler plutôt qu'écrire : pour lui dire ce que tu cherches, ou rédiger ton CV avec toi.",
+          "microphonePermission": "Karria t'écoute quand tu préfères parler plutôt qu'écrire : pour lui dire ce que tu cherches, rédiger ton CV avec toi, ou laisser un message vocal à l'équipe.",
           "enableBackgroundPlayback": false,
           "enableBackgroundRecording": false
         }
@@ -79,15 +79,15 @@
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "Karria t'écoute quand tu préfères parler plutôt qu'écrire : pour lui dire ce que tu cherches, ou rédiger ton CV avec toi.",
+          "microphonePermission": "Karria t'écoute quand tu préfères parler plutôt qu'écrire : pour lui dire ce que tu cherches, rédiger ton CV avec toi, ou laisser un message vocal à l'équipe.",
           "speechRecognitionPermission": "Karria écrit ce que tu dis pendant que tu parles, pour que tu puisses le relire et le corriger avant de l'envoyer."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Karria a besoin de tes photos pour en mettre une sur ton CV, seulement si tu le choisis.",
-          "cameraPermission": "Karria peut prendre une photo pour ton CV, seulement si tu le choisis.",
+          "photosPermission": "Karria ouvre tes photos seulement si tu le choisis : pour en mettre une sur ton CV, ou montrer une capture d'écran à l'équipe.",
+          "cameraPermission": "Karria peut prendre une photo, seulement si tu le choisis : pour ton CV, ou pour la montrer à l'équipe.",
           "microphonePermission": false
         }
       ],

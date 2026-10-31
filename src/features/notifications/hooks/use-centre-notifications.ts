@@ -30,6 +30,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 
 import { useSession } from "@/features/auth/hooks/use-session";
+import { ecranEquipeOuvert } from "@/features/equipe/services/presence";
 
 import { AiguilleurNotifications } from "../services/aiguilleur";
 import { analytiqueNotifications } from "../services/analytique";
@@ -120,6 +121,8 @@ export function useCentreNotifications(): CentreNotifications {
       // Sans session, pas de bannière : elle mènerait à un écran fermé. La
       // notification reste dans le centre du système.
       if (titre === null || !connecteCourant.current) return;
+      // La réponse de l'équipe est déjà à l'écran, arrivée en direct.
+      if (destination.type === "support" && ecranEquipeOuvert()) return;
       setBanniere({
         cle: notification.identifiant,
         titre,

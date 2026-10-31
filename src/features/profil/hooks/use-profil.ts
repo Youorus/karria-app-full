@@ -32,6 +32,10 @@ import { usePorte } from "@/features/auth/hooks/use-porte";
 import { poserConsentementIa } from "@/features/auth/services/consentement-ia";
 import { lireBrouillon, lireMonCv } from "@/features/cv/api/cv.api";
 import type { Cv } from "@/features/cv/types/cv.types";
+import {
+  useBoutonEquipe,
+  type BoutonEquipe,
+} from "@/features/equipe/hooks/use-bouton-equipe";
 import { useSoutien, type Soutien } from "@/features/soutien/hooks/use-soutien";
 import { useNavigationUnique } from "@/lib/navigation";
 
@@ -57,12 +61,15 @@ export interface Profil {
   ouvrirParametres: () => void;
   /** Vers le CV : la création s'il n'y en a pas, l'onglet sinon. */
   ouvrirCv: () => void;
+  /** Le bouton flottant « Parler à l'équipe » et son point de non-lu. */
+  equipe: BoutonEquipe;
 }
 
 export function useProfil(): Profil {
   const { pousser } = useNavigationUnique();
   const { exiger, invite } = usePorte();
   const soutien = useSoutien(!invite);
+  const equipe = useBoutonEquipe();
   const [email, setEmail] = useState<string | null>(null);
   const [cvLu, setCvLu] = useState<{ cv: Cv | null; brouillon: boolean } | null>(null);
 
@@ -112,5 +119,6 @@ export function useProfil(): Profil {
     soutien,
     ouvrirParametres: useCallback(() => pousser("/parametres"), [pousser]),
     ouvrirCv,
+    equipe,
   };
 }

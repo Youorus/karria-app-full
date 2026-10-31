@@ -16,6 +16,7 @@ const RAISONS: RaisonConnexion[] = [
   "achat",
   "modele",
   "profil",
+  "equipe",
 ];
 
 describe("textesDeLaPorte", () => {
