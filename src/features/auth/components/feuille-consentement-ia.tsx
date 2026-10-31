@@ -25,7 +25,7 @@ import { Modal, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { BoutonAction } from "@/components/bouton-action";
-import { Icone, type NomIcone } from "@/components/icone";
+import { Icone } from "@/components/icone";
 import { SymboleKarria } from "@/components/marque";
 import { MessageErreur } from "@/components/message-erreur";
 import { OrbeVivante } from "@/components/orbe-vivante";
@@ -37,28 +37,14 @@ import { useCouleurs } from "@/theme/use-couleurs";
 
 import { useConsentementIa } from "../hooks/use-consentement-ia";
 
-function Bloc({
-  icone,
-  titre,
-  children,
-}: {
-  icone: NomIcone;
-  titre: string;
-  children: React.ReactNode;
-}) {
-  const couleurs = useCouleurs();
+function Bloc({ titre, children }: { titre: string; children: React.ReactNode }) {
   return (
-    <HStack className="items-start gap-3">
-      <Box className="mt-0.5 h-8 w-8 items-center justify-center rounded-full bg-remplissage">
-        <Icone nom={icone} couleur={couleurs.primaire} taille={14} />
-      </Box>
-      <VStack className="flex-1 gap-0.5">
-        <Texte className="font-bold text-caption uppercase tracking-wide text-foreground-faint">
-          {titre}
-        </Texte>
-        {children}
-      </VStack>
-    </HStack>
+    <VStack className="gap-0.5">
+      <Texte className="font-bold text-caption uppercase tracking-wide text-foreground-faint">
+        {titre}
+      </Texte>
+      {children}
+    </VStack>
   );
 }
 
@@ -133,7 +119,7 @@ export function FeuilleConsentementIa() {
               </VStack>
 
               <VStack className="gap-3 rounded-lg border border-border-subtle bg-background px-4 py-3">
-                <Bloc icone="envoye" titre="Ce qui part">
+                <Bloc titre="Ce qui part">
                   {envois.length === 0 ? (
                     <Texte className="text-footnote text-foreground">Lecture…</Texte>
                   ) : (
@@ -149,7 +135,7 @@ export function FeuilleConsentementIa() {
                     ))
                   )}
                 </Bloc>
-                <Bloc icone="entreprise" titre="Chez qui, et pourquoi">
+                <Bloc titre="Chez qui, et pourquoi">
                   <Texte className="text-footnote text-foreground">
                     <Texte className="font-bold text-footnote text-foreground">
                       {fournisseurs}
@@ -159,7 +145,7 @@ export function FeuilleConsentementIa() {
                     score ATS. Si cette liste change, je te le redemande.
                   </Texte>
                 </Bloc>
-                <Bloc icone="bouclier" titre="Ce que je ne fais jamais">
+                <Bloc titre="Ce que je ne fais jamais">
                   <Texte className="text-footnote text-foreground">
                     Tes données ne servent ni à entraîner des modèles, ni à te cibler avec
                     de la publicité. Elles sont conservées selon notre{" "}

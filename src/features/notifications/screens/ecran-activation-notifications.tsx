@@ -22,29 +22,22 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Aura } from "@/components/aura";
 import { BoutonAction } from "@/components/bouton-action";
-import { Icone, type NomIcone } from "@/components/icone";
 import { SymboleKarria } from "@/components/marque";
 import { OrbeVivante } from "@/components/orbe-vivante";
 import { Texte } from "@/components/texte";
 import { TitreAccentue } from "@/components/titre-accentue";
 import { Box } from "@/components/ui/box";
-import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
-import { useCouleurs } from "@/theme/use-couleurs";
 
 import { useActivationNotifications } from "../hooks/use-activation-notifications";
 
-const RAISONS: { icone: NomIcone; texte: string }[] = [
-  {
-    icone: "etincelles",
-    texte: "Une offre qui te correspond vraiment, dès qu'elle sort.",
-  },
-  { icone: "cv", texte: "Ton CV prêt, sans avoir à revenir vérifier." },
-  { icone: "coeur", texte: "Jamais de bruit : seulement ce qui te concerne." },
+const RAISONS: readonly string[] = [
+  "Une offre qui te correspond vraiment, dès qu'elle sort.",
+  "Ton CV prêt, sans avoir à revenir vérifier.",
+  "Jamais de bruit : seulement ce qui te concerne.",
 ];
 
 export function EcranActivationNotifications() {
-  const couleurs = useCouleurs();
   const reduit = useReducedMotion();
   const { enCours, activer, plusTard } = useActivationNotifications();
 
@@ -83,15 +76,13 @@ export function EcranActivationNotifications() {
               className="w-full"
             >
               <VStack className="gap-3 rounded-lg border border-border-subtle bg-card p-4">
-                {RAISONS.map((raison) => (
-                  <HStack key={raison.icone} className="items-center gap-3">
-                    <Box className="h-10 w-10 items-center justify-center rounded-full bg-remplissage">
-                      <Icone nom={raison.icone} couleur={couleurs.primaire} taille={18} />
-                    </Box>
-                    <Texte className="flex-1 text-body text-foreground">
-                      {raison.texte}
-                    </Texte>
-                  </HStack>
+                {RAISONS.map((raison, i) => (
+                  <Texte
+                    key={raison}
+                    className={`text-body text-foreground ${i > 0 ? "border-t border-border-subtle pt-3" : ""}`}
+                  >
+                    {raison}
+                  </Texte>
                 ))}
               </VStack>
             </Animated.View>

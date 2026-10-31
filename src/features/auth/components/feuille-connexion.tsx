@@ -109,15 +109,13 @@ export function FeuilleConnexion({
 
           {invitation ? (
             <VStack className="gap-2.5 rounded-lg border border-border-subtle bg-background px-4 py-3">
-              {GAINS.map((gain) => (
-                <HStack key={gain.icone} className="items-center gap-3">
-                  <Box className="h-8 w-8 items-center justify-center rounded-full bg-remplissage">
-                    <Icone nom={gain.icone} couleur={couleurs.primaire} taille={15} />
-                  </Box>
-                  <Texte className="flex-1 text-footnote text-foreground">
-                    {gain.texte}
-                  </Texte>
-                </HStack>
+              {GAINS.map((gain, i) => (
+                <Texte
+                  key={gain}
+                  className={`text-footnote text-foreground ${i > 0 ? "border-t border-border-subtle pt-2.5" : ""}`}
+                >
+                  {gain}
+                </Texte>
               ))}
             </VStack>
           ) : null}

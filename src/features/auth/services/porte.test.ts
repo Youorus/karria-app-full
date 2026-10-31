@@ -29,6 +29,6 @@ describe("textesDeLaPorte", () => {
 
   it("liste ce qu'un compte apporte, quatre fois, avec une icône", () => {
     expect(GAINS).toHaveLength(4);
-    expect(GAINS.map((g) => g.icone)).toEqual(["etincelles", "cv", "signet", "cloche"]);
+    expect(GAINS[0]).toBe("Parler à Karria et lancer ta recherche");
   });
 });

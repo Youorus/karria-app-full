@@ -236,19 +236,13 @@ export function EcranSuppressionCompte() {
 
                 <Animated.View entering={entree(1)}>
                   <VStack className="gap-3 rounded-carte border border-border-subtle bg-card p-4">
-                    {CE_QUI_DISPARAIT.map((ligne) => (
-                      <HStack key={ligne.icone} className="items-center gap-3">
-                        <Box className="h-9 w-9 items-center justify-center rounded-full bg-surface-destructive">
-                          <Icone
-                            nom={ligne.icone}
-                            couleur={couleurs.destructif}
-                            taille={16}
-                          />
-                        </Box>
-                        <Texte className="flex-1 text-body text-foreground">
-                          {ligne.texte}
-                        </Texte>
-                      </HStack>
+                    {CE_QUI_DISPARAIT.map((ligne, i) => (
+                      <Texte
+                        key={ligne}
+                        className={`text-body text-foreground ${i > 0 ? "border-t border-border-subtle pt-3" : ""}`}
+                      >
+                        {ligne}
+                      </Texte>
                     ))}
                   </VStack>
                 </Animated.View>

@@ -12,7 +12,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Aura } from "@/components/aura";
 import { EnTeteKarria } from "@/components/en-tete-karria";
-import { Orbe } from "@/components/orbe";
+import { SymboleKarria } from "@/components/marque";
+import { OrbeVivante } from "@/components/orbe-vivante";
 import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
 import { VStack } from "@/components/ui/vstack";
@@ -30,7 +31,9 @@ export function EcranAVenir({ titre, sousTitre, message }: Props) {
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         <EnTeteKarria titre={titre} sousTitre={sousTitre} />
         <VStack space="lg" className="flex-1 items-center justify-center px-8 pb-24">
-          <Orbe taille={72} />
+          <OrbeVivante taille={110}>
+            <SymboleKarria taille={40} teinte="reflet" />
+          </OrbeVivante>
           <Texte className="text-center font-display text-title text-foreground">
             Bientôt ici
           </Texte>

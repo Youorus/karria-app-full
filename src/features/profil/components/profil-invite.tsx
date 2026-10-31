@@ -11,22 +11,17 @@
 import Animated, { FadeInDown, useReducedMotion } from "react-native-reanimated";
 
 import { BoutonAction } from "@/components/bouton-action";
-import { Icone } from "@/components/icone";
 import { SymboleKarria } from "@/components/marque";
 import { OrbeVivante } from "@/components/orbe-vivante";
 import { Texte } from "@/components/texte";
-import { Box } from "@/components/ui/box";
-import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
 import { GAINS, textesDeLaPorte } from "@/features/auth/services/porte";
-import { useCouleurs } from "@/theme/use-couleurs";
 
 interface Props {
   onSeConnecter: () => void;
 }
 
 export function ProfilInvite({ onSeConnecter }: Props) {
-  const couleurs = useCouleurs();
   const reduit = useReducedMotion();
   const textes = textesDeLaPorte("profil");
 
@@ -55,13 +50,13 @@ export function ProfilInvite({ onSeConnecter }: Props) {
         className="w-full"
       >
         <VStack className="gap-3 rounded-lg border border-border-subtle bg-card p-4">
-          {GAINS.map((gain) => (
-            <HStack key={gain.icone} className="items-center gap-3">
-              <Box className="h-10 w-10 items-center justify-center rounded-full bg-remplissage">
-                <Icone nom={gain.icone} couleur={couleurs.primaire} taille={18} />
-              </Box>
-              <Texte className="flex-1 text-body text-foreground">{gain.texte}</Texte>
-            </HStack>
+          {GAINS.map((gain, i) => (
+            <Texte
+              key={gain}
+              className={`text-body text-foreground ${i > 0 ? "border-t border-border-subtle pt-3" : ""}`}
+            >
+              {gain}
+            </Texte>
           ))}
         </VStack>
       </Animated.View>

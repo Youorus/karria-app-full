@@ -77,9 +77,9 @@ export function bornerDetails(texte: string): string {
 
 /** Ce qui disparaît, dit sans détour. L'ordre va du plus personnel au
  *  plus technique : on commence par ce qui compte pour la personne. */
-export const CE_QUI_DISPARAIT: readonly { icone: NomIcone; texte: string }[] = [
-  { icone: "profil", texte: "Ton compte et ton adresse e-mail" },
-  { icone: "cv", texte: "Ton CV, ton brouillon et ta photo" },
-  { icone: "signet", texte: "Tes offres gardées et ce que tu as dit à Karria" },
-  { icone: "appareil", texte: "Tes appareils : plus aucune notification" },
+export const CE_QUI_DISPARAIT: readonly string[] = [
+  "Ton compte et ton adresse e-mail",
+  "Ton CV, ton brouillon et ta photo",
+  "Tes offres gardées et ce que tu as dit à Karria",
+  "Tes appareils : plus aucune notification",
 ];

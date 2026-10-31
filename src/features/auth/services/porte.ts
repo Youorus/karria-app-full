@@ -11,8 +11,6 @@
  * Pur : des textes par raison, rien d'autre. Testé.
  */
 
-import type { NomIcone } from "@/components/icone";
-
 /** Pourquoi la porte s'ouvre. */
 export type RaisonConnexion =
   | "karria"
@@ -75,11 +73,11 @@ const TEXTES: Record<RaisonConnexion, TextesPorte> = {
 };
 
 /** Ce qu'un compte apporte, toujours dans le même ordre. */
-export const GAINS: readonly { icone: NomIcone; texte: string }[] = [
-  { icone: "etincelles", texte: "Parler à Karria et lancer ta recherche" },
-  { icone: "cv", texte: "Créer ou importer ton CV" },
-  { icone: "signet", texte: "Garder et écarter des offres" },
-  { icone: "cloche", texte: "Être prévenu dès qu'une offre sort" },
+export const GAINS: readonly string[] = [
+  "Parler à Karria et lancer ta recherche",
+  "Créer ou importer ton CV",
+  "Garder et écarter des offres",
+  "Être prévenu dès qu'une offre sort",
 ];
 
 export function textesDeLaPorte(raison: RaisonConnexion): TextesPorte {

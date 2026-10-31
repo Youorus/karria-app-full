@@ -24,9 +24,9 @@
  *
  * ═══ Ce que ça coûte, et ce qu'on s'autorise par appareil ═══
  *
- * Chaque image anime trois cercles à dégradé radial dont le rayon dépasse
- * la largeur de l'écran — deux à trois fois la surface de l'écran à
- * peindre et à fusionner — et le calque qui les porte change d'opacité et
+ * Chaque nappe est un dégradé radial dessiné une fois puis déplacé par le
+ * compositeur ; leur rayon dépasse la largeur de l'écran — deux à trois
+ * fois la surface de l'écran à fusionner à chaque image — et le calque qui les porte change d'opacité et
  * d'échelle, ce qui force le compositeur à le dessiner hors écran puis à
  * le recomposer. Sur un Android d'entrée de gamme, ce seul fond prend la
  * moitié du budget de 16 ms. Le palier visuel (`hooks/qualite-visuelle.ts`)
@@ -49,7 +49,6 @@ import { useWindowDimensions } from "react-native";
 import Animated, {
   Easing,
   cancelAnimation,
-  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -68,8 +67,6 @@ import { Box } from "@/components/ui/box";
 import { useAnimationActive, useQualiteVisuelle } from "@/hooks/use-qualite-visuelle";
 import { AURA, FOND } from "@/theme";
 import { useCouleurs } from "@/theme/use-couleurs";
-
-const CercleAnime = Animated.createAnimatedComponent(Circle);
 
 /** Recouvrir tout l'écran. En objet et non en classe : `Animated.View` et
  *  `<Svg>` reçoivent des styles natifs, pas des classes. */
@@ -136,15 +133,25 @@ interface Props {
   assise?: boolean;
 }
 
+/**
+ * Une nappe : son dégradé est dessiné **une seule fois**, dans une vue à sa
+ * taille, et c'est la vue qui se déplace. Animer `cx`/`cy` d'un cercle SVG
+ * obligeait react-native-svg à redessiner tout l'écran à chaque image — sur
+ * iOS, au processeur et sur le fil principal, en concurrence avec les
+ * gestes et la navigation : c'était la latence ressentie à l'ouverture.
+ * Une translation, elle, ne coûte qu'au compositeur.
+ */
 function NappeAnimee({
   nappe,
   largeur,
   hauteur,
+  intensite,
   immobile,
 }: {
   nappe: Nappe;
   largeur: number;
   hauteur: number;
+  intensite: number;
   immobile: boolean;
 }) {
   const t = useSharedValue(0);
@@ -163,24 +170,48 @@ function NappeAnimee({
     return () => cancelAnimation(t);
   }, [immobile, nappe.periode, t]);
 
-  const proprietes = useAnimatedProps(() => {
+  const style = useAnimatedStyle(() => {
     // Une trajectoire en ellipse plutôt qu'en ligne : un aller-retour
     // rectiligne se lit tout de suite comme une animation.
     const angle = t.value * Math.PI * 2;
     return {
-      cx: (nappe.x + Math.cos(angle) * nappe.derive) * largeur,
-      cy: nappe.y * hauteur + Math.sin(angle) * nappe.derive * largeur,
+      transform: [
+        { translateX: Math.cos(angle) * nappe.derive * largeur },
+        { translateY: Math.sin(angle) * nappe.derive * largeur },
+      ],
     };
   });
 
+  const rayon = nappe.rayon * largeur;
+  const diametre = rayon * 2;
   return (
-    <CercleAnime
-      animatedProps={proprietes}
-      cx={nappe.x * largeur}
-      cy={nappe.y * hauteur}
-      r={nappe.rayon * largeur}
-      fill={`url(#${nappe.id})`}
-    />
+    <Animated.View
+      style={[
+        {
+          position: "absolute",
+          left: nappe.x * largeur - rayon,
+          top: nappe.y * hauteur - rayon,
+          width: diametre,
+          height: diametre,
+        },
+        style,
+      ]}
+    >
+      <Svg width={diametre} height={diametre} accessible={false}>
+        <Defs>
+          <RadialGradient id={nappe.id} cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor={nappe.couleur} stopOpacity={intensite} />
+            <Stop
+              offset="0.45"
+              stopColor={nappe.couleur}
+              stopOpacity={intensite * 0.35}
+            />
+            <Stop offset="1" stopColor={nappe.couleur} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Circle cx={rayon} cy={rayon} r={rayon} fill={`url(#${nappe.id})`} />
+      </Svg>
+    </Animated.View>
   );
 }
 
@@ -226,30 +257,16 @@ export function Aura({ active = false, assise = false }: Props) {
   return (
     <Box pointerEvents="none" className="absolute inset-0">
       <Animated.View style={[PLEIN_ECRAN, styleSouffle]}>
-        <Svg width={largeur} height={hauteur} accessible={false}>
-          <Defs>
-            {NAPPES.map((nappe) => (
-              <RadialGradient key={nappe.id} id={nappe.id} cx="50%" cy="50%" r="50%">
-                <Stop offset="0" stopColor={nappe.couleur} stopOpacity={intensite} />
-                <Stop
-                  offset="0.45"
-                  stopColor={nappe.couleur}
-                  stopOpacity={intensite * 0.35}
-                />
-                <Stop offset="1" stopColor={nappe.couleur} stopOpacity={0} />
-              </RadialGradient>
-            ))}
-          </Defs>
-          {NAPPES.map((nappe) => (
-            <NappeAnimee
-              key={nappe.id}
-              nappe={nappe}
-              largeur={largeur}
-              hauteur={hauteur}
-              immobile={!derive}
-            />
-          ))}
-        </Svg>
+        {NAPPES.map((nappe) => (
+          <NappeAnimee
+            key={nappe.id}
+            nappe={nappe}
+            largeur={largeur}
+            hauteur={hauteur}
+            intensite={intensite}
+            immobile={!derive}
+          />
+        ))}
       </Animated.View>
       {assise ? (
         <Svg width={largeur} height={hauteur} style={PLEIN_ECRAN} accessible={false}>
