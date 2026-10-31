@@ -3,7 +3,66 @@
 > Document de passation. À lire en premier par toute personne ou IA qui
 > reprend le travail, avec `AGENTS.md`. Mis à jour à chaque fin de session.
 
-**Dernière mise à jour : 2026-10-30**
+**Dernière mise à jour : 2026-10-31**
+
+## Session du 2026-10-31 (suite) — dictée immersive, transcription en direct
+
+**Demande de Marc** : un message vocal à Karria au niveau de ChatGPT voix / Siri — l'animation
+suit la voix, le texte s'écrit **pendant** qu'on parle, on relit et corrige avant d'envoyer,
+rien ne part tout seul. Même expérience dans la création du CV.
+
+**Nouveau domaine `src/features/dictee/`** (partagé par l'agent et le CV ; l'ancien
+`cv/hooks/use-micro.ts` et `transcrire` de `cv.api.ts` y ont déménagé) :
+
+- `services/dictee.ts` — machine d'états pure (`repos → demarrage → ecoute → cloture |
+transcription → repos`), deux modes : **appareil** (reconnaissance du téléphone, partiels en
+  direct) et **serveur** (enregistrement + `POST /voice/transcribe`, le repli). Elle rend un
+  **texte**, jamais un envoi ; une fin imprévue (silence, interruption, erreur) garde ce qui a
+  été entendu. 23 tests (`dictee.test.ts`).
+- `hooks/use-dictee.ts` — `expo-speech-recognition@~57.1.1` (jamsch ; module Expo, nouvelle
+  architecture ; étiquette `sdk-57`) : `fr-FR`, `interimResults`, `continuous`,
+  `requiresOnDeviceRecognition`, `addsPunctuation`, `volumechange` toutes les 80 ms → valeur
+  partagée Reanimated (aucun rendu React par mesure). Mode appareil seulement si
+  `isRecognitionAvailable() && supportsOnDeviceRecognition()`, sinon repli serveur ; une erreur
+  `language-not-supported` / `service-not-allowed` sans texte bascule aussi sur le serveur.
+  Limite **2 min** (`LIMITE_MS`), minuterie en `text-warning` les 15 dernières secondes. Les
+  événements du module sont globaux : chaque instance ne traite que les siens (panneau agent
+  monté en permanence + écran CV).
+- `components/zone-dictee.tsx` — remplace le champ dans la capsule : texte confirmé + partiel
+  estompé (défile au dernier mot), ✕ annuler, **orbe vivante** (`ecoute`, `niveauAudio`
+  partagé, `active` pendant les attentes), minuterie, ✓ « Terminer et relire » (bleu plein).
+  Fondu d'entrée/sortie coupé par « réduire les animations ». Pas d'onde décorative : l'orbe
+  est la seule animation (règle de Marc), plus l'aura.
+- `Aura` : props `ecoute` et `niveau` — respiration plus rapide, et le niveau de la voix
+  gonfle le calque (palier **haut** seulement, comme le souffle).
+- Agent : `Compositeur` → bouton micro quand le champ est vide (flèche sinon) ; le texte dicté
+  **s'ajoute au brouillon** (`ajouterAuBrouillon`) ; le problème du micro s'affiche là où les
+  erreurs d'envoi. CV : `SaisieReponse` idem ; la phase `ecoute` a disparu de `use-creation-cv`,
+  la dictée pose le texte dans `texte` — **l'envoi automatique de la transcription (V1) n'existe
+  plus**, l'utilisateur relit puis envoie.
+
+**Consentement IA** — décision à relire par Marc : la dictée sur l'appareil n'envoie rien à
+un tiers → aucun accord demandé pour écouter ; l'envoi à Karria reste derrière `useActionIa`
+(`assistant`, `cv_creation`). Le repli serveur demande `avecConsentement("transcription")`
+**avant** d'ouvrir le micro, et un `403` rouvre la feuille (événement `transcrire-encore`).
+**Limite connue** : sur iOS, `requiresOnDeviceRecognition` n'est appliqué que si le moteur de la
+langue le permet, sinon Apple reconnaît par son réseau sans le dire ; `supportsOnDeviceRecognition()`
+est lu pour la **langue du téléphone**, pas pour `fr-FR`. Un francophone sur iPhone récent est
+sur place ; un téléphone en anglais avec dictée fr… passe probablement par Apple. À mentionner
+dans la politique de confidentialité (« service de dictée du système »), ou exiger le repli
+serveur partout si Marc préfère.
+
+**Natif** : `app.json` → plugin `expo-speech-recognition` (`NSSpeechRecognitionUsageDescription`,
+`NSMicrophoneUsageDescription` harmonisé avec `expo-audio`, `RECORD_AUDIO` + `queries`
+Android). **Recompilation obligatoire** (iPhone de Marc : voir la session précédente). Jest :
+module simulé dans `jest.setup.ts` (téléphone sans reconnaissance → repli).
+
+`npm run check` vert (308 tests), `npx expo export --platform ios` produit un paquet.
+
+**Non vérifié** : la reconnaissance réelle (le simulateur n'a pas de micro) — Marc doit tester
+sur son iPhone : partiels en français, ponctuation, ✓ puis correction, limite 2 min, refus de
+permission, et Android (bip de début/fin du `SpeechRecognizer`, modèle hors-ligne fr à
+télécharger sur certains appareils).
 
 ## Session du 2026-10-31 — sobriété visuelle, orbe unique, latence de l'aura
 

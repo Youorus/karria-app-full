@@ -10,7 +10,6 @@
  * - `POST /cv/import` : un CV existant (PDF, Word, photo) devient un
  *   brouillon pré-rempli de **propositions**, à valider chapitre par
  *   chapitre — rien n'est validé à la place de l'utilisateur.
- * - `POST /voice/transcribe` : la voix devient du texte.
  *
  * La traduction va dans les deux sens : ce qui part au serveur repasse en
  * `snake_case` ici, et nulle part ailleurs.
@@ -316,21 +315,6 @@ export async function importerCv(fichier: FichierCv): Promise<Brouillon> {
     return formulaire;
   });
   return versBrouillon(brut);
-}
-
-export async function transcrire(uri: string): Promise<string> {
-  const brut = await http.postFormulaire<{ text: string }>("/voice/transcribe", () => {
-    const formulaire = new FormData();
-    // React Native lit un fichier local sous cette forme ; ce n'est pas
-    // un `Blob`, d'où la conversion.
-    formulaire.append("audio_file", {
-      uri,
-      name: "reponse.m4a",
-      type: "audio/m4a",
-    } as unknown as Blob);
-    return formulaire;
-  });
-  return brut.text;
 }
 
 /** Envoie la photo choisie ; `ameliorer` seulement si l'utilisateur l'a

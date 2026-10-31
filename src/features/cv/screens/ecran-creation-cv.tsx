@@ -74,13 +74,12 @@ export function EcranCreationCv() {
     phase.nom === "reflexion" || phase.nom === "envoi" || phase.nom === "finalisation";
   const photo =
     phase.nom.startsWith("photo") || (phase.nom === "envoi" && chapitre.cle === "photo");
-  const parle =
-    phase.nom === "question" || phase.nom === "ecoute" || phase.nom === "reflexion";
+  const parle = phase.nom === "question" || phase.nom === "reflexion";
   const surLaQuestion = c.parole === chapitre.question;
 
   return (
     <Box style={{ flex: 1 }} className="bg-background">
-      <Aura />
+      <Aura ecoute={c.dictee.ecoute} niveau={c.dictee.niveau} />
       <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
         {phase.nom === "termine" ? (
           <Revelation onVoir={c.fermer} />
@@ -227,9 +226,7 @@ export function EcranCreationCv() {
                       valeur={c.texte}
                       onChange={c.setTexte}
                       onEnvoyer={c.envoyer}
-                      onMicro={c.basculerMicro}
-                      ecoute={phase.nom === "ecoute"}
-                      niveau={c.niveauMicro}
+                      dictee={c.dictee}
                       occupe={phase.nom === "reflexion"}
                       enCorrection={c.enCorrection}
                     />

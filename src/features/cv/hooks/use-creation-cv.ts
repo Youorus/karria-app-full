@@ -30,11 +30,18 @@
  *
  * ═══ L'accord sur l'IA, au premier geste qui en a besoin ═══
  *
- * Répondre (interprétation), dicter (transcription), améliorer la photo :
- * chacun part chez un modèle tiers. Avant le premier, la feuille de
- * consentement se montre (`useActionIa`) et le geste reprend après
- * « J'accepte et je continue ». Un `403 ai_consent_required` du serveur
- * fait pareil : la feuille, puis le geste rejoué.
+ * Répondre (interprétation), améliorer la photo : chacun part chez un
+ * modèle tiers. Avant le premier, la feuille de consentement se montre
+ * (`useActionIa`) et le geste reprend après « J'accepte et je continue ».
+ * Un `403 ai_consent_required` du serveur fait pareil : la feuille, puis le
+ * geste rejoué.
+ *
+ * ═══ Dicter, c'est écrire ═══
+ *
+ * La dictée (`features/dictee`) écrit dans le champ de réponse, en direct,
+ * depuis la reconnaissance du téléphone ; l'utilisateur relit, corrige, et
+ * c'est lui qui envoie — l'interprétation passe alors par la même porte que
+ * l'écrit. Elle porte elle-même son repli serveur et l'accord qui va avec.
  *
  * ═══ Rien ne se perd ═══
  *
@@ -47,20 +54,20 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useActionIa } from "@/features/auth/hooks/use-action-ia";
+import { useDictee, type Dictee } from "@/features/dictee/hooks/use-dictee";
+import { joindre } from "@/features/dictee/services/dictee";
 import { ErreurApi } from "@/lib/http";
 import {
   finaliser,
   interpreter,
   ouvrirBrouillon,
   televerserPhoto,
-  transcrire,
   validerChapitre,
 } from "../api/cv.api";
 import { DEFINITIONS, veutPasser, type DefinitionChapitre } from "../services/chapitres";
 import { CHAPITRES, type Brouillon, type CleChapitre, type Jet } from "../types/cv.types";
 import { useChoixPhoto } from "./use-choix-photo";
 import { useImportCv } from "./use-import-cv";
-import { useMicro } from "./use-micro";
 
 const PAROLE_PROPOSITION = "Voici ce que j'ai lu dans ton CV. C'est bon, ou je corrige ?";
 const PAROLE_PROPOSITION_SUIVANTE = "Et celle-ci, c'est bon ?";
@@ -69,7 +76,6 @@ export type Phase =
   | { nom: "chargement" }
   | { nom: "erreur"; message: string }
   | { nom: "question" }
-  | { nom: "ecoute" }
   | { nom: "reflexion"; reponse: string }
   | { nom: "jet"; jet: Jet; relance: string | null }
   | { nom: "encore" }
@@ -104,13 +110,13 @@ export interface CreationCv {
   elements: Jet[];
   /** Ce qui s'empile dans le mini-CV, dans l'ordre. */
   valides: Jet[];
-  niveauMicro: number;
+  /** Parler au lieu d'écrire : ce qui est entendu rejoint `texte`. */
+  dictee: Dictee;
   probleme: string | null;
   texte: string;
   setTexte: (t: string) => void;
   envoyer: () => void;
   toucherSuggestion: (s: string) => void;
-  basculerMicro: () => void;
   valider: () => void;
   corriger: () => void;
   passer: () => void;
@@ -160,17 +166,20 @@ function rienDeValide(brouillon: Brouillon | null): boolean {
 
 export function useCreationCv(): CreationCv {
   const router = useRouter();
-  const micro = useMicro();
   const photo = useChoixPhoto();
   const { avecConsentement, rejouerSiConsentementRequis } = useActionIa();
   // Les rejeux après l'accord passent par des références : chaque fonction se
   // cite elle-même, et React refuse qu'une valeur soit lue avant sa déclaration.
   const rejouerInterpretation = useRef<(propre: string) => void>(() => undefined);
-  const rejouerTranscription = useRef<(uri: string) => void>(() => undefined);
   const rejouerPhoto = useRef<(image: string) => void>(() => undefined);
   const [brouillon, setBrouillon] = useState<Brouillon | null>(null);
   const [phase, setPhase] = useState<Phase>({ nom: "chargement" });
   const [texte, setTexte] = useState("");
+  // Ce que la dictée a entendu s'ajoute à ce qui est déjà écrit : on relit
+  // le tout avant d'envoyer.
+  const dictee = useDictee({
+    onTexte: useCallback((entendu: string) => setTexte((t) => joindre(t, entendu)), []),
+  });
   const [parole, setParole] = useState<string | null>(null);
   const [correctionDe, setCorrectionDe] = useState<Jet | null>(null);
   const [elements, setElements] = useState<Jet[]>([]);
@@ -335,57 +344,6 @@ export function useCreationCv(): CreationCv {
     [passer, repondre],
   );
 
-  const transcrireEtRepondre = useCallback(
-    (uri: string) => {
-      setPhase({ nom: "reflexion", reponse: "" });
-      transcrire(uri)
-        .then((entendu) => {
-          if (vivant.current) repondre(entendu);
-        })
-        .catch((cause: unknown) => {
-          console.warn("[karria] transcription en échec", cause);
-          if (!vivant.current) return;
-          setPhase({ nom: "question" });
-          if (
-            rejouerSiConsentementRequis(cause, "transcription", () =>
-              rejouerTranscription.current(uri),
-            )
-          ) {
-            return;
-          }
-          setProbleme("Je ne t'ai pas bien entendu. Réessaie, ou écris-moi.");
-        });
-    },
-    [repondre, rejouerSiConsentementRequis],
-  );
-
-  useEffect(() => {
-    rejouerTranscription.current = transcrireEtRepondre;
-  }, [transcrireEtRepondre]);
-
-  const basculerMicro = useCallback(() => {
-    if (phase.nom === "ecoute") {
-      setPhase({ nom: "reflexion", reponse: "" });
-      micro.arreter().then((uri) => {
-        if (!vivant.current) return;
-        if (uri === null) {
-          setProbleme("Je ne t'ai pas bien entendu. Réessaie, ou écris-moi.");
-          setPhase({ nom: "question" });
-          return;
-        }
-        transcrireEtRepondre(uri);
-      });
-      return;
-    }
-    // L'accord d'abord, le micro ensuite : on ne fait pas parler quelqu'un
-    // pour lui dire après que sa voix ne partira pas.
-    avecConsentement("transcription", () => {
-      micro.demarrer().then((ok) => {
-        if (ok && vivant.current) setPhase({ nom: "ecoute" });
-      });
-    });
-  }, [phase.nom, micro, transcrireEtRepondre, avecConsentement]);
-
   const valider = useCallback(() => {
     if (phase.nom !== "jet") return;
     if (chapitre.boucle) {
@@ -495,13 +453,12 @@ export function useCreationCv(): CreationCv {
     enCorrection: correctionDe !== null,
     elements,
     valides: brouillon === null ? [] : [...jetsValides(brouillon), ...elements],
-    niveauMicro: micro.niveau,
-    probleme: probleme ?? micro.probleme ?? photo.probleme ?? importCv.probleme,
+    dictee,
+    probleme: probleme ?? dictee.probleme ?? photo.probleme ?? importCv.probleme,
     texte,
     setTexte,
     envoyer: () => repondre(texte),
     toucherSuggestion,
-    basculerMicro,
     valider,
     corriger,
     passer,

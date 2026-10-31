@@ -14,7 +14,11 @@
  *
  * - au repos, elle respire à peine ;
  * - `active` — l'IA réfléchit ou parle —, elle s'intensifie et accélère.
- *   L'utilisateur voit l'IA travailler sans lire un indicateur.
+ *   L'utilisateur voit l'IA travailler sans lire un indicateur ;
+ * - `ecoute` — l'utilisateur dicte —, elle respire un peu plus vite et
+ *   **suit la voix** : le niveau du micro (`niveau`, valeur partagée lue sur
+ *   le fil d'interface) gonfle légèrement le calque. Le téléphone montre
+ *   qu'il entend, sans vumètre.
  *
  * ═══ Mouvement réduit ═══
  *
@@ -53,6 +57,7 @@ import Animated, {
   useSharedValue,
   withRepeat,
   withTiming,
+  type SharedValue,
 } from "react-native-reanimated";
 import Svg, {
   Circle,
@@ -129,6 +134,10 @@ const NAPPES: Nappe[] = [
 interface Props {
   /** L'IA réfléchit ou parle : l'aura s'intensifie. */
   active?: boolean;
+  /** L'utilisateur dicte : l'aura respire plus vite et suit la voix. */
+  ecoute?: boolean;
+  /** Le niveau de la voix, de 0 à 1, sur le fil d'interface. */
+  niveau?: SharedValue<number>;
   /** Fondu vers le fond en bas d'écran, pour asseoir un contenu. */
   assise?: boolean;
 }
@@ -215,7 +224,7 @@ function NappeAnimee({
   );
 }
 
-export function Aura({ active = false, assise = false }: Props) {
+export function Aura({ active = false, ecoute = false, niveau, assise = false }: Props) {
   const { width: largeur, height: hauteur } = useWindowDimensions();
   const { mode } = useCouleurs();
   const palier = useQualiteVisuelle();
@@ -227,7 +236,7 @@ export function Aura({ active = false, assise = false }: Props) {
   const souffleAnime = anime && palier === "haut";
 
   // L'intensité globale : une respiration lente au repos, plus ample et
-  // plus rapide quand l'IA travaille.
+  // plus rapide quand l'IA travaille, entre les deux quand elle écoute.
   const souffle = useSharedValue(0.85);
   useEffect(() => {
     if (!souffleAnime) {
@@ -241,18 +250,32 @@ export function Aura({ active = false, assise = false }: Props) {
           -1,
           true,
         )
-      : withRepeat(
-          withTiming(1, { duration: 4_200, easing: Easing.inOut(Easing.quad) }),
-          -1,
-          true,
-        );
+      : ecoute
+        ? withRepeat(
+            withTiming(1.02, { duration: 1_600, easing: Easing.inOut(Easing.quad) }),
+            -1,
+            true,
+          )
+        : withRepeat(
+            withTiming(1, { duration: 4_200, easing: Easing.inOut(Easing.quad) }),
+            -1,
+            true,
+          );
     return () => cancelAnimation(souffle);
-  }, [active, souffleAnime, souffle]);
+  }, [active, ecoute, souffleAnime, souffle]);
 
-  const styleSouffle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, souffle.value),
-    transform: [{ scale: 0.96 + souffle.value * 0.06 }],
-  }));
+  // La voix ne gonfle le calque que là où le souffle est déjà animé : en
+  // dessous, le calque hors écran qu'elle forcerait coûte trop cher.
+  const silence = useSharedValue(0);
+  const voix = niveau ?? silence;
+  const suitLaVoix = souffleAnime && ecoute;
+  const styleSouffle = useAnimatedStyle(() => {
+    const gonflement = suitLaVoix ? voix.get() * 0.12 : 0;
+    return {
+      opacity: Math.min(1, souffle.value + gonflement),
+      transform: [{ scale: 0.96 + souffle.value * 0.06 + gonflement * 0.4 }],
+    };
+  });
 
   return (
     <Box pointerEvents="none" className="absolute inset-0">

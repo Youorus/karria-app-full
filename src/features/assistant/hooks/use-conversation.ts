@@ -47,6 +47,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useActionIa } from "@/features/auth/hooks/use-action-ia";
+import { joindre } from "@/features/dictee/services/dictee";
 import { ErreurApi } from "@/lib/http";
 import { envoyerMessage } from "../api/assistant.api";
 import { BATTEMENT_MS, borneSuivante } from "@/lib/revelation";
@@ -65,6 +66,8 @@ export interface Conversation {
   messages: Message[];
   brouillon: string;
   changerBrouillon: (texte: string) => void;
+  /** Ajoute au brouillon — ce que la dictée a entendu, à relire avant d'envoyer. */
+  ajouterAuBrouillon: (texte: string) => void;
   envoyer: (texte?: string) => void;
   reflechit: boolean;
   parle: boolean;
@@ -204,10 +207,16 @@ export function useConversation(onRecherche?: (resultats: number) => void): Conv
     [erreur],
   );
 
+  const ajouterAuBrouillon = useCallback((texte: string) => {
+    setBrouillon((courant) => joindre(courant, texte));
+    setErreur(null);
+  }, []);
+
   return {
     messages,
     brouillon,
     changerBrouillon,
+    ajouterAuBrouillon,
     envoyer,
     reflechit,
     parle,

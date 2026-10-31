@@ -1,17 +1,23 @@
 /**
- * Le micro : parler au lieu d'écrire.
+ * L'enregistreur : la voix dans un fichier, pour la transcription serveur.
+ *
+ * ═══ Un repli, pas la règle ═══
+ *
+ * La dictée passe d'abord par la reconnaissance du téléphone (`use-dictee`),
+ * qui écrit le texte en direct. Ce hook ne sert que lorsqu'elle manque :
+ * on enregistre, et Karria transcrit à la fin.
  *
  * ═══ Ce qu'il rend ═══
  *
- * `niveau`, de 0 à 1, lu sur le compteur du micro toutes les 80 ms :
- * c'est lui qui fait onduler l'onde pendant qu'on parle. Sans retour
- * visuel, on ne sait pas si le téléphone écoute — et on se tait.
+ * `niveau`, de 0 à 1, lu sur le compteur du micro toutes les 80 ms : c'est
+ * lui qui fait vivre l'orbe pendant qu'on parle. Sans retour visuel, on ne
+ * sait pas si le téléphone écoute — et on se tait.
  *
  * ═══ L'autorisation ═══
  *
- * Demandée au premier appui, jamais à l'ouverture de l'écran : on
- * comprend pourquoi le micro est demandé quand on vient de toucher le
- * bouton micro. Refusée, on le dit et l'écrit reste là.
+ * Demandée au premier appui, jamais à l'ouverture de l'écran : on comprend
+ * pourquoi le micro est demandé quand on vient de toucher le bouton micro.
+ * Refusée, `demarrer` rend le message à afficher et l'écrit reste là.
  */
 
 import {
@@ -21,7 +27,9 @@ import {
   useAudioRecorder,
   useAudioRecorderState,
 } from "expo-audio";
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
+
+import { MESSAGE_REFUS, niveauDepuisDecibels } from "../services/dictee";
 
 /** Le compteur rend des décibels (≈ −60 en silence, 0 au plus fort). */
 const SILENCE_DB = -55;
@@ -31,9 +39,8 @@ const OPTIONS = { ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true };
 export interface Micro {
   enregistre: boolean;
   niveau: number;
-  /** Message à montrer quand le micro est refusé ou en panne. */
-  probleme: string | null;
-  demarrer: () => Promise<boolean>;
+  /** Ouvre le micro ; rend `null` si tout va bien, sinon le message à montrer. */
+  demarrer: () => Promise<string | null>;
   /** Arrête et rend le fichier enregistré, ou `null`. */
   arreter: () => Promise<string | null>;
 }
@@ -41,26 +48,18 @@ export interface Micro {
 export function useMicro(): Micro {
   const enregistreur = useAudioRecorder(OPTIONS);
   const etat = useAudioRecorderState(enregistreur, 80);
-  const [probleme, setProbleme] = useState<string | null>(null);
 
-  const demarrer = useCallback(async () => {
+  const demarrer = useCallback(async (): Promise<string | null> => {
     const permission = await requestRecordingPermissionsAsync();
-    if (!permission.granted) {
-      setProbleme(
-        "Autorise le micro dans les réglages pour me parler. En attendant, écris-moi !",
-      );
-      return false;
-    }
+    if (!permission.granted) return MESSAGE_REFUS;
     try {
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       await enregistreur.prepareToRecordAsync();
       enregistreur.record();
-      setProbleme(null);
-      return true;
+      return null;
     } catch (cause: unknown) {
       console.warn("[karria] micro indisponible", cause);
-      setProbleme("Le micro ne répond pas. Écris-moi plutôt.");
-      return false;
+      return "Le micro ne répond pas. Écris-moi plutôt.";
     }
   }, [enregistreur]);
 
@@ -75,10 +74,10 @@ export function useMicro(): Micro {
     }
   }, [enregistreur]);
 
-  const db = etat.metering ?? SILENCE_DB;
-  const niveau = etat.isRecording
-    ? Math.min(1, Math.max(0, (db - SILENCE_DB) / -SILENCE_DB))
-    : 0;
-
-  return { enregistre: etat.isRecording, niveau, probleme, demarrer, arreter };
+  return {
+    enregistre: etat.isRecording,
+    niveau: etat.isRecording ? niveauDepuisDecibels(etat.metering ?? SILENCE_DB) : 0,
+    demarrer,
+    arreter,
+  };
 }

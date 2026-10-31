@@ -50,6 +50,23 @@ jest.mock("react-native-reanimated", () =>
   jest.requireActual("react-native-reanimated/mock"),
 );
 
+// La reconnaissance vocale charge son module natif à l'import
+// (`requireNativeModule`), qui n'existe pas sous Jest : tout écran qui
+// porte la dictée — l'agent, la création du CV — plantait au chargement.
+// Ici, un téléphone sans reconnaissance : la dictée se replie sur le
+// serveur, et les tests de la machine d'états n'en dépendent pas.
+jest.mock("expo-speech-recognition", () => ({
+  ExpoSpeechRecognitionModule: {
+    start: jest.fn(),
+    stop: jest.fn(),
+    abort: jest.fn(),
+    isRecognitionAvailable: jest.fn(() => false),
+    supportsOnDeviceRecognition: jest.fn(() => false),
+    requestPermissionsAsync: jest.fn(async () => ({ granted: false, status: "denied" })),
+  },
+  useSpeechRecognitionEvent: jest.fn(),
+}));
+
 configure({ asyncUtilTimeout: 5_000 });
 
 beforeEach(() => {

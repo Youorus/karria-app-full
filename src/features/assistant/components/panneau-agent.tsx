@@ -84,13 +84,19 @@ export function PanneauAgent({ onFermer, onRecherche }: Props) {
     suggestions,
     vierge,
     active,
+    dictee,
     fermer,
     suite,
   } = useEcranAssistant(onFermer, onRecherche);
 
   return (
     <Box style={{ flex: 1 }} className="bg-background">
-      <Aura active={active} assise={!vierge} />
+      <Aura
+        active={active}
+        ecoute={dictee.ecoute}
+        niveau={dictee.niveau}
+        assise={!vierge}
+      />
       <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -163,6 +169,7 @@ export function PanneauAgent({ onFermer, onRecherche }: Props) {
               onChange={changerBrouillon}
               onEnvoyer={() => envoyer()}
               peutEnvoyer={peutEnvoyer}
+              dictee={dictee}
             />
           </Box>
         </KeyboardAvoidingView>

@@ -1,5 +1,5 @@
 /**
- * Le compositeur : la capsule où l'on écrit à Karria.
+ * Le compositeur : la capsule où l'on écrit — ou dicte — à Karria.
  *
  * ═══ Le verre ═══
  *
@@ -10,20 +10,31 @@
  * — Android, iOS plus ancien —, une surface translucide (`bg-verre`) en
  * reprend l'esprit sans prétendre l'imiter.
  *
- * ═══ Le bouton d'envoi ═══
+ * ═══ Un bouton, deux visages ═══
  *
- * Le seul élément bleu plein de l'écran, donc la seule action principale.
- * Désactivé — et estompé — tant qu'il n'y a rien à envoyer ou que Karria
- * répond : un envoi pendant la réponse croiserait deux fils.
+ * Champ vide, le bouton bleu est le **micro** : parler est plus facile
+ * qu'écrire pour beaucoup, et c'est à eux que Karria s'adresse d'abord. Dès
+ * qu'il y a du texte, il devient la flèche d'envoi — le seul élément bleu
+ * plein de l'écran, donc la seule action principale. Désactivée tant que
+ * Karria répond : un envoi pendant la réponse croiserait deux fils.
+ *
+ * ═══ Pendant la dictée ═══
+ *
+ * Le champ cède la place à la zone d'écoute (`ZoneDictee`) : le texte qui
+ * s'écrit, l'orbe qui suit la voix, annuler / terminer. « Terminer » pose le
+ * texte dans le champ ; l'utilisateur le relit, le corrige, puis envoie.
+ * Rien ne part tout seul.
  */
 
 import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import type { ReactNode } from "react";
 import { Pressable, TextInput } from "react-native";
-import Svg, { Path } from "react-native-svg";
 
+import { Icone } from "@/components/icone";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
+import { ZoneDictee } from "@/features/dictee/components/zone-dictee";
+import type { Dictee } from "@/features/dictee/hooks/use-dictee";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 interface Props {
@@ -31,25 +42,12 @@ interface Props {
   onChange: (texte: string) => void;
   onEnvoyer: () => void;
   peutEnvoyer: boolean;
+  dictee: Dictee;
 }
 
 /** Lu une fois : la disponibilité du verre ne change pas pendant la vie
  *  de l'application. */
 const VERRE = isLiquidGlassAvailable();
-
-function Fleche({ couleur }: { couleur: string }) {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M12 19V5M5.5 11.5 12 5l6.5 6.5"
-        stroke={couleur}
-        strokeWidth={2.4}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
 
 function Capsule({ children }: { children: ReactNode }) {
   if (VERRE) {
@@ -66,8 +64,19 @@ function Capsule({ children }: { children: ReactNode }) {
   );
 }
 
-export function Compositeur({ valeur, onChange, onEnvoyer, peutEnvoyer }: Props) {
+export function Compositeur({ valeur, onChange, onEnvoyer, peutEnvoyer, dictee }: Props) {
   const couleurs = useCouleurs();
+  const ecrit = valeur.trim() !== "";
+
+  if (dictee.ouverte) {
+    return (
+      <Capsule>
+        <ZoneDictee dictee={dictee} />
+      </Capsule>
+    );
+  }
+
+  const bloque = ecrit && !peutEnvoyer;
 
   return (
     <Capsule>
@@ -84,17 +93,27 @@ export function Compositeur({ valeur, onChange, onEnvoyer, peutEnvoyer }: Props)
           accessibilityLabel="Ton message pour Karria"
         />
         <Pressable
-          onPress={onEnvoyer}
-          disabled={!peutEnvoyer}
+          onPress={ecrit ? onEnvoyer : dictee.demarrer}
+          disabled={bloque}
           hitSlop={6}
           className={`ml-2 h-11 w-11 items-center justify-center rounded-full bg-primary ${
-            peutEnvoyer ? "" : "opacity-40"
+            bloque ? "opacity-40" : ""
           }`}
           accessibilityRole="button"
-          accessibilityLabel="Envoyer"
-          accessibilityState={{ disabled: !peutEnvoyer }}
+          accessibilityLabel={ecrit ? "Envoyer" : "Dicter mon message"}
+          accessibilityHint={
+            ecrit
+              ? undefined
+              : "Le texte s'écrit pendant que tu parles, à relire avant d'envoyer"
+          }
+          accessibilityState={{ disabled: bloque }}
         >
-          <Fleche couleur={couleurs.surPrimaire} />
+          <Icone
+            nom={ecrit ? "envoyer" : "micro"}
+            couleur={couleurs.surPrimaire}
+            taille={18}
+            graisse="bold"
+          />
         </Pressable>
       </HStack>
     </Capsule>
