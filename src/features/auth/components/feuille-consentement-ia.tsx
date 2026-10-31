@@ -37,23 +37,11 @@ import { useCouleurs } from "@/theme/use-couleurs";
 
 import { useConsentementIa } from "../hooks/use-consentement-ia";
 
-function Bloc({ titre, children }: { titre: string; children: React.ReactNode }) {
-  return (
-    <VStack className="gap-0.5">
-      <Texte className="font-bold text-caption uppercase tracking-wide text-foreground-faint">
-        {titre}
-      </Texte>
-      {children}
-    </VStack>
-  );
-}
-
 export function FeuilleConsentementIa() {
   const couleurs = useCouleurs();
   const {
     feuille,
     consentement,
-    envois,
     fournisseurs,
     accepteLe,
     enCours,
@@ -102,63 +90,30 @@ export function FeuilleConsentementIa() {
                 </Pressable>
               </HStack>
 
-              <VStack className="items-center gap-2">
+              <VStack className="items-center gap-3">
                 <Texte
                   accessibilityRole="header"
                   className="text-center font-display text-title-sm tracking-tight text-foreground"
                 >
-                  {consultation
-                    ? "Karria et tes données"
-                    : "Avant qu'on commence, un mot sur tes données"}
+                  Karria et tes données
                 </Texte>
+                {/* Court, mais complet pour l'App Store (5.1.2 i) : ce qui part,
+                    chez qui, et l'accord explicite demandé par le bouton. */}
                 <Texte className="px-2 text-center text-footnote leading-5 text-muted-foreground">
-                  {consultation
-                    ? "Voici ce que je partage avec mes fournisseurs d'IA pour travailler pour toi, et comment revenir dessus."
-                    : "Pour t'aider, je m'appuie sur des modèles d'IA tiers. Je te dis ce qui leur est envoyé, et je ne fais rien sans ton accord."}
+                  Pour te répondre, Karria envoie tes messages, ta voix, ton CV et ta
+                  photo à{" "}
+                  <Texte className="font-bold text-footnote text-foreground">
+                    {fournisseurs}
+                  </Texte>
+                  . Jamais pour entraîner des modèles ni pour de la publicité.{" "}
+                  <Texte
+                    className="font-bold text-footnote text-primary underline"
+                    accessibilityRole="link"
+                    onPress={lirePolitique}
+                  >
+                    En savoir plus
+                  </Texte>
                 </Texte>
-              </VStack>
-
-              <VStack className="gap-3 rounded-lg border border-border-subtle bg-background px-4 py-3">
-                <Bloc titre="Ce qui part">
-                  {envois.length === 0 ? (
-                    <Texte className="text-footnote text-foreground">Lecture…</Texte>
-                  ) : (
-                    envois.map((envoi, i) => (
-                      <Texte
-                        key={envoi}
-                        className={`text-footnote ${i === 0 && !consultation ? "font-bold text-foreground" : "text-foreground"}`}
-                      >
-                        {i === 0
-                          ? envoi.charAt(0).toUpperCase() + envoi.slice(1)
-                          : `· ${envoi}`}
-                      </Texte>
-                    ))
-                  )}
-                </Bloc>
-                <Bloc titre="Chez qui, et pourquoi">
-                  <Texte className="text-footnote text-foreground">
-                    <Texte className="font-bold text-footnote text-foreground">
-                      {fournisseurs}
-                    </Texte>
-                    , le temps de produire la réponse : comprendre ta recherche, écrire et
-                    relire ton CV, transcrire ta voix, améliorer ta photo, expliquer ton
-                    score ATS. Si cette liste change, je te le redemande.
-                  </Texte>
-                </Bloc>
-                <Bloc titre="Ce que je ne fais jamais">
-                  <Texte className="text-footnote text-foreground">
-                    Tes données ne servent ni à entraîner des modèles, ni à te cibler avec
-                    de la publicité. Elles sont conservées selon notre{" "}
-                    <Texte
-                      className="font-bold text-footnote text-primary underline"
-                      accessibilityRole="link"
-                      onPress={lirePolitique}
-                    >
-                      politique de confidentialité
-                    </Texte>
-                    .
-                  </Texte>
-                </Bloc>
               </VStack>
 
               {erreur !== null ? <MessageErreur message={erreur} /> : null}
