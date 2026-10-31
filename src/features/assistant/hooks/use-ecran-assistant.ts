@@ -9,7 +9,7 @@
  * la conversation — l'utilisateur relit, corrige, puis envoie lui-même.
  */
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
 import { useDictee, type Dictee } from "@/features/dictee/hooks/use-dictee";
 import { salutation } from "@/lib/salutation";
@@ -30,6 +30,7 @@ export interface EcranAssistant extends Conversation {
 }
 
 export function useEcranAssistant(
+  ouvert: boolean,
   fermer: () => void,
   onRecherche?: (resultats: number) => void,
 ): EcranAssistant {
@@ -41,7 +42,14 @@ export function useEcranAssistant(
   const bonjour = useMemo(() => salutation(new Date().getHours()), []);
 
   const { changerBrouillon } = conversation;
-  const { oublierProbleme } = dictee;
+  const { oublierProbleme, annuler: annulerDictee } = dictee;
+
+  // Le panneau reste monté derrière le rideau refermé : le micro, lui, ne
+  // doit pas continuer d'écouter. Refermer, c'est renoncer à la dictée.
+  useEffect(() => {
+    if (!ouvert) annulerDictee();
+  }, [ouvert, annulerDictee]);
+
   // Écrire, c'est reprendre la main : le message du micro s'efface.
   const changerBrouillonEtOublier = useCallback(
     (texte: string) => {

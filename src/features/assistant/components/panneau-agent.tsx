@@ -65,12 +65,14 @@ function IconeFermer({ couleur }: { couleur: string }) {
 }
 
 interface Props {
+  /** Le rideau est ouvert ; refermé, une dictée en cours est abandonnée. */
+  ouvert: boolean;
   onFermer: () => void;
   /** Karria a lancé une recherche : le fil, derrière, doit se recharger. */
   onRecherche?: (resultats: number) => void;
 }
 
-export function PanneauAgent({ onFermer, onRecherche }: Props) {
+export function PanneauAgent({ ouvert, onFermer, onRecherche }: Props) {
   const couleurs = useCouleurs();
   const {
     fil,
@@ -87,7 +89,7 @@ export function PanneauAgent({ onFermer, onRecherche }: Props) {
     dictee,
     fermer,
     suite,
-  } = useEcranAssistant(onFermer, onRecherche);
+  } = useEcranAssistant(ouvert, onFermer, onRecherche);
 
   return (
     <Box style={{ flex: 1 }} className="bg-background">

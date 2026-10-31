@@ -18,6 +18,14 @@
  * téléphone — répond oui. Un francophone sur un iPhone récent est sur place ;
  * les autres passent par le serveur de Karria, avec l'accord qui va avec.
  *
+ * ═══ Les autorisations ═══
+ *
+ * Demandées au premier appui sur le micro, jamais avant. iOS en demande
+ * deux : le micro et la reconnaissance vocale. La reconnaissance refusée
+ * mais le micro permis, la dictée passe par le serveur (sans texte en
+ * direct) ; le micro refusé, un message renvoie aux Réglages et l'écrit
+ * reste là.
+ *
  * ═══ Sinon, le serveur de Karria ═══
  *
  * Pas de reconnaissance disponible, langue sans modèle local, service
@@ -135,8 +143,20 @@ function reconnaissanceSurPlace(): boolean {
   }
 }
 
+/** Rend la session audio aux autres apps : le module la laisse active, en
+ *  mode « mesure », ce qui baisse le son de tout ce qui jouerait ensuite.
+ *  Sans effet sur Android. */
+function rendreSessionAudio(): void {
+  try {
+    ExpoSpeechRecognitionModule.setAudioSessionActiveIOS(false, {
+      notifyOthersOnDeactivation: true,
+    });
+  } catch (cause: unknown) {
+    console.warn("[karria] session audio non rendue", cause);
+  }
+}
+
 export function useDictee({ onTexte }: OptionsDictee): Dictee {
-  const micro = useMicro();
   const { avecConsentement, rejouerSiConsentementRequis } = useActionIa();
   const [etat, setEtat] = useState<EtatDictee>(REPOS);
   // Les événements natifs arrivent hors du rendu : la référence est la
@@ -145,12 +165,17 @@ export function useDictee({ onTexte }: OptionsDictee): Dictee {
   const [probleme, setProbleme] = useState<string | null>(null);
   const [dureeMs, setDureeMs] = useState(0);
   const niveau = useSharedValue(0);
+  const micro = useMicro(niveau);
   const onTexteRef = useRef(onTexte);
   const minuteurCloture = useRef<ReturnType<typeof setTimeout> | null>(null);
   // La transcription se cite elle-même après l'accord : une référence, pour
   // que React n'ait pas à lire une valeur avant sa déclaration.
   const transcrireFichierRef = useRef<(uri: string) => void>(() => undefined);
   const terminerRef = useRef<() => void>(() => undefined);
+  // Le système écoute pour cette instance, de `start()` à l'événement `end` —
+  // même après une annulation, qui ne fait que demander l'arrêt : c'est à la
+  // vraie fin qu'on rend la session audio.
+  const systemeEngage = useRef(false);
 
   useEffect(() => {
     onTexteRef.current = onTexte;
@@ -230,15 +255,34 @@ export function useDictee({ onTexte }: OptionsDictee): Dictee {
 
   // ── La reconnaissance du téléphone ──
 
+  // La reconnaissance refusée mais le micro permis (iOS demande les deux) :
+  // la voix passe par le serveur, avec l'accord sur l'IA. Le micro refusé :
+  // le message qui renvoie aux Réglages.
+  const refusAppareil = useCallback(() => {
+    ExpoSpeechRecognitionModule.getMicrophonePermissionsAsync().then(
+      (micro) => {
+        if (etatRef.current.nom !== "demarrage") return;
+        if (!micro.granted) {
+          appliquer({ type: "echec", message: MESSAGE_REFUS });
+          return;
+        }
+        appliquer({ type: "annuler" });
+        demarrerServeur();
+      },
+      () => appliquer({ type: "echec", message: MESSAGE_REFUS }),
+    );
+  }, [appliquer, demarrerServeur]);
+
   const demarrerAppareil = useCallback(() => {
     appliquer({ type: "demarrer", mode: "appareil" });
     ExpoSpeechRecognitionModule.requestPermissionsAsync().then(
       (permission) => {
         if (etatRef.current.nom !== "demarrage") return;
         if (!permission.granted) {
-          appliquer({ type: "echec", message: MESSAGE_REFUS });
+          refusAppareil();
           return;
         }
+        systemeEngage.current = true;
         ExpoSpeechRecognitionModule.start({
           lang: LANGUE,
           interimResults: true,
@@ -257,7 +301,7 @@ export function useDictee({ onTexte }: OptionsDictee): Dictee {
         appliquer({ type: "echec", message: MESSAGE_REFUS });
       },
     );
-  }, [appliquer]);
+  }, [appliquer, refusAppareil]);
 
   /** Cette instance est-elle celle qui parle au système en ce moment ? */
   const enModeAppareil = useCallback(() => modeDe(etatRef.current) === "appareil", []);
@@ -274,6 +318,10 @@ export function useDictee({ onTexte }: OptionsDictee): Dictee {
   });
 
   useSpeechRecognitionEvent("end", () => {
+    if (systemeEngage.current) {
+      systemeEngage.current = false;
+      rendreSessionAudio();
+    }
     if (enModeAppareil()) appliquer({ type: "fin" });
   });
 
@@ -313,12 +361,7 @@ export function useDictee({ onTexte }: OptionsDictee): Dictee {
     );
   });
 
-  // En repli, le niveau vient du compteur de l'enregistreur.
-  useEffect(() => {
-    if (etat.nom === "ecoute" && etat.mode === "serveur") {
-      niveau.set(withTiming(micro.niveau, { duration: CADENCE_VOLUME_MS }));
-    }
-  }, [etat, micro.niveau, niveau]);
+  // En repli, le niveau vient du compteur de l'enregistreur (`useMicro`).
 
   // ── Les gestes ──
 
@@ -338,7 +381,10 @@ export function useDictee({ onTexte }: OptionsDictee): Dictee {
     if (courant.mode === "appareil") {
       ExpoSpeechRecognitionModule.stop();
       minuteurCloture.current = setTimeout(() => {
-        if (etatRef.current.nom === "cloture") appliquer({ type: "fin" });
+        if (etatRef.current.nom !== "cloture") return;
+        appliquer({ type: "fin" });
+        // Le système traîne : on le coupe, la session sera rendue à `end`.
+        ExpoSpeechRecognitionModule.abort();
       }, DELAI_CLOTURE_MS);
       return;
     }
@@ -379,10 +425,18 @@ export function useDictee({ onTexte }: OptionsDictee): Dictee {
     // Dépend du nom seul : chaque mot entendu change l'état, pas l'écoute.
   }, [etat.nom]);
 
-  // Quitter l'écran micro ouvert : on coupe, sans rien garder.
+  // Quitter l'écran micro ouvert : on coupe, sans rien garder. (Le repli
+  // serveur se coupe dans `useMicro`.)
   useEffect(
     () => () => {
-      if (modeDe(etatRef.current) === "appareil") ExpoSpeechRecognitionModule.abort();
+      if (minuteurCloture.current !== null) clearTimeout(minuteurCloture.current);
+      if (modeDe(etatRef.current) === "appareil" || systemeEngage.current) {
+        etatRef.current = REPOS;
+        ExpoSpeechRecognitionModule.abort();
+        // Plus personne n'écoute `end` : on rend la session une fois le
+        // moteur arrêté.
+        setTimeout(rendreSessionAudio, 500);
+      }
     },
     [],
   );

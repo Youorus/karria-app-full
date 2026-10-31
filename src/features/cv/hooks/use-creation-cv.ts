@@ -456,7 +456,11 @@ export function useCreationCv(): CreationCv {
     dictee,
     probleme: probleme ?? dictee.probleme ?? photo.probleme ?? importCv.probleme,
     texte,
-    setTexte,
+    // Écrire, c'est reprendre la main : le message du micro s'efface.
+    setTexte: (t: string) => {
+      setTexte(t);
+      dictee.oublierProbleme();
+    },
     envoyer: () => repondre(texte),
     toucherSuggestion,
     valider,

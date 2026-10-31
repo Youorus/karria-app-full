@@ -162,7 +162,7 @@ export function RideauAgent({ ouvert, onFermer, onRecherche, children }: Props) 
         accessibilityElementsHidden={!ouvert}
         importantForAccessibility={ouvert ? "auto" : "no-hide-descendants"}
       >
-        <PanneauAgent onFermer={onFermer} onRecherche={onRecherche} />
+        <PanneauAgent ouvert={ouvert} onFermer={onFermer} onRecherche={onRecherche} />
       </Animated.View>
     </View>
   );
