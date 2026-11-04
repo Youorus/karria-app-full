@@ -4,28 +4,29 @@
  *
  * ═══ Un champ, une pastille ═══
  *
- * On tape un mot, on touche « Ajouter » (ou Entrée), la pastille apparaît
+ * On tape un mot, on touche « Terminé » (ou la coche), la pastille apparaît
  * avec le niveau par défaut (« Intermédiaire », « B2 ») ; toucher la
  * pastille fait tourner le niveau ; la croix la retire. Aucun menu : sur
  * une liste de vingt compétences, un sélecteur par ligne serait un mur.
+ * Les briques (`Puce`, `ChampAjout`) sont celles des missions ; ici le
+ * champ reste ouvert, c'est l'action principale de l'écran, et il propose
+ * les compétences et les langues connues (`GET /cv/suggestions`).
  */
 
 import { useState } from "react";
-import { Pressable } from "react-native";
 
-import { ChampTexte } from "@/components/champ-texte";
-import { Icone } from "@/components/icone";
 import { Texte } from "@/components/texte";
 import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
-import { useCouleurs } from "@/theme/use-couleurs";
 
 import type {
   Competences,
   Interets,
   NiveauCompetence,
   NiveauLangue,
+  TypeSuggestion,
 } from "../../types/cv.types";
+import { ChampAjout, Puce } from "./liste-puces";
 
 export const NIVEAUX_COMPETENCE: readonly NiveauCompetence[] = [
   "Débutant",
@@ -48,89 +49,29 @@ function suivant<T>(liste: readonly T[], courant: T): T {
   return liste[(i + 1) % liste.length];
 }
 
-function Pastille({
-  texte,
-  niveau,
-  onToucher,
-  onRetirer,
-}: {
-  texte: string;
-  niveau?: string;
-  onToucher?: () => void;
-  onRetirer: () => void;
-}) {
-  const couleurs = useCouleurs();
-  return (
-    <HStack className="items-center rounded-full bg-card pl-3">
-      <Pressable
-        onPress={onToucher}
-        disabled={onToucher === undefined}
-        className="min-h-[40px] flex-row items-center gap-1.5 py-1"
-        accessibilityRole="button"
-        accessibilityLabel={
-          niveau ? `${texte}, ${niveau}. Toucher pour changer le niveau` : texte
-        }
-      >
-        <Texte className="text-footnote text-foreground">{texte}</Texte>
-        {niveau ? (
-          <Texte className="font-bold text-caption text-primary">{niveau}</Texte>
-        ) : null}
-      </Pressable>
-      <Pressable
-        onPress={onRetirer}
-        className="h-10 w-9 items-center justify-center"
-        accessibilityRole="button"
-        accessibilityLabel={`Retirer ${texte}`}
-      >
-        <Icone nom="fermer" couleur={couleurs.estompe} taille={11} graisse="semibold" />
-      </Pressable>
-    </HStack>
-  );
-}
-
 function Ajout({
   libelle,
   placeholder,
+  suggestions,
   onAjouter,
 }: {
   libelle: string;
   placeholder: string;
+  suggestions?: TypeSuggestion;
   onAjouter: (texte: string) => void;
 }) {
-  const couleurs = useCouleurs();
   const [texte, setTexte] = useState("");
-  const ajouter = () => {
-    const propre = texte.trim();
-    if (propre === "") return;
-    onAjouter(propre);
-    setTexte("");
-  };
   return (
-    <ChampTexte
+    <ChampAjout
       libelle={libelle}
       placeholder={placeholder}
-      value={texte}
+      valeur={texte}
       onChangeText={setTexte}
-      onSubmitEditing={ajouter}
-      blurOnSubmit={false}
-      returnKeyType="done"
-      autoCapitalize="sentences"
-      accessoire={
-        <Pressable
-          onPress={ajouter}
-          disabled={texte.trim() === ""}
-          className="h-10 flex-row items-center gap-1 pl-2"
-          accessibilityRole="button"
-          accessibilityLabel="Ajouter"
-        >
-          <Icone
-            nom="ajouter"
-            couleur={texte.trim() === "" ? couleurs.estompe : couleurs.primaire}
-            taille={15}
-            graisse="semibold"
-          />
-        </Pressable>
-      }
+      suggestions={suggestions}
+      onValider={(propre) => {
+        onAjouter(propre);
+        setTexte("");
+      }}
     />
   );
 }
@@ -148,6 +89,7 @@ export function FormulaireCompetences({
         <Ajout
           libelle="Compétences"
           placeholder="Ex. : Vente, Excel, Travail en équipe"
+          suggestions="skill"
           onAjouter={(nom) =>
             onChange({
               ...valeur,
@@ -157,10 +99,11 @@ export function FormulaireCompetences({
         />
         <HStack className="flex-wrap gap-2">
           {valeur.competences.map((c, i) => (
-            <Pastille
+            <Puce
               key={`${c.nom}-${i}`}
               texte={c.nom}
-              niveau={c.niveau}
+              detail={c.niveau}
+              indicationToucher="Change le niveau"
               onToucher={() =>
                 onChange({
                   ...valeur,
@@ -186,6 +129,7 @@ export function FormulaireCompetences({
         <Ajout
           libelle="Langues"
           placeholder="Ex. : Anglais"
+          suggestions="language"
           onAjouter={(langue) =>
             onChange({
               ...valeur,
@@ -195,10 +139,11 @@ export function FormulaireCompetences({
         />
         <HStack className="flex-wrap gap-2">
           {valeur.langues.map((l, i) => (
-            <Pastille
+            <Puce
               key={`${l.langue}-${i}`}
               texte={l.langue}
-              niveau={l.niveau}
+              detail={l.niveau}
+              indicationToucher="Change le niveau"
               onToucher={() =>
                 onChange({
                   ...valeur,
@@ -236,7 +181,7 @@ export function FormulaireInterets({
       />
       <HStack className="flex-wrap gap-2">
         {valeur.interets.map((it, i) => (
-          <Pastille
+          <Puce
             key={`${it.nom}-${i}`}
             texte={it.nom}
             onRetirer={() =>
