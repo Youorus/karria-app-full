@@ -40,7 +40,10 @@ import { FrontiereErreur } from "@/components/frontiere-erreur";
 import { RenvoiClavier } from "@/components/renvoi-clavier";
 import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
 import { FournisseurDeSession, useSession } from "@/features/auth/hooks/use-session";
+import { BandesDeDemarrage } from "@/features/demarrage/components/bandes-demarrage";
+import { usePorteDeVersion } from "@/features/demarrage/hooks/use-porte-de-version";
 import { EcranChargement } from "@/features/demarrage/screens/ecran-chargement";
+import { EcranVersionObsolete } from "@/features/demarrage/screens/ecran-version-obsolete";
 import { CentreDeNotifications } from "@/features/notifications/components/centre-notifications";
 import { configurerLaReception } from "@/features/notifications/services/notifications";
 import { FOND } from "@/theme";
@@ -97,6 +100,10 @@ function FondDeRacine({ children }: { children: ReactNode }) {
 function Portail() {
   const { etat } = useSession();
   const { mode } = useTheme();
+  // Demandée dès le chargeur, en parallèle des polices et de la session :
+  // la réponse est là avant le premier écran, et une version obsolète ne
+  // montre jamais le fil une seconde avant de le cacher.
+  const version = usePorteDeVersion();
   const [policesPretes, echecPolices] = useFonts({
     Manrope: Manrope_400Regular,
     ManropeMedium: Manrope_500Medium,
@@ -125,6 +132,17 @@ function Portail() {
     return <EcranChargement />;
   }
 
+  // Cette build n'est plus servie : l'écran bloquant prend la place de
+  // toute la navigation — aucun écran ne peut passer au-dessus.
+  if (version.etat === "requise") {
+    return (
+      <>
+        <StatusBar style="auto" />
+        <EcranVersionObsolete onMettreAJour={version.ouvrirStore} />
+      </>
+    );
+  }
+
   return (
     <>
       {/* `auto` : la barre d'état s'inverse avec le thème. */}
@@ -145,6 +163,9 @@ function Portail() {
       {/* Au-dessus de la navigation : les notifications touchées avant la
           session y attendent, et la bannière du premier plan s'y pose. */}
       <CentreDeNotifications />
+      {/* Les bandes du démarrage — « Une amélioration est prête »,
+          « Une nouvelle version est disponible » — au même niveau. */}
+      <BandesDeDemarrage version={version} />
     </>
   );
 }

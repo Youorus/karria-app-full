@@ -10,7 +10,8 @@
       "env": {
         "EXPO_PUBLIC_API_MODE": "simulation",
         "EXPO_PUBLIC_ADMOB_TEST_MODE": "true"
-      }
+      },
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
@@ -19,7 +20,8 @@
       },
       "env": {
         "EXPO_PUBLIC_ADMOB_TEST_MODE": "true"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
       "autoIncrement": true,
@@ -28,7 +30,8 @@
         "EXPO_PUBLIC_ADMOB_NATIVE_IOS": "ca-app-pub-3330048630750788/2234634875",
         "EXPO_PUBLIC_ADMOB_NATIVE_ANDROID": "ca-app-pub-3330048630750788/5303498413",
         "EXPO_PUBLIC_ADMOB_FEED_INTERVAL": "7"
-      }
+      },
+      "channel": "production"
     }
   },
   "submit": {
