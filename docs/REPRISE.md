@@ -35,7 +35,7 @@ tout ce qui suit est vérifié par les tests et l'empaquetage, pas à l'écran.
   ouverte **20 min**, bande discrète « Une amélioration est prête — Relancer »
   (`components/bande-demarrage.tsx`, en haut, fermable pour la session). Jamais de rechargement
   forcé.
-- **Clé privée** : `keys/private-key.pem` a été générée sur ce poste
+- **Clé privée** : `keys/private-key.pem` a été générée sur ce poste puis **déplacée le 2026-11-05 vers `~/.karria/eas-update-private-key.pem`** (mode 600, hors dépôt ; à sauvegarder ailleurs par Marc)
   (`npx expo-updates codesigning:generate …`), `keys/` est ignoré par git. **Elle n'existe nulle
   part ailleurs** : à ranger tout de suite (trousseau, gestionnaire de mots de passe). Perdue =
   impossible de publier une mise à jour pour les builds qui embarquent ce certificat (il faudrait
@@ -44,7 +44,7 @@ tout ce qui suit est vérifié par les tests et l'empaquetage, pas à l'écran.
 
 **Gestes qui restent à Marc (EAS) — rien n'a été publié :**
 
-1. Ranger `keys/private-key.pem` hors du dépôt (et garder une copie sûre).
+1. Fait : la clé est dans `~/.karria/eas-update-private-key.pem` ; en garder une copie sûre (gestionnaire de mots de passe).
 2. `npx eas-cli@latest whoami` (le poste est connecté en `marc29`), sinon `eas login`.
 3. **Une nouvelle build est indispensable** : une mise à jour OTA ne s'applique qu'aux builds qui
    contiennent `expo-updates` (et ce certificat). `npx eas-cli@latest build --platform ios --profile
