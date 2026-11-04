@@ -21,6 +21,7 @@ import { EnTeteKarria } from "@/components/en-tete-karria";
 import { MessageErreur } from "@/components/message-erreur";
 import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
+import { CarteAnnonceModele } from "@/features/publicite/components/carte-annonce-modele";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import { CarteModele } from "../components/carte-modele";
@@ -31,7 +32,7 @@ import { useGalerie } from "../hooks/use-galerie";
 export function EcranGalerie() {
   const couleurs = useCouleurs();
   const {
-    modeles,
+    elements,
     largeurCarte: largeur,
     possedes,
     puces,
@@ -59,17 +60,23 @@ export function EcranGalerie() {
           </Box>
         ) : (
           <FlatList
-            data={modeles}
+            data={elements}
             numColumns={2}
-            keyExtractor={(m) => String(m.id)}
-            renderItem={({ item, index }) => (
-              <CarteModele
-                modele={item}
-                rang={index}
-                largeur={largeur}
-                possede={possedes.has(item.id)}
-              />
-            )}
+            keyExtractor={(el) =>
+              el.type === "modele" ? String(el.modele.id) : "annonce-galerie"
+            }
+            renderItem={({ item, index }) =>
+              item.type === "annonce" ? (
+                <CarteAnnonceModele annonce={item.annonce} largeur={largeur} />
+              ) : (
+                <CarteModele
+                  modele={item.modele}
+                  rang={index}
+                  largeur={largeur}
+                  possede={possedes.has(item.modele.id)}
+                />
+              )
+            }
             columnWrapperClassName="gap-3"
             contentContainerClassName="gap-3 px-4 pb-[120px] pt-2"
             ListHeaderComponent={

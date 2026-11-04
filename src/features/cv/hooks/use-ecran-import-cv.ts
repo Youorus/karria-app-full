@@ -19,6 +19,9 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef } from "react";
 
+import type { NativeAd } from "@/features/publicite/api/publicite.api";
+import { useAnnonceEmplacement } from "@/features/publicite/hooks/use-annonce-emplacement";
+
 import { useImportCv, type PhaseImport } from "./use-import-cv";
 import type { SourceImport } from "./use-choix-fichiers";
 
@@ -31,6 +34,10 @@ export interface EcranImportCv {
   changerDeSource: (source: SourceImport) => void;
   creerDeZero: () => void;
   toutVoir: () => void;
+  /** Pendant la lecture seulement (5–10 s d'attente, aucun bouton à
+   *  l'écran) : une annonce native sous la phrase. Retirée dès que les
+   *  notes ou « Voir mon CV » arrivent. */
+  annonce: NativeAd | null;
 }
 
 const SOURCES: readonly SourceImport[] = ["camera", "galerie", "fichier"];
@@ -57,8 +64,14 @@ export function useEcranImportCv(): EcranImportCv {
     importation.demarrer(sourceDepuis(source));
   }, [importation, source]);
 
+  const annonce = useAnnonceEmplacement(
+    "attente_import",
+    importation.phase.nom === "lecture",
+  );
+
   return {
     phase: importation.phase,
+    annonce,
     fermer,
     voirMonCv: fermer,
     reessayer: importation.reessayer,

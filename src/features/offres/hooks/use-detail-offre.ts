@@ -17,8 +17,9 @@
  * ═══ L'annonce du détail ═══
  *
  * Sous le texte de l'offre, une annonce native **propre au détail**
- * (`use-annonce-detail.ts`) : jamais celle du fil, qui est déjà affichée
- * ailleurs. Aucune quand la personne est sans pub ou qu'aucune ne vient.
+ * (`use-annonce-emplacement.ts`, emplacement `detail_offre`) : jamais celle
+ * du fil, qui est déjà affichée ailleurs. Aucune quand la personne est
+ * sans pub ou qu'aucune ne vient ; montrée au calme, jamais sous le doigt.
  *
  * ═══ Sans compte ═══
  *
@@ -38,7 +39,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Linking, Platform, Share } from "react-native";
 
 import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
-import { useAnnonceDetail } from "@/features/publicite/hooks/use-annonce-detail";
+import { useAnnonceEmplacement } from "@/features/publicite/hooks/use-annonce-emplacement";
 import type { NativeAd } from "@/features/publicite/api/publicite.api";
 import { ErreurApi } from "@/lib/http";
 import {
@@ -95,7 +96,7 @@ export function useDetailOffre(): DetailOffre {
   );
   const [tentative, setTentative] = useState(0);
   const [enregistrement, setEnregistrement] = useState(false);
-  const annonce = useAnnonceDetail();
+  const annonce = useAnnonceEmplacement("detail_offre");
 
   // L'offre complète : toujours lue, sauf si la mémoire a déjà son texte.
   useEffect(() => {

@@ -51,6 +51,7 @@ export function EcranCv() {
             manquants={e.manquants}
             onModifier={e.modifier}
             onTerminerVerification={e.terminerVerification}
+            annonce={e.annonce}
           />
         ) : (
           <InvitationCv

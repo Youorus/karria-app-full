@@ -43,6 +43,7 @@
  */
 
 import { Platform } from "react-native";
+import { NativeAdEventType } from "react-native-google-mobile-ads";
 
 import { abonnerSansPub, estSansPub } from "@/lib/sans-pub";
 
@@ -52,6 +53,8 @@ import {
   type Autorisation,
   type NativeAd,
 } from "../api/publicite.api";
+import { delaiAvantCalme } from "../services/calme-tactile";
+import { compterImpression } from "../services/journal-impressions";
 import { blocNatif } from "../services/regles-publicite";
 
 /** L'écart entre deux requêtes, pour varier les créatifs. */
@@ -79,7 +82,25 @@ let enCours = false;
 let instantane: ReadonlyMap<number, NativeAd> = new Map();
 const abonnes = new Set<() => void>();
 
+let publicationEnAttente: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Publie l'instantané — mais jamais dans les deux secondes qui suivent un
+ * toucher (`services/calme-tactile.ts`) : une annonce qui surgit dans le
+ * fil sous le doigt est un clic accidentel garanti. Si ce n'est pas calme,
+ * on réessaie quand ça le sera ; une seule attente à la fois.
+ */
 function publier(): void {
+  const delai = delaiAvantCalme();
+  if (delai > 0) {
+    if (publicationEnAttente === null) {
+      publicationEnAttente = setTimeout(() => {
+        publicationEnAttente = null;
+        publier();
+      }, delai);
+    }
+    return;
+  }
   instantane = new Map(annonces);
   abonnes.forEach((rappel) => rappel());
 }
@@ -105,6 +126,11 @@ async function vider(): Promise<void> {
     while (emplacement !== undefined) {
       const annonce = await chargerAnnonce(bloc, personnalisees);
       if (annonce !== null) {
+        // L'impression du fil, comptée sur l'événement du SDK — pas au
+        // chargement, qui surestimerait (`services/journal-impressions.ts`).
+        annonce.addAdEventListener(NativeAdEventType.IMPRESSION, () =>
+          compterImpression("fil"),
+        );
         annonces.set(emplacement, annonce);
         chargeesA.set(emplacement, Date.now());
         publier();

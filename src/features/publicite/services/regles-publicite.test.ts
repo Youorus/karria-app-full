@@ -13,6 +13,7 @@ import {
   blocNatif,
   emplacementsPour,
   entrelacer,
+  insererApres,
   intervalleDepuis,
 } from "./regles-publicite";
 
@@ -108,5 +109,24 @@ describe("Le bloc d'annonces", () => {
   it("coupe la publicité plutôt que servir un bloc absent ou mal formé", () => {
     expect(blocNatif({ ...prod, idIos: undefined })).toEqual({ mode: "coupe" });
     expect(blocNatif({ ...prod, idIos: "ca-app-pub-1~2" })).toEqual({ mode: "coupe" });
+  });
+});
+
+describe("L'annonce d'une grille", () => {
+  it("se pose après le rang demandé", () => {
+    expect(insererApres(["a", "b", "c", "d"], "pub", 3)).toEqual([
+      "a",
+      "b",
+      "c",
+      "pub",
+      "d",
+    ]);
+    expect(insererApres(["a", "b", "c"], "pub", 3)).toEqual(["a", "b", "c", "pub"]);
+  });
+
+  it("n'apparaît ni sans annonce, ni dans une liste trop courte", () => {
+    expect(insererApres(["a", "b", "c"], null, 3)).toEqual(["a", "b", "c"]);
+    expect(insererApres(["a", "b"], "pub", 3)).toEqual(["a", "b"]);
+    expect(insererApres([], "pub", 3)).toEqual([]);
   });
 });

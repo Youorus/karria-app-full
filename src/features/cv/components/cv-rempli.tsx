@@ -36,6 +36,8 @@ import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
+import type { NativeAd } from "@/features/publicite/api/publicite.api";
+import { CarteAnnonce } from "@/features/publicite/components/carte-annonce";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import { periodeLisible } from "../services/chapitres";
@@ -205,6 +207,8 @@ interface Props {
   manquants: ChampManquant[];
   onModifier: (section: CleChapitre) => void;
   onTerminerVerification: () => void;
+  /** Sous la dernière section, jamais au-dessus d'un crayon : `null` = rien. */
+  annonce: NativeAd | null;
 }
 
 export function CvRempli({
@@ -214,6 +218,7 @@ export function CvRempli({
   manquants,
   onModifier,
   onTerminerVerification,
+  annonce,
 }: Props) {
   const couleurs = useCouleurs();
   const reduit = useReducedMotion();
@@ -461,6 +466,8 @@ export function CvRempli({
       >
         <Puces elements={cv.interets.map((i) => i.nom)} />
       </Section>
+      {/* L'annonce ferme la page : sous tout ce qui se modifie. */}
+      {annonce !== null ? <CarteAnnonce annonce={annonce} /> : null}
     </ScrollView>
   );
 }

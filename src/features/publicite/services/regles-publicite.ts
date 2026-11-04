@@ -11,6 +11,16 @@
  * conversation avec Karria ni dans la création du CV : ce sont des
  * moments de confiance, pas d'audience.
  *
+ * ═══ Les emplacements (2026-11-05) ═══
+ *
+ * Le fil (une toutes les `intervalle` offres), le détail d'une offre (sous
+ * le descriptif), la galerie des modèles (une carte au format modèle après
+ * le troisième, `insererApres`), le CV (sous les sections), l'attente d'un
+ * import (pendant la lecture seulement). Un seul emplacement par écran ;
+ * jamais au-dessus d'un bouton principal ; jamais dans les deux secondes
+ * qui suivent un toucher (`calme-tactile.ts`) ; chargé en arrière-plan.
+ * Comptés à l'impression (`journal-impressions.ts`).
+ *
  * ═══ Les blocs d'annonces ═══
  *
  * En développement (ou `EXPO_PUBLIC_ADMOB_TEST_MODE=true`), les blocs de
@@ -93,4 +103,19 @@ export function blocNatif(env: {
   return id !== undefined && /^ca-app-pub-\d+\/\d+$/.test(id)
     ? { mode: "reel", id }
     : { mode: "coupe" };
+}
+
+/**
+ * Une seule annonce dans une grille, posée **après** le `rang`-ième
+ * élément — la galerie des modèles la place après le troisième. Rien si la
+ * liste est trop courte pour la porter, ou si l'annonce n'est pas là :
+ * jamais de trou, jamais d'annonce en tête.
+ */
+export function insererApres<T, A>(
+  elements: readonly T[],
+  annonce: A | null,
+  rang: number,
+): (T | A)[] {
+  if (annonce === null || elements.length < rang) return [...elements];
+  return [...elements.slice(0, rang), annonce, ...elements.slice(rang)];
 }

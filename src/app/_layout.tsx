@@ -46,6 +46,7 @@ import { EcranChargement } from "@/features/demarrage/screens/ecran-chargement";
 import { EcranVersionObsolete } from "@/features/demarrage/screens/ecran-version-obsolete";
 import { CentreDeNotifications } from "@/features/notifications/components/centre-notifications";
 import { configurerLaReception } from "@/features/notifications/services/notifications";
+import { noterToucher } from "@/features/publicite/services/calme-tactile";
 import { FOND } from "@/theme";
 import { FournisseurDeTheme, useTheme } from "@/theme/preference";
 import "@/global.css";
@@ -94,7 +95,16 @@ export default function RootLayout() {
  */
 function FondDeRacine({ children }: { children: ReactNode }) {
   const { mode } = useTheme();
-  return <View style={{ flex: 1, backgroundColor: FOND[mode] }}>{children}</View>;
+  return (
+    <View
+      style={{ flex: 1, backgroundColor: FOND[mode] }}
+      // Chaque toucher de l'arbre remonte ici : la publicité s'en sert pour
+      // ne jamais faire paraître une annonce sous le doigt (`calme-tactile`).
+      onTouchStart={() => noterToucher()}
+    >
+      {children}
+    </View>
+  );
 }
 
 function Portail() {

@@ -18,6 +18,9 @@ import { useLocalSearchParams } from "expo-router";
 import { useWindowDimensions } from "react-native";
 
 import { usePorte } from "@/features/auth/hooks/use-porte";
+import type { NativeAd } from "@/features/publicite/api/publicite.api";
+import { useAnnonceEmplacement } from "@/features/publicite/hooks/use-annonce-emplacement";
+import { insererApres } from "@/features/publicite/services/regles-publicite";
 import { ErreurApi } from "@/lib/http";
 import { lireMesModeles, lireModeles } from "../api/modeles.api";
 import {
@@ -33,8 +36,17 @@ import type { FiltreGalerie, Modele } from "../types/modeles.types";
 const MARGE = 16;
 const ECART = 12;
 
+/** Une cellule de la grille : un modèle, ou l'annonce au format modèle. */
+export type ElementDeGalerie =
+  { type: "modele"; modele: Modele } | { type: "annonce"; annonce: NativeAd };
+
+/** L'annonce se pose après ce modèle-là — jamais en tête de grille. */
+const ANNONCE_APRES = 3;
+
 export interface Galerie {
-  modeles: Modele[];
+  /** Les modèles filtrés, avec l'annonce glissée après le troisième
+   *  (`features/publicite`) quand elle est là. */
+  elements: ElementDeGalerie[];
   /** Largeur d'une carte : deux colonnes dans la largeur de l'écran. */
   largeurCarte: number;
   possedes: Set<string>;
@@ -112,8 +124,23 @@ export function useGalerie(): Galerie {
     setTentative((t) => t + 1);
   }, []);
 
+  const modeles = useMemo(() => filtrer(tous, filtre), [tous, filtre]);
+  const annonce = useAnnonceEmplacement(
+    "galerie",
+    !chargement && modeles.length >= ANNONCE_APRES,
+  );
+  const elements = useMemo(
+    () =>
+      insererApres<ElementDeGalerie, ElementDeGalerie>(
+        modeles.map((modele) => ({ type: "modele", modele })),
+        annonce === null ? null : { type: "annonce", annonce },
+        ANNONCE_APRES,
+      ),
+    [modeles, annonce],
+  );
+
   return {
-    modeles: useMemo(() => filtrer(tous, filtre), [tous, filtre]),
+    elements,
     largeurCarte: Math.floor((width - MARGE * 2 - ECART) / 2),
     possedes,
     puces,

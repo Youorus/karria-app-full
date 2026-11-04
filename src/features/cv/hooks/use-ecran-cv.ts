@@ -23,6 +23,8 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 
 import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
+import type { NativeAd } from "@/features/publicite/api/publicite.api";
+import { useAnnonceEmplacement } from "@/features/publicite/hooks/use-annonce-emplacement";
 import { ErreurApi } from "@/lib/http";
 
 import { lireBrouillon, lireMonCv } from "../api/cv.api";
@@ -51,6 +53,9 @@ export interface EcranCv {
   /** « C'est bon » : on n'insiste plus sur la vérification. */
   terminerVerification: () => void;
   recharger: () => void;
+  /** Une annonce native **sous** les sections du CV rempli (`features/publicite`),
+   *  jamais au-dessus d'un geste ; rien sans CV, sans pub, ou sans annonce. */
+  annonce: NativeAd | null;
 }
 
 const SOURCES: readonly SourceImport[] = ["camera", "galerie", "fichier"];
@@ -122,6 +127,7 @@ export function useEcranCv(): EcranCv {
   useReprise("cv.importer", (charge) =>
     ouvrirImport(SOURCES.find((s) => s === charge) ?? "fichier"),
   );
+  const annonce = useAnnonceEmplacement("cv", cv !== null && !cv.vide);
 
   return {
     cv,
@@ -135,6 +141,7 @@ export function useEcranCv(): EcranCv {
     importRecent: verification.importRecent,
     manquants: cv === null || cv.vide ? [] : manquantsDuCv(cv),
     terminerVerification: effacerVerification,
+    annonce,
     recharger: () => {
       setChargement(true);
       charger();

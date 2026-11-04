@@ -27,6 +27,7 @@ import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
+import { CarteAnnonce } from "@/features/publicite/components/carte-annonce";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import { NotesDeLecture } from "../components/notes-de-lecture";
@@ -76,6 +77,12 @@ export function EcranImportCv() {
                 </Texte>
               </VStack>
             </Animated.View>
+          ) : null}
+
+          {/* L'attente est le seul moment de cet écran sans bouton : l'annonce
+              s'y pose, sous la phrase, et s'en va avec elle. */}
+          {phase.nom === "lecture" && e.annonce !== null ? (
+            <CarteAnnonce annonce={e.annonce} />
           ) : null}
 
           {phase.nom === "notes" ? (
