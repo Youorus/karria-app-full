@@ -36,6 +36,8 @@ import {
 
 import { desinscrireAppareil } from "@/features/notifications/api/appareils.api";
 import { poserConsentementIa } from "../services/consentement-ia";
+import { oublierTousLesBrouillons } from "@/features/cv/services/brouillons-edition";
+import { effacerVerification } from "@/features/cv/services/verification";
 import { liberer as libererLesAnnonces } from "@/features/publicite/hooks/reserve-annonces";
 import { auMomentDeLaDeconnexion } from "@/lib/http";
 import { poserSansPub } from "@/lib/sans-pub";
@@ -109,6 +111,10 @@ export function FournisseurDeSession({ children }: { children: ReactNode }) {
     // Qui sort veut l'accueil, pas le fil d'un invité, à la prochaine ouverture.
     void oublierDecouverte();
     // L'accord sur l'IA est celui d'un compte : le prochain repart de zéro.
+    // Le CV est celui d'un compte : ses brouillons de formulaire et ses
+    // sections « à vérifier » ne doivent pas survivre pour le suivant.
+    oublierTousLesBrouillons();
+    effacerVerification();
     poserConsentementIa(null);
     setEtat("anonyme");
     router.replace("/bienvenue");
@@ -170,6 +176,10 @@ export function FournisseurDeSession({ children }: { children: ReactNode }) {
     await oublierLesFournisseurs();
     await oublierSession();
     poserSansPub(false);
+    // Le CV est celui d'un compte : ses brouillons de formulaire et ses
+    // sections « à vérifier » ne doivent pas survivre pour le suivant.
+    oublierTousLesBrouillons();
+    effacerVerification();
     poserConsentementIa(null);
     setEtat("anonyme");
     router.replace({ pathname: "/bienvenue", params: { [PARAMETRE_ADIEU]: "1" } });

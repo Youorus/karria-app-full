@@ -32,3 +32,9 @@ export function lireBrouillon<T>(section: CleChapitre): T | undefined {
 export function oublierBrouillon(section: CleChapitre): void {
   brouillons.delete(section);
 }
+
+/** À la déconnexion : un brouillon est celui d'un compte, le suivant ne
+ *  doit ni le voir ni le relire. */
+export function oublierTousLesBrouillons(): void {
+  brouillons.clear();
+}
