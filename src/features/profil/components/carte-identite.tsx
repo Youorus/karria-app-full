@@ -4,14 +4,16 @@
  * ═══ Ce qu'elle montre, et d'où ça vient ═══
  *
  * La photo du CV, ou des initiales sur la crème du café ; le nom tiré du
- * CV, et dessous le pseudonyme (la partie locale de l'adresse) ou, à
- * défaut, le métier visé. Rien n'est demandé à l'inscription (AGENTS.md
- * §9) : cette carte se remplit **avec** le CV.
+ * CV, et dessous **l'adresse e-mail complète** du compte — ou, sans
+ * adresse, le métier visé (`services/identite.ts`). Pas de pseudonyme : le
+ * compte est une adresse prouvée, sans nom (AGENTS.md §9), et un
+ * « @partie-locale » n'avait aucun sens (Marc, 2026-11-04). Cette carte se
+ * remplit **avec** le CV.
  *
  * ═══ En ligne, compacte ═══
  *
  * Redessinée par Marc (2026-10-29) : l'avatar (72 points, anneau caramel)
- * à gauche, le nom et le pseudonyme à droite — la carte prend moins de
+ * à gauche, le nom et l'adresse à droite — la carte prend moins de
  * hauteur et laisse la place au soutien, dessous.
  */
 
@@ -56,11 +58,11 @@ function Avatar({ identite }: { identite: Identite }) {
 }
 
 interface Props {
+  /** `null` tant qu'on charge : la carte montre un squelette. */
   identite: Identite | null;
-  email: string | null;
 }
 
-export function CarteIdentite({ identite, email }: Props) {
+export function CarteIdentite({ identite }: Props) {
   return (
     <HStack space="md" className="items-center justify-between py-1">
       {identite === null ? (
@@ -87,9 +89,11 @@ export function CarteIdentite({ identite, email }: Props) {
             >
               {identite.nom}
             </Texte>
-            <Texte className="text-body text-muted-foreground pt-0.5" numberOfLines={1}>
-              {email ? "@" + email.split("@")[0] : (identite.titre ?? "Ton métier visé")}
-            </Texte>
+            {identite.sousLeNom !== null ? (
+              <Texte className="text-body text-muted-foreground pt-0.5" numberOfLines={1}>
+                {identite.sousLeNom}
+              </Texte>
+            ) : null}
           </>
         )}
       </VStack>

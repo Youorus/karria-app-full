@@ -45,6 +45,7 @@ describe("L'identité du profil", () => {
     expect(identite("marc@exemple.fr", CV_REMPLI)).toEqual({
       nom: "Marc Takoumba",
       titre: "Data engineer",
+      sousLeNom: "marc@exemple.fr",
       initiales: "MT",
       photo: "https://exemple.fr/photo.jpg",
     });
@@ -54,9 +55,21 @@ describe("L'identité du profil", () => {
     expect(identite("marc.t@exemple.fr", null)).toEqual({
       nom: "marc.t",
       titre: null,
+      sousLeNom: "marc.t@exemple.fr",
       initiales: "M",
       photo: null,
     });
+  });
+
+  it("écrit l'adresse complète sous le nom, jamais un pseudo", () => {
+    expect(identite("marc@exemple.fr", CV_REMPLI).sousLeNom).toBe("marc@exemple.fr");
+    expect(identite("marc@exemple.fr", null).sousLeNom).not.toMatch(/^@/);
+  });
+
+  it("sans adresse, met le métier visé sous le nom ; sans rien, rien", () => {
+    expect(identite(null, CV_REMPLI).sousLeNom).toBe("Data engineer");
+    expect(identite("", CV_REMPLI).sousLeNom).toBe("Data engineer");
+    expect(identite(null, null).sousLeNom).toBeNull();
   });
 
   it("n'affiche jamais une case vide", () => {

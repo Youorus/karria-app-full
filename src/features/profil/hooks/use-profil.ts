@@ -54,7 +54,6 @@ export interface Profil {
   seConnecter: () => void;
   /** `null` tant qu'on charge : la carte montre un squelette. */
   identite: Identite | null;
-  email: string | null;
   cv: { etat: EtatDuCv; resume: string } | null;
   /** La carte de soutien — sans pub, café (`features/soutien`). */
   soutien: Soutien;
@@ -113,7 +112,6 @@ export function useProfil(): Profil {
     invite,
     seConnecter: useCallback(() => void exiger("profil"), [exiger]),
     identite: email === null && cvLu === null ? null : identite(email, cvLu?.cv ?? null),
-    email,
     cv:
       etat === null || cvLu === null ? null : { etat, resume: resumeDuCv(etat, cvLu.cv) },
     soutien,

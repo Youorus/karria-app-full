@@ -58,7 +58,6 @@ export function EcranProfil() {
     invite,
     seConnecter,
     identite,
-    email,
     cv,
     soutien,
     ouvrirParametres,
@@ -91,7 +90,7 @@ export function EcranProfil() {
             showsVerticalScrollIndicator={false}
           >
             <Animated.View entering={entree(0)}>
-              <CarteIdentite identite={identite} email={email} />
+              <CarteIdentite identite={identite} />
             </Animated.View>
 
             <Animated.View entering={entree(1)}>

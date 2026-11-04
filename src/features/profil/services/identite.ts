@@ -9,6 +9,15 @@
  * meilleur affichage possible de ce qui est disponible, et ne mentent
  * jamais — pas de « Utilisateur » ni de prénom inventé.
  *
+ * ═══ Sous le nom : l'adresse, jamais un pseudo ═══
+ *
+ * Le compte est une adresse prouvée, sans nom. Sous le titre de la carte
+ * — prénom et nom du CV quand ils existent — on écrit donc **l'adresse
+ * complète** : c'est l'information utile, et elle ne répète pas le titre.
+ * Marc a retiré (2026-11-04) le « @partie-locale » qui s'y trouvait : il
+ * n'avait aucun sens. Sans adresse, le métier visé prend la place ; sans
+ * rien, la ligne n'existe pas.
+ *
  * ═══ L'état du CV ═══
  *
  * Trois cas, lus par la carte « Mon CV » du profil : rien, un brouillon en
@@ -24,6 +33,8 @@ export interface Identite {
   nom: string;
   /** Le métier visé (`headline` du CV), ou `null`. */
   titre: string | null;
+  /** Ce qui s'écrit sous le nom : l'adresse complète, sinon le métier visé. */
+  sousLeNom: string | null;
   /** Une ou deux lettres pour l'avatar. */
   initiales: string;
   /** La photo du CV, si elle existe. */
@@ -35,10 +46,13 @@ export function identite(email: string | null, cv: Cv | null): Identite {
   const nom = cv?.identite?.nom.trim() ?? "";
   const complet = `${prenom} ${nom}`.trim();
   const local = email?.split("@")[0]?.trim() ?? "";
+  const adresse = email?.trim() || null;
+  const titre = cv?.identite?.titre?.trim() || null;
 
   return {
     nom: complet !== "" ? complet : local !== "" ? local : "Toi",
-    titre: cv?.identite?.titre?.trim() || null,
+    titre,
+    sousLeNom: adresse ?? titre,
     initiales: initiales(prenom, nom, local),
     photo: cv?.photo ?? null,
   };
