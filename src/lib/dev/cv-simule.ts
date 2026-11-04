@@ -717,8 +717,102 @@ function porteIa(): Response {
   return erreur(refus.statut, refus.raison, refus.message, refus.details);
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Les suggestions à la saisie (ADR-0028 de l'API)
+// ─────────────────────────────────────────────────────────────────────
+
+/** Un petit vocabulaire par famille, du plus fréquent au plus rare : assez
+ *  pour éprouver la liste sous le champ, le préfixe, le début de mot et
+ *  l'indifférence aux accents. */
+const VOCABULAIRE: Record<string, string[]> = {
+  title: [
+    "Vendeur",
+    "Vendeuse",
+    "Conseiller de vente",
+    "Conseillère de vente",
+    "Serveur",
+    "Développeur web",
+    "Développeuse web",
+    "Chef de projet",
+    "Chef de rayon",
+    "Assistant administratif",
+    "Comptable",
+    "Caissier",
+  ],
+  company: [
+    "Carrefour",
+    "Zara",
+    "Lidl",
+    "Decathlon",
+    "McDonald's",
+    "La Poste",
+    "SNCF",
+    "Orange",
+  ],
+  city: ["Paris", "Lyon", "Marseille", "Montreuil", "Pau", "Nantes", "Lille", "Le Parc"],
+  school: [
+    "Université Paris 8 Vincennes-Saint-Denis",
+    "HEC Paris",
+    "IUT de Villetaneuse",
+    "Lycée professionnel",
+  ],
+  degree: [
+    "Baccalauréat",
+    "Bac pro Commerce",
+    "BTS MCO (Management commercial opérationnel)",
+    "Licence Droit",
+    "Master Marketing",
+  ],
+  skill: [
+    "Vente",
+    "Excel",
+    "Travail en équipe",
+    "Relation client",
+    "Encaissement",
+    "Anglais professionnel",
+  ],
+  language: ["Français", "Anglais", "Espagnol", "Arabe", "Portugais", "Allemand"],
+};
+
+function plier(texte: string): string {
+  return texte
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function suggerer(kind: string, q: string): string[] {
+  const saisie = plier(q);
+  const liste = VOCABULAIRE[kind] ?? [];
+  if (saisie === "") return [];
+  const rang = (texte: string) => {
+    const plie = plier(texte);
+    return plie.startsWith(saisie) ? 0 : plie.includes(` ${saisie}`) ? 1 : null;
+  };
+  return liste
+    .map((texte, i) => ({ texte, i, r: rang(texte) }))
+    .filter((x): x is { texte: string; i: number; r: number } => x.r !== null)
+    .sort((a, b) => a.r - b.r || a.i - b.i)
+    .slice(0, 8)
+    .map((x) => x.texte);
+}
+
+const FAMILLES = new Set(Object.keys(VOCABULAIRE));
+
 export function repondreCv(methode: string, chemin: string, corps: unknown): Response {
-  const route = `${methode} ${chemin.split("?")[0]}`;
+  const [cheminSeul, requete = ""] = chemin.split("?");
+  const route = `${methode} ${cheminSeul}`;
+
+  if (route === "GET /cv/suggestions") {
+    const params = new URLSearchParams(requete);
+    const kind = params.get("kind") ?? "";
+    const q = params.get("q") ?? "";
+    if (!FAMILLES.has(kind))
+      return erreur(422, "validation_error", `Famille inconnue : ${kind}.`);
+    if (q.length > 60) return erreur(422, "validation_error", "Saisie trop longue.");
+    return json(200, { items: suggerer(kind, q) });
+  }
 
   // Comme la vraie API (ADR-0025) : l'accord sur l'IA avant toute donnée.
   if (ROUTES_IA.has(route) && !consentementIaAccorde()) return porteIa();

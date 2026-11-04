@@ -42,15 +42,15 @@ dans le CV — `identity { first_name, last_name, headline }` et
 Ordre fixe. `boucle` = l'utilisateur peut en ajouter plusieurs (« Une
 autre ? »).
 
-| Clé           | Produit                                      | Boucle |
-| ------------- | -------------------------------------------- | ------ |
-| `identity`    | `{ first_name, last_name, headline }`        | non    |
-| `contact`     | `{ email, phone, city, links[] }`            | non    |
-| `summary`     | `{ summary }` (3 à 5 phrases, « je »)        | non    |
-| `experiences` | `Experience` V1                              | oui    |
-| `educations`  | `Education` V1                               | oui    |
-| `skills`      | `{ skills: Skill[], languages: Language[] }` | non    |
-| `interests`   | `{ interests: Interest[] }`                  | non    |
+| Clé           | Produit                                                  | Boucle |
+| ------------- | -------------------------------------------------------- | ------ |
+| `identity`    | `{ first_name, last_name, headline }`                    | non    |
+| `contact`     | `{ email, phone, city, links[] }`                        | non    |
+| `summary`     | `{ summary }` (3 à 5 phrases, « je »)                    | non    |
+| `experiences` | `Experience` V1                                          | oui    |
+| `educations`  | `Education` V1                                           | oui    |
+| `skills`      | `{ skills: Skill[], languages: Language[] }`             | non    |
+| `interests`   | `{ interests: Interest[] }`                              | non    |
 | `photo`       | `{ image_id }` ou `{ image_id: null }` (choix explicite) | non    |
 
 Un chapitre peut être **passé** (`skipped`) — sans expérience, on va
@@ -156,14 +156,14 @@ fine voyage dans `details.reason`, en `snake_case` minuscule — comme pour
 l'authentification (`auth_code_invalid`). Les noms en capitales de ce
 document se lisent donc ainsi :
 
-| Ce document disait          | HTTP | `error.code`         | `details.reason`            |
-| --------------------------- | ---- | -------------------- | --------------------------- |
-| `DRAFT_NOT_FOUND`           | 404  | `not_found`          | `draft_not_found`           |
-| `DRAFT_INCOMPLETE`          | 409  | `rule_violation`     | `draft_incomplete` (+ `chapters: [...]`) |
-| `PHOTO_ENHANCE_REFUSED`     | 422  | `invalid_input`      | `photo_enhance_refused`     |
-| `PHOTO_ENHANCE_UNAVAILABLE` | 503  | `dependency_failure` | `photo_enhance_unavailable` |
+| Ce document disait          | HTTP | `error.code`         | `details.reason`                                  |
+| --------------------------- | ---- | -------------------- | ------------------------------------------------- |
+| `DRAFT_NOT_FOUND`           | 404  | `not_found`          | `draft_not_found`                                 |
+| `DRAFT_INCOMPLETE`          | 409  | `rule_violation`     | `draft_incomplete` (+ `chapters: [...]`)          |
+| `PHOTO_ENHANCE_REFUSED`     | 422  | `invalid_input`      | `photo_enhance_refused`                           |
+| `PHOTO_ENHANCE_UNAVAILABLE` | 503  | `dependency_failure` | `photo_enhance_unavailable`                       |
 | chapitre invalide           | 422  | `invalid_input`      | `chapter_invalid` (+ `fields: [{field, reason}]`) |
-| modèle indisponible         | 503  | `dependency_failure` | `ai_unavailable`            |
+| modèle indisponible         | 503  | `dependency_failure` | `ai_unavailable`                                  |
 
 Autres raisons : `chapter_required` (passer `identity` ou `contact`),
 `chapter_items_expected` / `chapter_data_expected` / `chapter_items_empty`
@@ -266,6 +266,19 @@ Erreurs : `404 cv_not_found` sans CV ; `422 chapter_invalid` avec
 `details.fields: [{ field, reason }]` (`field` en snake_case du contrat :
 `first_name`, `links.0.url`…) ; `chapter_items_expected` /
 `chapter_data_expected`.
+
+### `GET /cv/suggestions?kind=…&q=…` → `200 { items: string[] }` — suggestions à la saisie (2026-11-04)
+
+Session requise. `kind` ∈ `title | company | city | school | degree | skill |
+language` ; `q` la saisie (60 caractères au plus, casse et accents
+indifférents). Rend **huit libellés au plus**, du plus pertinent au moins
+pertinent : ce qui commence par la saisie, puis ce dont un mot commence par
+elle, puis par fréquence. Vide pour une saisie vide ou sans correspondance.
+`title`, `company` et `city` viennent de l'index d'offres (matérialisé chaque
+nuit côté API, ADR-0028) ; `school`, `degree`, `skill`, `language` de listes
+de référence embarquées. `422` pour une famille inconnue ou une saisie trop
+longue. L'app appelle après 200 ms de calme (`use-suggestions.ts`) ; une
+suggestion remplit le champ, la saisie libre reste possible.
 
 ### `POST /voice/transcribe`
 

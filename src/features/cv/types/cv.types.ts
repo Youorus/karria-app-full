@@ -163,6 +163,12 @@ export interface Cv {
   misAJour: string;
 }
 
+/** Ce qu'on peut compléter à la saisie (`GET /cv/suggestions?kind=`) :
+ *  les trois premiers viennent de l'index d'offres, les autres de listes de
+ *  référence embarquées côté serveur. */
+export type TypeSuggestion =
+  "title" | "company" | "city" | "school" | "degree" | "skill" | "language";
+
 /** Les sections que l'on modifie à la main depuis l'écran du CV. Les clés
  *  sont celles du contrat (`PUT /cv/me/chapters/{chapitre}`). */
 export type SectionCv = Exclude<CleChapitre, never>;

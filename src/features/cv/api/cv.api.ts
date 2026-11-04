@@ -11,6 +11,8 @@
  *   de pages) devient **le CV**, directement ; la réponse dit ce qui a été
  *   retenu, écarté et ce qu'il reste à vérifier.
  * - `PUT /cv/me/chapters/{c}` : remplacer une section du CV à la main.
+ * - `GET /cv/suggestions` : des valeurs connues pour ce qu'on tape (poste,
+ *   entreprise, ville, école, diplôme, compétence, langue).
  *
  * La traduction va dans les deux sens : ce qui part au serveur repasse en
  * `snake_case` ici, et nulle part ailleurs.
@@ -28,6 +30,7 @@ import {
   type DonneesBrutes,
   type ImportBrut,
   type ResultatImport,
+  type TypeSuggestion,
   type EtatDeChapitre,
   type ExperienceBrute,
   type FormationBrute,
@@ -376,4 +379,18 @@ export async function televerserPhoto(
     return formulaire;
   });
   return { image: brut.image_url, imageId: brut.image_id, amelioree: brut.enhanced };
+}
+
+/**
+ * Des valeurs connues qui commencent par ce qu'on tape — huit au plus, dans
+ * l'ordre à afficher, vide si rien ne correspond. Une aide, jamais une
+ * contrainte : la saisie libre reste possible.
+ */
+export async function lireSuggestions(
+  kind: TypeSuggestion,
+  q: string,
+): Promise<string[]> {
+  const p = new URLSearchParams({ kind, q });
+  const brut = await http.get<{ items: string[] }>(`/cv/suggestions?${p.toString()}`);
+  return brut.items;
 }

@@ -197,3 +197,24 @@ describe("Le brouillon", () => {
     expect((await appeler("GET", "/cv/draft")).statut).toBe(404);
   });
 });
+
+describe("Les suggestions à la saisie (ADR-0028 de l'API)", () => {
+  it("proposent par préfixe puis début de mot, sans tenir compte des accents, huit au plus", async () => {
+    const { statut, corps } = await appeler("GET", "/cv/suggestions?kind=title&q=DÉV");
+    expect(statut).toBe(200);
+    expect(corps.items).toEqual(["Développeur web", "Développeuse web"]);
+
+    const rayon = await appeler("GET", "/cv/suggestions?kind=title&q=rayon");
+    expect(rayon.corps.items).toEqual(["Chef de rayon"]);
+
+    const ville = await appeler("GET", "/cv/suggestions?kind=city&q=pa");
+    expect(ville.corps.items).toEqual(["Paris", "Pau", "Le Parc"]);
+  });
+
+  it("rendent une liste vide pour une saisie vide, et 422 pour une famille inconnue", async () => {
+    expect((await appeler("GET", "/cv/suggestions?kind=skill&q=")).corps.items).toEqual(
+      [],
+    );
+    expect((await appeler("GET", "/cv/suggestions?kind=couleur&q=r")).statut).toBe(422);
+  });
+});
