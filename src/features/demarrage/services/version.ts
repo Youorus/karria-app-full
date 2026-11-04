@@ -70,3 +70,34 @@ export function rendreOuvrable(version: Version): Version {
   }
   return version;
 }
+
+/** Les seuls hôtes d'où l'on accepte une fiche de magasin, par plateforme. */
+const HOTES_DE_MAGASIN: Record<"ios" | "android", string> = {
+  ios: "apps.apple.com",
+  android: "play.google.com",
+};
+
+/**
+ * L'adresse du magasin, **validée** avant d'être ouverte : `https` et le
+ * nom d'hôte exact du magasin de la plateforme (`apps.apple.com`,
+ * `play.google.com`), rien d'autre. Une réponse altérée — API compromise,
+ * intermédiaire — ne doit pas pouvoir envoyer la personne, depuis un écran
+ * qui ne lui laisse qu'un bouton, vers une page qui n'est pas le magasin.
+ * Toute autre forme rend `null`, et `requise` se dégrade alors en
+ * `disponible` (`rendreOuvrable`) : on ne bloque jamais sur une URL invalide.
+ */
+export function urlDeMagasin(
+  brute: unknown,
+  plateforme: "ios" | "android",
+): string | null {
+  if (typeof brute !== "string" || brute === "") return null;
+  try {
+    const url = new URL(brute);
+    return url.protocol === "https:" && url.hostname === HOTES_DE_MAGASIN[plateforme]
+      ? url.toString()
+      : null;
+  } catch {
+    // Pas une URL : la cause n'a rien à dire de plus que « invalide ».
+    return null;
+  }
+}

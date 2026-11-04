@@ -9,7 +9,12 @@
 
 import { http } from "@/lib/http";
 
-import { rendreOuvrable, type EtatDeVersion, type Version } from "../services/version";
+import {
+  rendreOuvrable,
+  urlDeMagasin,
+  type EtatDeVersion,
+  type Version,
+} from "../services/version";
 
 interface ReleaseBrute {
   status: "ok" | "update_available" | "update_required";
@@ -38,9 +43,8 @@ export async function lireVersion(
     etat: VERS_ETAT[brute.status] ?? "ok",
     derniereBuild: brute.latest_build,
     buildMinimale: brute.minimum_build,
-    urlStore:
-      typeof brute.store_url === "string" && brute.store_url !== ""
-        ? brute.store_url
-        : null,
+    // Validée : https et l'hôte exact du magasin de la plateforme, sinon
+    // rien — et « requise » se dégrade en « disponible » (`rendreOuvrable`).
+    urlStore: urlDeMagasin(brute.store_url, plateforme),
   });
 }

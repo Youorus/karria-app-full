@@ -11,6 +11,7 @@ import {
   numeroDeBuild,
   rendreOuvrable,
   REVERIFICATION_MS,
+  urlDeMagasin,
   UN_JOUR_MS,
   type Version,
 } from "./version";
@@ -64,5 +65,35 @@ describe("Une mise à jour exigée sans magasin", () => {
 
   it("ne touche pas aux autres états", () => {
     expect(rendreOuvrable({ ...base, etat: "ok" }).etat).toBe("ok");
+  });
+});
+
+describe("L'adresse du magasin", () => {
+  it("accepte l'App Store pour iOS et le Play Store pour Android, en https", () => {
+    expect(urlDeMagasin("https://apps.apple.com/fr/app/karria/id123", "ios")).toBe(
+      "https://apps.apple.com/fr/app/karria/id123",
+    );
+    expect(
+      urlDeMagasin(
+        "https://play.google.com/store/apps/details?id=com.karria.app",
+        "android",
+      ),
+    ).toBe("https://play.google.com/store/apps/details?id=com.karria.app");
+  });
+
+  it("refuse tout le reste : autre hôte, sous-domaine piégé, http, absurdité", () => {
+    expect(
+      urlDeMagasin("https://play.google.com/store/apps/details?id=x", "ios"),
+    ).toBeNull();
+    expect(
+      urlDeMagasin("https://apps.apple.com/fr/app/karria/id123", "android"),
+    ).toBeNull();
+    expect(urlDeMagasin("https://apps.apple.com.evil.fr/x", "ios")).toBeNull();
+    expect(urlDeMagasin("https://evil.fr/apps.apple.com", "ios")).toBeNull();
+    expect(urlDeMagasin("http://apps.apple.com/fr/app/karria/id123", "ios")).toBeNull();
+    expect(urlDeMagasin("javascript:alert(1)", "ios")).toBeNull();
+    expect(urlDeMagasin("pas une url", "ios")).toBeNull();
+    expect(urlDeMagasin(null, "ios")).toBeNull();
+    expect(urlDeMagasin("", "android")).toBeNull();
   });
 });
