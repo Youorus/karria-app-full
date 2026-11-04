@@ -5,6 +5,44 @@
 
 **Dernière mise à jour : 2026-11-04**
 
+## Session du 2026-11-04 (soir) — Profil : écran noir, e-mail sous le nom, refonte du soutien (Fable)
+
+**Trois demandes de Marc**, dans l'onglet Profil. Commits `6224a82`, `ef4415a`, `42ed2a9`.
+
+**1. L'onglet Profil qui devient tout noir** (`fix(onglets)`). Aucun geste de l'app ne change
+d'onglet par glissement : ni la barre (`barre-onglets.tsx`, des `Pressable`), ni les onglets
+d'expo-router 57 (pas de pager), ni l'écran profil. La mécanique des scènes (opacité par
+`sceneStyleInterpolator`, détachement natif de l'onglet Profil, qui est toujours « à droite »
+donc toujours détaché quand il n'est pas affiché) a été exercée sur simulateur, invité et
+connecté, avec des glissements sur le contenu, la barre et le bord : l'écran revient toujours.
+**Ce qui rend l'écran entièrement noir**, reproduit sur simulateur : une erreur de rendu non
+rattrapée — React démonte tout l'arbre, et en production il ne reste que le fond. La cause
+trouvée : le fil des offres (`FlatList`, monté derrière les autres onglets) recevait une
+nouvelle identité de `viewabilityConfigCallbackPairs` dès que la session changeait
+(`signalerVisibles` dépend d'`invite`), et FlatList lève « Changing
+viewabilityConfigCallbackPairs on the fly is not supported » : se connecter depuis le Profil →
+écran noir, exactement le symptôme. Corrigé par `offres/hooks/use-visibilite-stable.ts` (une
+paire créée une fois, rappel courant par référence) ; et `components/frontiere-erreur.tsx` posé
+à la racine : une erreur de rendu affiche désormais « Karria a trébuché », le message
+technique et « Reprendre ». **À vérifier sur l'iPhone de Marc** : si le noir revient après un
+glissement, la frontière en affichera la cause — la rapporter telle quelle.
+
+**2. Sous le nom** (`fix(profil)`) : l'adresse e-mail complète, jamais « @partie-locale »
+(`services/identite.ts › sousLeNom`, test de la carte).
+
+**3. Soutien** (`feat(soutien)`) : section « Soutenir Karria », puis deux surfaces. « Karria
+sans pub » : entrée compacte dorée (mini-fil où l'annonce s'efface, prix, « sans engagement »)
+qui ouvre une feuille plein format (trois bénéfices, prix, un seul bouton bleu, Stripe) ; le
+paiement part après la fermeture de la feuille (`onDismiss`, iOS) ; état « Tu es sans pub »
+valorisé. « Nous offrir un café » : quatre tuiles typographiques, ressort sur la tuile choisie,
+bouton caramel (ton `chaleur`, jeton `--color-chaleur-foreground`), plus d'émoji. Hook et API
+inchangés. Vu sur simulateur, sombre et clair, serveur simulé. **Non vérifié** : le retour
+Stripe réel sur appareil (la feuille se ferme avant l'ouverture du navigateur — à regarder).
+
+**Vu en passant, pas corrigé** : sur le simulateur, la barre d'onglets se dessine parfois
+sans sa pilule de verre sur l'onglet Offres (après un remontage) ; la capsule « Parler à
+l'équipe » chevauche « Se connecter » sur le profil invité.
+
 ## Session du 2026-11-04 (soir) — missions en puces, validation, suggestions à la saisie (Fable)
 
 **Demande de Marc** : (1) les missions d'une expérience une par une, en puces ; (2) validation
