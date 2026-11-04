@@ -5,6 +5,48 @@
 
 **Dernière mise à jour : 2026-11-04**
 
+## Session du 2026-11-04 (soir) — missions en puces, validation, suggestions à la saisie (Fable)
+
+**Demande de Marc** : (1) les missions d'une expérience une par une, en puces ; (2) validation
+et cohérence des champs d'édition du CV, erreurs près du champ, « Enregistrer » bloqué tant que
+c'est incohérent ; (3) suggestions à la saisie « comme dans les grandes apps » (poste,
+entreprise, ville, école, diplôme, compétence, langue). API : `karria_api_v2` `1b6e70c` +
+`1eb0164` (ADR-0028, **en production**, table matérialisée : 17 070 villes, 19 959 entreprises,
+22 855 intitulés ; 10–22 ms par recherche).
+
+**Livré (`src/features/cv/`, commits `340d934`, `611587f`, `462a1ec`)** :
+
+- **Puces** (`components/edition/liste-puces.tsx`) : `ListePuces` pour les missions — « Ajouter
+  une mission » ouvre un champ, « Terminé » du clavier ou la coche pose la puce et garde le champ
+  ouvert, croix pour retirer, toucher une puce la modifie à sa place, plafond 15 / 300 caractères.
+  `Puce` et `ChampAjout` sont réutilisés par compétences, langues, centres d'intérêt
+  (`formulaires-listes-courtes.tsx`). **Pas de réordonnancement** (deux flèches par puce
+  doubleraient chaque ligne ; glisser = module natif) : retirer puis rajouter.
+- **Validation** (`services/validation-edition.ts`, pur, testé) : dates (`début ≤ fin`, pas de fin
+  future sauf « en cours », pas de début futur ni avant 1950, « obtention » pour les formations),
+  formats (e-mail, téléphone 6–15 chiffres, lien http(s) avec ou sans schéma — jamais
+  `javascript:`), requis (prénom, nom, un canal de contact, poste/entreprise, diplôme/école,
+  libellé + adresse d'un lien), bornes (1 500 / 150 / 10 liens). Deux natures : **incohérent**
+  s'affiche tout de suite et **bloque** le bouton (`m.bloque`, feuille d'élément comprise) ;
+  **requis** s'affiche à la première tentative. Les `422` du serveur se posent par-dessus, les
+  liens ligne par ligne (`liens.0.url`).
+- **Suggestions** (`hooks/use-suggestions.ts`, `components/edition/champ-avec-suggestions.tsx`,
+  `api/cv.api.ts › lireSuggestions`) : 200 ms de calme, numéro de demande (une réponse en retard
+  est ignorée), liste **insérée** sous le champ actif (pas de menu flottant coupé par la feuille),
+  toucher = remplir + fermer, saisie libre toujours possible, panne silencieuse (journalisée).
+  Branché sur : poste visé, ville (coordonnées), poste/entreprise/lieu (expérience),
+  diplôme/établissement/lieu (formation), compétences, langues. Faux serveur
+  `lib/dev/cv-simule.ts › GET /cv/suggestions` (petit vocabulaire, même classement que l'API).
+  Contrat : `docs/contrat-api-cv.md`.
+
+`npm run check` vert (401 tests), `npx expo export --platform ios` produit un paquet. **Non
+exercé à l'écran** (pas de simulateur lancé) : la liste de suggestions sous le clavier dans la
+feuille `pageSheet`, le `blur` à 150 ms avant le toucher d'une proposition (voir le commentaire
+dans `champ-avec-suggestions.tsx` — si un toucher « ne prend pas » sur iPhone, c'est là), les
+puces sur Android. **Reste** : essai sur iPhone contre la production ; relire les messages ;
+l'index propose encore des intitulés d'annonces moches (« Rayon Surgele Employe (E) Libre
+Service ») — le nettoyage vit côté API (`domain/suggestions.py › clean_label`).
+
 ## Session du 2026-11-04 — import d'abord, CV modifiable à la main (Fable)
 
 **Demande de Marc** (essai sur appareil) : (1) tout corriger à la main depuis le CV
@@ -90,7 +132,7 @@ changement de vue ou à la connexion), filtres **partagés** entre les deux vues
 **Livré** :
 
 - `hooks/use-fil-offres.ts` — réglages **par vue** (`reglages: Record<ModeDuFil, {filtres,
-  tri}>`) : filtrer « Ma recherche » ne touche pas « Toutes les offres » ; repasser d'une vue
+tri}>`) : filtrer « Ma recherche » ne touche pas « Toutes les offres » ; repasser d'une vue
   à l'autre retrouve ses réglages (choix documenté en en-tête : le plus prévisible, rien ne
   fuit d'une vue à l'autre, rien n'est perdu). Options lues avec le **mode servi**, relues au
   changement de vue, à la connexion (`relance`) et à « tirer pour actualiser ». Une nouvelle
@@ -538,7 +580,7 @@ vivante, animations.
 | Offres                     | **Branchées sur la production** (`docs/contrat-api-offres.md`) : identifiants UUID, deux modes du fil (toutes les offres récentes / recherche) ; sélecteur « Ma recherche / Toutes les offres » sous l'en-tête dès que le serveur rend un `criteria_summary`. Changer de vue ne change que le paramètre `mode` (`all_offers` / `search`) de `GET /job-matches/me` : les critères restent, **les alertes restent actives** (plus de `DELETE`/`PUT /search/criteria`, plus de stockage sur l'appareil — `recherche-en-pause.ts` supprimé le 2026-10-24). Une nouvelle recherche Karria remet le mode « déduit ». Offres vues envoyées par lots, écarter une offre depuis le détail. Pas d'analyse par offre dans la V2. La feuille de filtres reste celle de la V1.                                                                                                                                                                                                                                                                                                                                                                         |
 | Karria                     | `POST /assistant/messages` au contrat `docs/contrat-api-recherche.md` : statut, réponses rapides et élargissements comptés en capsules sous la réponse, « Voir les N offres » referme le rideau sur un fil rechargé.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Modèles                    | Onglet et détail au contrat `docs/contrat-api-modeles.md` (UUID, `pages`, corps de `POST /user-templates/me` réduit à `template_id`). **Servis par le faux serveur** `lib/dev/modeles-simule.ts` : `/templates/` répond 404 en production (vérifié le 2026-10-24). Il sert les 3 modèles du PoC (Meridian, Marketing, Minimalist) avec leurs **vrais aperçus** (WebP dans `lib/dev/modeles/`, absents du paquet de production) et un `thumbnail_blurhash` (champ **proposé** au contrat). **Bascule** : ajouter `"/templates/"` et `"/user-templates/"` à `SERVI_PAR_LA_V2` (`lib/dev/serveur-simule.ts`), rien d'autre. Images `expo-image` en cache mémoire+disque, clé `modele-<id>-v<version>`. Ouverture : zoom natif sur iOS 18+, zoom Reanimated mesuré (`hooks/use-ouverture-modele.ts`) sur Android, aucun en mouvement réduit ; le détail s'affiche aussitôt depuis la galerie (`modeleConnu`). Pastille et puce « Premium » (or, jetons `premium-texte`, `surface-premium`, `border-premium`). Lien `karria://modeles?categorie=étudiant`. Puces : hauteur fixe, défileur `grow-0 shrink-0` (corrige l'étirement à une carte). |
-| CV                         | **Import d'abord** (2026-11-04) : photographier, PDF/Word ou galerie → `POST /cv/import` écrit le CV ; notes de lecture réelles, puis CV avec « À vérifier » et ce qui manque. **Édition à la main** de chaque section (`/cv/modifier/[section]`). Création en conversation gardée pour qui n'a pas de CV : 8 chapitres, texte ou voix, jet validé ou corrigé, photo avec amélioration IA.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| CV                         | **Import d'abord** (2026-11-04) : photographier, PDF/Word ou galerie → `POST /cv/import` écrit le CV ; notes de lecture réelles, puis CV avec « À vérifier » et ce qui manque. **Édition à la main** de chaque section (`/cv/modifier/[section]`). Création en conversation gardée pour qui n'a pas de CV : 8 chapitres, texte ou voix, jet validé ou corrigé, photo avec amélioration IA.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Orbe                       | `OrbeVivante` est une sphère de particules Skia sur un tourbillon chromatique (`components/orbe-vivante.tsx`, maths dans `orbe-particules.ts`). Même API + `ecoute`, `niveauAudio`. Réglages dans l'en-tête du fichier.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | Profil                     | Minimaliste et chaleureux : identité en ligne (avatar caramel, nom, pseudonyme), raccourci CV, **carte de soutien** (`features/soutien`, 2026-10-29) = un mot signé de l'équipe sur crème, « Profiter de Karria sans pub » (4,99 €/mois, Stripe, portail pour gérer) et « Nous offrir un café » (1/2/3/5 tasses, prix du serveur). Contrat `docs/contrat-api-paiements.md`. Jetons : `chaleur`, `surface-chaleur`, `border-chaleur`, Premium. **Pas encore vérifié à l'écran** après la refonte du 29/10.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Paramètres (`/parametres`) | Apparence, notifications, documents, version, déconnexion, suppression de compte (`/compte/supprimer` : raison du départ → ce qui sera supprimé → confirmation ; `DELETE /auth/me` vérifié contre la v2)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
