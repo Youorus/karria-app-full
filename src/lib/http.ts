@@ -180,27 +180,25 @@ async function envoyer(chemin: string, options: Options, jeton: string | null) {
       jeton,
     });
   }
+  const entetes = {
+    ...(options.formulaire === true ? {} : { "Content-Type": "application/json" }),
+    ...(jeton === null ? {} : { Authorization: `Bearer ${jeton}` }),
+  };
+  if (options.formulaire === true) {
+    return envoyerMultipart(
+      `${API_URL}${chemin}`,
+      options.method ?? "POST",
+      entetes,
+      (options.body as () => FormData)(),
+    );
+  }
   const controleur = new AbortController();
   const echeance = setTimeout(() => controleur.abort(), DELAI_MS);
   try {
     return await fetch(`${API_URL}${chemin}`, {
       method: options.method ?? "GET",
-      headers: {
-        ...(options.formulaire === true ? {} : { "Content-Type": "application/json" }),
-        ...(jeton === null ? {} : { Authorization: `Bearer ${jeton}` }),
-      },
-      // Le formulaire est **refabriqué** à chaque envoi. Un corps de
-      // requête ne se consomme qu'une fois : réutilisé lors de la reprise
-      // après session expirée, il partirait vide, et le serveur
-      // répondrait « fichier manquant » sur un appel où le fichier était
-      // bien là. La panne ne se produirait qu'après une heure de session
-      // — donc jamais en développement.
-      body:
-        options.body === undefined
-          ? undefined
-          : options.formulaire === true
-            ? (options.body as () => FormData)()
-            : JSON.stringify(options.body),
+      headers: entetes,
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
       signal: controleur.signal,
       // `no-store` explicite. Le serveur ne pose aucun en-tête de cache
       // sur ces routes, et URLSession applique alors une heuristique
@@ -216,6 +214,59 @@ async function envoyer(chemin: string, options: Options, jeton: string | null) {
   } finally {
     clearTimeout(echeance);
   }
+}
+
+/**
+ * Envoie un formulaire multipart par `XMLHttpRequest`, pas par `fetch`.
+ *
+ * Constaté le 2026-11-04 sur le simulateur : depuis le SDK 57, le `fetch`
+ * global est celui d'Expo (« winter »), et son encodeur de `FormData`
+ * n'accepte que des chaînes, des `Blob` et des `File` — la forme
+ * `{ uri, name, type }` qui désigne un fichier local lève
+ * « Unsupported FormDataPart implementation ». Tous les envois de fichiers
+ * de l'app (photo du CV, import, médias de l'équipe) passaient par là et
+ * échouaient avant de partir. Le `XMLHttpRequest` de React Native, lui,
+ * lit cette forme nativement et diffuse le fichier sans le charger en
+ * mémoire. On rend une `Response` pour que la suite — lecture des erreurs,
+ * reprise après session expirée — ne change pas.
+ *
+ * Le formulaire est **refabriqué** à chaque envoi (d'où la fonction) : un
+ * corps ne se consomme qu'une fois, et la reprise après expiration de la
+ * session repartirait sinon avec un fichier vide.
+ */
+function envoyerMultipart(
+  url: string,
+  methode: string,
+  entetes: Record<string, string>,
+  formulaire: FormData,
+): Promise<Response> {
+  return new Promise((resoudre, rejeter) => {
+    const requete = new XMLHttpRequest();
+    requete.open(methode, url);
+    requete.timeout = DELAI_MS;
+    for (const [nom, valeur] of Object.entries(entetes))
+      requete.setRequestHeader(nom, valeur);
+    requete.onload = () => {
+      const lignes = requete
+        .getAllResponseHeaders()
+        .split("\r\n")
+        .filter((l) => l.includes(":"));
+      const headers = new Headers();
+      for (const ligne of lignes) {
+        const i = ligne.indexOf(":");
+        headers.append(ligne.slice(0, i).trim(), ligne.slice(i + 1).trim());
+      }
+      // Un 204 n'a pas de corps : `Response` refuse un corps non nul avec ce statut.
+      const corps =
+        requete.status === 204 || requete.responseText === ""
+          ? null
+          : requete.responseText;
+      resoudre(new Response(corps, { status: requete.status, headers }));
+    };
+    requete.onerror = () => rejeter(new TypeError("Network request failed"));
+    requete.ontimeout = () => rejeter(new DOMException("Délai dépassé", "AbortError"));
+    requete.send(formulaire);
+  });
 }
 
 /**

@@ -1,22 +1,22 @@
 /**
  * L'invitation : l'onglet CV quand il n'y a pas encore de CV.
  *
- * ═══ Donner envie, pas expliquer ═══
+ * ═══ L'import d'abord ═══
  *
- * Derrière l'orbe, trois pages de CV flottent, encore vides — des lignes
- * grises qui attendent d'être écrites. On voit ce qu'on va obtenir avant
- * d'avoir rien fait, et l'orbe au premier plan dit qui va l'écrire. Une
- * seule phrase, une seule action : le reste (durée, voix, pause) tient en
- * une ligne, parce que c'est ce qui rassure.
+ * Décision de Marc (2026-11-04, essai sur appareil) : répondre à toutes les
+ * questions est long, et la plupart des gens ont déjà un CV. La porte
+ * principale est donc **importer ou photographier** son CV : Karria en fait
+ * un CV compatible ATS, sur ses modèles, plus vite qu'en répondant. « Créer
+ * de zéro » reste là, en retrait, pour qui n'a rien.
  *
- * « J'ai déjà un CV » est la seconde porte, en retrait : Karria lit le
- * fichier et pré-remplit la conversation, mais c'est toujours la même
- * conversation qui suit — rien n'est validé sans qu'on l'ait relu.
+ * Le texte est court et sans emphase : une promesse, une comparaison, deux
+ * boutons. Derrière l'orbe, trois pages de CV flottent, encore vides.
  *
  * Mouvement réduit : les pages restent immobiles.
  */
 
 import { useEffect } from "react";
+import { Pressable } from "react-native";
 import Animated, {
   Easing,
   FadeInDown,
@@ -34,8 +34,11 @@ import { SymboleKarria } from "@/components/marque";
 import { OrbeVivante } from "@/components/orbe-vivante";
 import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
+import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
 import { useCouleurs } from "@/theme/use-couleurs";
+
+import type { SourceImport } from "../hooks/use-choix-fichiers";
 
 /** Trois pages : décalage, inclinaison, phase de flottaison. */
 const PAGES = [
@@ -75,20 +78,21 @@ function Page({
 interface Props {
   reprendre: boolean;
   onCreer: () => void;
-  onImporter: () => void;
-  /** Le fichier est en route vers Karria. */
-  importation: boolean;
-  /** Pourquoi l'import a échoué, et quoi faire. */
-  probleme: string | null;
+  onImporter: (source: SourceImport) => void;
 }
 
-export function InvitationCv({
-  reprendre,
-  onCreer,
-  onImporter,
-  importation,
-  probleme,
-}: Props) {
+/** Les trois façons d'apporter son CV, dans l'ordre où on les propose. */
+const SOURCES: {
+  source: SourceImport;
+  libelle: string;
+  icone: "camera" | "importer" | "galerie";
+}[] = [
+  { source: "camera", libelle: "Photographier", icone: "camera" },
+  { source: "fichier", libelle: "PDF ou Word", icone: "importer" },
+  { source: "galerie", libelle: "Mes photos", icone: "galerie" },
+];
+
+export function InvitationCv({ reprendre, onCreer, onImporter }: Props) {
   const couleurs = useCouleurs();
   const reduit = useReducedMotion();
   const temps = useSharedValue(0);
@@ -115,12 +119,12 @@ export function InvitationCv({
             accessibilityRole="header"
             className="text-center font-display text-title-lg tracking-tight text-foreground"
           >
-            {reprendre ? "On reprend ton CV ?" : "Ton CV, en parlant."}
+            {reprendre ? "On reprend ton CV ?" : "Ton CV, refait par Karria."}
           </Texte>
           <Texte className="text-center text-body leading-6 text-muted-foreground">
             {reprendre
               ? "Tout ce que tu m'as dit est gardé. On continue là où on s'était arrêtés."
-              : "Quelques questions, quelques minutes. Je l'écris, tu valides."}
+              : "Importe ou photographie ton CV actuel : j'en fais un CV compatible ATS, sur les modèles Karria. Plus rapide que de répondre à mes questions."}
           </Texte>
         </VStack>
       </Animated.View>
@@ -129,26 +133,51 @@ export function InvitationCv({
         entering={reduit ? undefined : FadeInDown.duration(500).delay(300)}
         className="w-full gap-3"
       >
-        <BoutonAction
-          libelle={reprendre ? "Reprendre mon CV" : "Créer mon CV avec Karria"}
-          onPress={onCreer}
-          desactive={importation}
-          icone={<Icone nom="micro" couleur={couleurs.surPrimaire} taille={16} />}
-        />
-        <BoutonAction
-          libelle="J'ai déjà un CV"
-          libelleEnCours="Je lis ton CV…"
-          ton="secondaire"
-          onPress={onImporter}
-          enCours={importation}
-          icone={<Icone nom="importer" couleur={couleurs.texte} taille={16} />}
-        />
-        {probleme !== null ? (
-          <Texte className="text-center text-footnote text-destructive">{probleme}</Texte>
-        ) : (
-          <Texte className="text-center text-caption text-foreground-faint">
-            À l&apos;écrit ou à la voix · tu peux t&apos;arrêter quand tu veux
-          </Texte>
+        {reprendre ? (
+          <BoutonAction
+            libelle="Reprendre mon CV"
+            onPress={onCreer}
+            icone={<Icone nom="micro" couleur={couleurs.surPrimaire} taille={16} />}
+          />
+        ) : null}
+        <HStack className="gap-2">
+          {SOURCES.map((s, i) => (
+            <Pressable
+              key={s.source}
+              onPress={() => onImporter(s.source)}
+              className={`min-h-[72px] flex-1 items-center justify-center gap-1.5 rounded-carte px-2 py-3 ${
+                i === 0 && !reprendre
+                  ? "bg-primary"
+                  : "border border-border-champ bg-card"
+              }`}
+              accessibilityRole="button"
+              accessibilityLabel={`Importer mon CV : ${s.libelle}`}
+            >
+              <Icone
+                nom={s.icone}
+                couleur={i === 0 && !reprendre ? couleurs.surPrimaire : couleurs.texte}
+                taille={18}
+              />
+              <Texte
+                className={`text-center font-bold text-footnote ${
+                  i === 0 && !reprendre ? "text-primary-foreground" : "text-foreground"
+                }`}
+              >
+                {s.libelle}
+              </Texte>
+            </Pressable>
+          ))}
+        </HStack>
+        {reprendre ? null : (
+          <Pressable
+            onPress={onCreer}
+            className="min-h-touch items-center justify-center"
+            accessibilityRole="button"
+          >
+            <Texte className="font-medium text-footnote text-muted-foreground">
+              Pas de CV ? Créer de zéro, en parlant
+            </Texte>
+          </Pressable>
         )}
       </Animated.View>
     </VStack>

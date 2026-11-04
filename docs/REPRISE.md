@@ -3,7 +3,77 @@
 > Document de passation. À lire en premier par toute personne ou IA qui
 > reprend le travail, avec `AGENTS.md`. Mis à jour à chaque fin de session.
 
-**Dernière mise à jour : 2026-10-31**
+**Dernière mise à jour : 2026-11-04**
+
+## Session du 2026-11-04 — import d'abord, CV modifiable à la main (Fable)
+
+**Demande de Marc** (essai sur appareil) : (1) tout corriger à la main depuis le CV
+fini ; (2) importer ou photographier un CV existant devient la voie principale, avec des
+notes de lecture **honnêtes** pendant l'import, et l'on atterrit sur le CV avec « à vérifier ».
+API : `karria_api_v2` commit `6a33a8f` (en production). Contrat : `docs/contrat-api-cv.md`.
+
+**Livré (`src/features/cv/`)** :
+
+- **Entrée** (`components/invitation-cv.tsx`) : « Ton CV, refait par Karria. » + trois
+  sources — Photographier · PDF ou Word · Mes photos — et « Créer de zéro, en parlant » en
+  retrait. Chaque source ouvre `/cv/importer?source=camera|fichier|galerie`.
+- **Import** (`screens/ecran-import-cv.tsx`, `hooks/use-ecran-import-cv.ts`,
+  `hooks/use-import-cv.ts`, `hooks/use-choix-fichiers.ts`) : sélecteur (appareil photo page
+  après page avec « Ajouter une page ? », galerie multiple, fichier), consentement IA avant,
+  orbe active + « Je lis ton CV… » pendant l'appel (5–10 s), puis **notes de lecture tirées
+  du compte rendu réel** du serveur (`services/import.ts › lignesDeLecture` : nom, parcours
+  « chez X, Y et Z », compte des formations/compétences, éléments écartés, ce qui manque),
+  révélées une à une, puis « Ton CV est importé. Vérifie d'abord tes coordonnées… » et
+  « Voir mon CV ». Erreurs par raison, « Réessayer » avec les mêmes fichiers. Arrière-plan :
+  une coupure réseau pendant la lecture relit `GET /cv/me` et retrouve l'import s'il a abouti.
+  Pas de flux pendant l'appel (le serveur n'en a pas) — voir `karria_api_v2/docs/PLUS-TARD.md`.
+- **CV** (`components/cv-rempli.tsx`) : bandeau « Ton CV est importé » (fermable), pastille
+  « À vérifier » sur coordonnées / expériences / formations tant que la section n'a pas été
+  ouverte (`services/verification.ts`, en mémoire pour la session), pastilles ambrées pour ce
+  qui **manque** (téléphone, dates…) calculées depuis le CV, crayon sur chaque section.
+- **Édition** (`/cv/modifier/[section]`, `screens/ecran-modifier-cv.tsx`,
+  `hooks/use-modifier-cv.ts`, `components/edition/*`) : identité (prénom, nom, poste visé),
+  coordonnées (+ liens), à-propos, expériences et formations (liste : monter/descendre,
+  supprimer, ajouter, feuille `pageSheet` par élément, **enregistrement à chaque geste**),
+  compétences/langues/intérêts (pastilles, niveau par toucher), photo (prendre, choisir,
+  retirer). Dates par `SelecteurMois` (année ‹ ›, grille des mois, « Année seule »,
+  « Effacer »), jamais de `AAAA-MM` tapé. Formulaires simples : « Enregistrer » → « Enregistré »
+  → retour ; saisies non enregistrées gardées en mémoire (`services/brouillons-edition.ts`)
+  et restituées à la visite suivante. Erreurs `422 chapter_invalid` sous les champs.
+- **Création** : « J'ai déjà un CV » dans la conversation ouvre l'écran d'import (remplace).
+- **Faux serveur** `lib/dev/cv-simule.ts` : `POST /cv/import` écrit le CV et rend `ImportRead`
+  (sans téléphone, pour exercer « à vérifier ») ; `PUT /cv/me/chapters/{c}`.
+
+**Deux défauts trouvés sur simulateur, corrigés, qui dépassent le CV** :
+
+1. `lib/http.ts` : depuis le SDK 57 le `fetch` global est celui d'Expo (« winter ») et son
+   `FormData` refuse la forme `{ uri, name, type }` (« Unsupported FormDataPart
+   implementation ») — **tous** les envois de fichiers échouaient (photo du CV, import, médias
+   de l'équipe). Le multipart passe désormais par `XMLHttpRequest` (`envoyerMultipart`).
+2. Un sélecteur système (photos, fichiers) demandé pendant que la feuille de consentement se
+   ferme ne se présente jamais sur iOS ; `use-import-cv` attend 450 ms après l'accord. Le
+   même risque existe pour la photo de la création (`use-creation-cv`, après
+   `photo_enhancement`) — non corrigé là, à surveiller.
+
+**Vérifié sur le simulateur iPhone 17 (Maestro, API locale sur 8001 avec PostgreSQL
+Homebrew + stockage mémoire, extraction Gemini réelle)** : entrée → « Mes photos » →
+consentement → galerie (image réelle d'un CV) → « Je lis ton CV… » → notes (« Marc Takoumba —
+… », « 4 expériences trouvées, chez Papiers Express, Zoumani et Karria… ») = exactement
+`cv.imported kept={experiences: 4, educations: 2, skills: 29, languages: 2}` du journal →
+« Ton CV est importé » → CV avec bandeau et « À vérifier » → crayon coordonnées → ville
+modifiée → 422 sur un lien vide (affiché) → lien retiré → « Enregistré » → CV mis à jour,
+« À vérifier » retiré des coordonnées. Captures dans le rapport de session.
+**Non exercé à l'écran** : appareil photo (pas de caméra sur simulateur), « PDF ou Word »
+(sélecteur Fichiers ; le PDF a été testé par le cas d'usage réel côté API), listes
+(réordonner, feuille d'élément), sélecteur de mois, photo, Android, mode clair, Marc sur
+iPhone contre la production.
+
+`npm run check` vert, `npx expo export --platform ios` produit un paquet. Aucun module natif
+ajouté.
+
+**Prochaine étape (Marc)** : l'éditeur de CV en temps réel par offre. **Reste** : relire les
+textes ; `expo-image-picker` sur iPhone réel (plusieurs pages) ; retirer l'« à vérifier » du
+store au redémarrage est voulu (session seulement).
 
 ## Session du 2026-10-31 (suite) — « tri rapide et filtres par mode » — FAIT PAR OPUS, À RELIRE PAR FABLE
 
@@ -468,7 +538,7 @@ vivante, animations.
 | Offres                     | **Branchées sur la production** (`docs/contrat-api-offres.md`) : identifiants UUID, deux modes du fil (toutes les offres récentes / recherche) ; sélecteur « Ma recherche / Toutes les offres » sous l'en-tête dès que le serveur rend un `criteria_summary`. Changer de vue ne change que le paramètre `mode` (`all_offers` / `search`) de `GET /job-matches/me` : les critères restent, **les alertes restent actives** (plus de `DELETE`/`PUT /search/criteria`, plus de stockage sur l'appareil — `recherche-en-pause.ts` supprimé le 2026-10-24). Une nouvelle recherche Karria remet le mode « déduit ». Offres vues envoyées par lots, écarter une offre depuis le détail. Pas d'analyse par offre dans la V2. La feuille de filtres reste celle de la V1.                                                                                                                                                                                                                                                                                                                                                                         |
 | Karria                     | `POST /assistant/messages` au contrat `docs/contrat-api-recherche.md` : statut, réponses rapides et élargissements comptés en capsules sous la réponse, « Voir les N offres » referme le rideau sur un fil rechargé.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Modèles                    | Onglet et détail au contrat `docs/contrat-api-modeles.md` (UUID, `pages`, corps de `POST /user-templates/me` réduit à `template_id`). **Servis par le faux serveur** `lib/dev/modeles-simule.ts` : `/templates/` répond 404 en production (vérifié le 2026-10-24). Il sert les 3 modèles du PoC (Meridian, Marketing, Minimalist) avec leurs **vrais aperçus** (WebP dans `lib/dev/modeles/`, absents du paquet de production) et un `thumbnail_blurhash` (champ **proposé** au contrat). **Bascule** : ajouter `"/templates/"` et `"/user-templates/"` à `SERVI_PAR_LA_V2` (`lib/dev/serveur-simule.ts`), rien d'autre. Images `expo-image` en cache mémoire+disque, clé `modele-<id>-v<version>`. Ouverture : zoom natif sur iOS 18+, zoom Reanimated mesuré (`hooks/use-ouverture-modele.ts`) sur Android, aucun en mouvement réduit ; le détail s'affiche aussitôt depuis la galerie (`modeleConnu`). Pastille et puce « Premium » (or, jetons `premium-texte`, `surface-premium`, `border-premium`). Lien `karria://modeles?categorie=étudiant`. Puces : hauteur fixe, défileur `grow-0 shrink-0` (corrige l'étirement à une carte). |
-| CV                         | Création en conversation : 8 chapitres, texte ou voix, jet validé ou corrigé, photo avec amélioration IA. Puis l'écran CV de la V1. **Import d'un CV existant** (« J'ai déjà un CV », `expo-document-picker` → `POST /cv/import`) : les chapitres extraits arrivent en propositions à valider une à une ; seuls les chapitres validés comptent.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| CV                         | **Import d'abord** (2026-11-04) : photographier, PDF/Word ou galerie → `POST /cv/import` écrit le CV ; notes de lecture réelles, puis CV avec « À vérifier » et ce qui manque. **Édition à la main** de chaque section (`/cv/modifier/[section]`). Création en conversation gardée pour qui n'a pas de CV : 8 chapitres, texte ou voix, jet validé ou corrigé, photo avec amélioration IA.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Orbe                       | `OrbeVivante` est une sphère de particules Skia sur un tourbillon chromatique (`components/orbe-vivante.tsx`, maths dans `orbe-particules.ts`). Même API + `ecoute`, `niveauAudio`. Réglages dans l'en-tête du fichier.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | Profil                     | Minimaliste et chaleureux : identité en ligne (avatar caramel, nom, pseudonyme), raccourci CV, **carte de soutien** (`features/soutien`, 2026-10-29) = un mot signé de l'équipe sur crème, « Profiter de Karria sans pub » (4,99 €/mois, Stripe, portail pour gérer) et « Nous offrir un café » (1/2/3/5 tasses, prix du serveur). Contrat `docs/contrat-api-paiements.md`. Jetons : `chaleur`, `surface-chaleur`, `border-chaleur`, Premium. **Pas encore vérifié à l'écran** après la refonte du 29/10.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Paramètres (`/parametres`) | Apparence, notifications, documents, version, déconnexion, suppression de compte (`/compte/supprimer` : raison du départ → ce qui sera supprimé → confirmation ; `DELETE /auth/me` vérifié contre la v2)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -541,7 +611,7 @@ npx expo run:ios --device <UDID simulateur>
    production ne l'accepte pas (`extra=forbid` côté API → 422).
 5. **Vérifier en mode clair et sur Android** le Profil, les Paramètres et la suppression de compte.
 6. **Tests manuels** : connexion Google ou Apple réelle (Marc), parcours CV complet (voix, photo), notification de test sur appareil physique.
-7. **Actions d'édition du CV** après sa création, puis l'onglet Dossiers ; « Ce que Karria sait de moi » (`/assistant/memory`) dans les réglages.
+7. L'onglet Dossiers ; « Ce que Karria sait de moi » (`/assistant/memory`) dans les réglages ; l'éditeur de CV par offre (Marc).
 
 ## Règles de travail (Marc)
 

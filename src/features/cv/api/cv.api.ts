@@ -7,9 +7,10 @@
  * - `POST /cv/draft/interpret` : une réponse libre → un premier jet.
  * - `PUT /cv/draft/chapters/{c}` : valider (ou passer) un chapitre.
  * - `POST /cv/draft/finalize` : le brouillon devient le CV.
- * - `POST /cv/import` : un CV existant (PDF, Word, photo) devient un
- *   brouillon pré-rempli de **propositions**, à valider chapitre par
- *   chapitre — rien n'est validé à la place de l'utilisateur.
+ * - `POST /cv/import` : un CV existant (PDF, Word, une ou plusieurs photos
+ *   de pages) devient **le CV**, directement ; la réponse dit ce qui a été
+ *   retenu, écarté et ce qu'il reste à vérifier.
+ * - `PUT /cv/me/chapters/{c}` : remplacer une section du CV à la main.
  *
  * La traduction va dans les deux sens : ce qui part au serveur repasse en
  * `snake_case` ici, et nulle part ailleurs.
@@ -25,6 +26,8 @@ import {
   type Cv,
   type CvBrut,
   type DonneesBrutes,
+  type ImportBrut,
+  type ResultatImport,
   type EtatDeChapitre,
   type ExperienceBrute,
   type FormationBrute,
@@ -195,7 +198,7 @@ function versBrouillon(brut: BrouillonBrut): Brouillon {
 }
 
 function versCv(b: CvBrut): Cv {
-  const cv: Omit<Cv, "vide"> = {
+  const cv: Omit<Cv, "vide" | "misAJour"> = {
     identite:
       b.identity === undefined || b.identity === null
         ? null
@@ -227,7 +230,21 @@ function versCv(b: CvBrut): Cv {
     cv.experiences.length === 0 &&
     cv.formations.length === 0 &&
     cv.competences.length === 0;
-  return { ...cv, vide };
+  return { ...cv, vide, misAJour: b.updated_at ?? "" };
+}
+
+function versResultatImport(b: ImportBrut): ResultatImport {
+  return {
+    cv: versCv(b.cv),
+    source: {
+      type: b.source.content_type,
+      fichiers: b.source.files,
+      pages: b.source.pages,
+    },
+    retenus: b.kept,
+    ecartes: b.discarded,
+    manquants: b.missing,
+  };
 }
 
 export async function lireMonCv(): Promise<Cv> {
@@ -300,21 +317,42 @@ export interface FichierCv {
 }
 
 /**
- * Importe un CV existant dans le brouillon. Les chapitres extraits
- * reviennent `in_progress` avec leurs données : des propositions, que le
- * parcours de création fait valider une à une.
+ * Importe un CV existant : il devient le CV de la personne.
+ *
+ * Un fichier (PDF, Word, image), ou **plusieurs images** — les photos des
+ * pages d'un même CV, dans l'ordre, toutes sous le même champ `file`.
  */
-export async function importerCv(fichier: FichierCv): Promise<Brouillon> {
-  const brut = await http.postFormulaire<BrouillonBrut>("/cv/import", () => {
+export async function importerCv(fichiers: FichierCv[]): Promise<ResultatImport> {
+  const brut = await http.postFormulaire<ImportBrut>("/cv/import", () => {
     const formulaire = new FormData();
-    formulaire.append("file", {
-      uri: fichier.uri,
-      name: fichier.nom,
-      type: fichier.type ?? "application/octet-stream",
-    } as unknown as Blob);
+    for (const fichier of fichiers) {
+      formulaire.append("file", {
+        uri: fichier.uri,
+        name: fichier.nom,
+        type: fichier.type ?? "application/octet-stream",
+      } as unknown as Blob);
+    }
     return formulaire;
   });
-  return versBrouillon(brut);
+  return versResultatImport(brut);
+}
+
+/**
+ * Remplace une section du CV, à la main. Même forme que la validation d'un
+ * chapitre : un jet, une liste de jets (dans l'ordre voulu, éventuellement
+ * vide), ou `null` pour vider une section facultative. Le serveur revalide.
+ */
+export async function modifierSection(
+  chapitre: CleChapitre,
+  contenu: Jet | Jet[] | null,
+): Promise<Cv> {
+  const corps =
+    contenu === null
+      ? { skipped: true }
+      : Array.isArray(contenu)
+        ? { items: contenu.map(versBrut) }
+        : { data: versBrut(contenu) };
+  return versCv(await http.put<CvBrut>(`/cv/me/chapters/${chapitre}`, corps));
 }
 
 /** Envoie la photo choisie ; `ameliorer` seulement si l'utilisateur l'a

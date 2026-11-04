@@ -9,7 +9,7 @@
  * le domaine CV avec elles, pour que le CV créé soit celui qu'on relit.
  * Le jour où le backend les sert, on retire le préfixe de la liste.
  *
- * ═══ L'import ne lit pas le fichier ═══
+ * ═══ L'import ne lit pas le fichier, mais écrit le CV ═══
  *
  * `POST /cv/import` vérifie le type du fichier comme le vrai serveur,
  * puis pose toujours le même CV d'exemple en propositions : ce qu'on
@@ -121,6 +121,7 @@ function cvVide() {
     skills: [],
     languages: [],
     interests: [],
+    updated_at: new Date(0).toISOString(),
   };
 }
 
@@ -533,35 +534,162 @@ function parties(corps: unknown): { fieldName: string; uri?: string; type?: stri
 }
 
 function importerCv(corps: unknown): Response {
-  const fichier = parties(corps).find((p) => p.fieldName === "file");
-  if (fichier === undefined) {
-    return erreur(422, "document_empty", "Le fichier est vide.", { field: "file" });
+  const fichiers = parties(corps).filter((p) => p.fieldName === "file");
+  if (fichiers.length === 0) {
+    return erreur(422, "document_empty", "Aucun fichier reçu.", { field: "file" });
   }
-  const type = (fichier.type ?? "").split(";")[0].trim().toLowerCase();
-  if (!TYPES_DE_DOCUMENT.includes(type) && !type.startsWith("image/")) {
+  const types = fichiers.map((f) => (f.type ?? "").split(";")[0].trim().toLowerCase());
+  if (fichiers.length > 1 && !types.every((t) => t.startsWith("image/"))) {
     return erreur(
       422,
-      "document_type_unsupported",
-      "Ce type de fichier n'est pas accepté : envoie un PDF, un DOCX ou une image.",
+      "document_pages_must_be_images",
+      "Plusieurs fichiers ne s'envoient qu'en photos, une par page.",
       { field: "file" },
     );
   }
-  etat.brouillon ??= brouillonNeuf();
-  const brouillon = etat.brouillon;
-  // Les chapitres déjà validés ne sont pas touchés ; les autres reçoivent
-  // une proposition — jamais une validation.
-  for (const [chapitre, lu] of Object.entries(CV_LU) as [Chapitre, ChapitreSimule][]) {
-    if (brouillon.chapters[chapitre]?.status !== "validated") {
-      brouillon.chapters[chapitre] = { ...lu };
+  for (const type of types) {
+    if (!TYPES_DE_DOCUMENT.includes(type) && !type.startsWith("image/")) {
+      return erreur(
+        422,
+        "document_type_unsupported",
+        "Ce type de fichier n'est pas accepté : envoie un PDF, un DOCX ou une image.",
+        { field: "file" },
+      );
     }
   }
-  brouillon.current_chapter =
-    ORDRE.find(
-      (c) =>
-        !["validated", "skipped"].includes(brouillon.chapters[c]?.status ?? "pending"),
-    ) ?? "photo";
-  brouillon.updated_at = new Date().toISOString();
-  return json(201, brouillon);
+  // Comme le vrai serveur : le CV lu remplace les sections, la photo reste,
+  // le brouillon disparaît. Le compte rendu dit ce qui a été retenu.
+  const donnee = (c: Chapitre) => CV_LU[c]?.data as Record<string, unknown> | undefined;
+  const elements = (c: Chapitre) => CV_LU[c]?.items ?? [];
+  const skills = (donnee("skills")?.skills ?? []) as unknown[];
+  const languages = (donnee("skills")?.languages ?? []) as unknown[];
+  const interests = (donnee("interests")?.interests ?? []) as unknown[];
+  // La fausse lecture ne trouve pas de téléphone : c'est ce qui exerce
+  // « à vérifier » dans l'app.
+  const contact = { ...(donnee("contact") ?? {}), phone: null };
+  etat.cv = {
+    ...cvVide(),
+    ...(etat.cv ?? {}),
+    identity: donnee("identity") ?? null,
+    contact,
+    summary: (donnee("summary")?.summary as string | undefined) ?? null,
+    experiences: elements("experiences"),
+    educations: elements("educations"),
+    skills,
+    languages,
+    interests,
+    updated_at: new Date().toISOString(),
+  };
+  etat.brouillon = null;
+  return json(201, {
+    cv: etat.cv,
+    source: {
+      content_type: types[0],
+      files: fichiers.length,
+      pages:
+        types[0] === "application/pdf" || types[0].startsWith("image/")
+          ? fichiers.length
+          : null,
+    },
+    kept: {
+      identity: 1,
+      contact: 1,
+      summary: 1,
+      experiences: elements("experiences").length,
+      educations: elements("educations").length,
+      skills: skills.length,
+      languages: languages.length,
+      interests: interests.length,
+    },
+    discarded: {},
+    missing: ["contact.phone"],
+  });
+}
+
+/** `PUT /cv/me/chapters/{chapitre}` : la section est remplacée d'un bloc. */
+function modifierSectionCv(chapitre: Chapitre, corps: unknown): Response {
+  if (etat.cv === null) {
+    return erreur(
+      404,
+      "cv_not_found",
+      "Aucun CV à modifier : crée-le ou importe-le d'abord.",
+    );
+  }
+  const data = champ(corps, "data") as Record<string, unknown> | undefined;
+  const items = champ(corps, "items") as unknown[] | undefined;
+  const skipped = champ(corps, "skipped") === true;
+  const cv = etat.cv;
+  if (chapitre === "experiences" || chapitre === "educations") {
+    if (items === undefined) {
+      return erreur(
+        422,
+        "chapter_items_expected",
+        "Cette section attend une liste `items`.",
+        {
+          chapter: chapitre,
+        },
+      );
+    }
+    cv[chapitre] = items;
+  } else if (skipped) {
+    if (chapitre === "identity" || chapitre === "contact") {
+      return erreur(422, "chapter_required", "Cette section ne peut pas être vidée.", {
+        chapter: chapitre,
+      });
+    }
+    if (chapitre === "summary") cv.summary = null;
+    if (chapitre === "skills") {
+      cv.skills = [];
+      cv.languages = [];
+    }
+    if (chapitre === "interests") cv.interests = [];
+    if (chapitre === "photo") cv.image_url = null;
+  } else {
+    if (data === undefined) {
+      return erreur(
+        422,
+        "chapter_data_expected",
+        "Cette section attend une valeur `data`.",
+        {
+          chapter: chapitre,
+        },
+      );
+    }
+    if (chapitre === "identity") {
+      if (!String(data.first_name ?? "").trim()) {
+        return erreur(422, "chapter_invalid", "Le contenu du chapitre est invalide.", {
+          chapter: chapitre,
+          fields: [
+            { field: "first_name", reason: "String should have at least 1 character" },
+          ],
+        });
+      }
+      cv.identity = data;
+    }
+    if (chapitre === "contact") {
+      if (!data.email && !data.phone) {
+        return erreur(422, "chapter_invalid", "Le contenu du chapitre est invalide.", {
+          chapter: chapitre,
+          fields: [
+            { field: "body", reason: "Un e-mail ou un téléphone est nécessaire." },
+          ],
+        });
+      }
+      cv.contact = data;
+    }
+    if (chapitre === "summary") cv.summary = (data.summary as string) ?? null;
+    if (chapitre === "skills") {
+      cv.skills = (data.skills as unknown[]) ?? [];
+      cv.languages = (data.languages as unknown[]) ?? [];
+    }
+    if (chapitre === "interests") cv.interests = (data.interests as unknown[]) ?? [];
+    if (chapitre === "photo") {
+      const id = data.image_id as string | null;
+      cv.image_url = id === null ? null : (photos.get(id) ?? null);
+    }
+  }
+  cv.updated_at = new Date().toISOString();
+  return json(200, cv);
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -609,6 +737,14 @@ export function repondreCv(methode: string, chemin: string, corps: unknown): Res
   }
 
   if (route === "POST /cv/import") return importerCv(corps);
+
+  const section = /^PUT \/cv\/me\/chapters\/([a-z]+)$/.exec(route)?.[1];
+  if (section !== undefined) {
+    if (!ORDRE.includes(section as Chapitre)) {
+      return erreur(422, "validation_error", `Chapitre inconnu : ${section}.`);
+    }
+    return modifierSectionCv(section as Chapitre, corps);
+  }
 
   if (route === "POST /voice/transcribe") {
     return json(200, { text: ENTENDU[etat.brouillon?.current_chapter ?? "identity"] });

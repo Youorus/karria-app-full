@@ -158,6 +158,39 @@ export interface Cv {
   interets: Interet[];
   /** Vrai quand aucune section n'est remplie : le CV reste à créer. */
   vide: boolean;
+  /** Dernière écriture côté serveur (ISO 8601) : permet de savoir si un
+   *  import parti en arrière-plan a abouti. */
+  misAJour: string;
+}
+
+/** Les sections que l'on modifie à la main depuis l'écran du CV. Les clés
+ *  sont celles du contrat (`PUT /cv/me/chapters/{chapitre}`). */
+export type SectionCv = Exclude<CleChapitre, never>;
+
+/** Un champ à vérifier après un import, tel que le serveur le nomme. */
+export type ChampManquant =
+  | "contact.phone"
+  | "contact.email"
+  | "contact.city"
+  | "identity"
+  | "identity.headline"
+  | "summary"
+  | "experiences"
+  | "experiences.dates"
+  | "educations"
+  | "educations.dates"
+  | "skills";
+
+/** Ce que l'import a vraiment fait : le CV écrit, et le compte rendu de la
+ *  lecture — rien n'est raconté qui ne vienne d'ici. */
+export interface ResultatImport {
+  cv: Cv;
+  source: { type: string; fichiers: number; pages: number | null };
+  /** Par section, le nombre d'éléments retenus. */
+  retenus: Partial<Record<string, number>>;
+  /** Par section, les éléments lus mais refusés par le serveur. */
+  ecartes: Partial<Record<string, number>>;
+  manquants: ChampManquant[];
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -248,6 +281,7 @@ export interface InterpretationBrute {
 
 export interface CvBrut {
   id: string;
+  updated_at?: string;
   summary: string | null;
   image_url: string | null;
   identity?: IdentiteBrute | null;
@@ -257,4 +291,12 @@ export interface CvBrut {
   skills: CompetenceBrute[];
   languages: LangueBrute[];
   interests: InteretBrut[];
+}
+
+export interface ImportBrut {
+  cv: CvBrut;
+  source: { content_type: string; files: number; pages: number | null };
+  kept: Record<string, number>;
+  discarded: Record<string, number>;
+  missing: ChampManquant[];
 }

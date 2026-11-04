@@ -19,6 +19,7 @@ const CV_VIDE: Cv = {
   langues: [],
   interets: [],
   vide: true,
+  misAJour: "",
 };
 
 const CV_REMPLI: Cv = {

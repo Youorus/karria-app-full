@@ -1,12 +1,15 @@
 /**
- * L'onglet CV : le CV s'il existe, l'invitation à le créer sinon.
+ * L'onglet CV : le CV s'il existe, l'invitation à l'apporter sinon.
  *
- * Relu à chaque retour sur l'onglet : on revient de la création avec un
- * CV tout neuf, il doit être là sans geste de plus.
+ * Relu à chaque retour sur l'onglet : on revient de l'import ou d'une
+ * modification avec un CV changé, il doit être là sans geste de plus.
  *
- * « J'ai déjà un CV » importe un fichier puis ouvre le parcours de
- * création : c'est là que les propositions tirées du document se
- * valident, une à une — le même écran que la création en parlant.
+ * ═══ Importer ouvre un écran ═══
+ *
+ * « Photographier », « PDF ou Word », « Mes photos » mènent à
+ * `/cv/importer?source=…` : c'est cet écran qui ouvre le sélecteur, lit,
+ * raconte et revient ici. L'onglet ne fait que router — et, après
+ * l'import, mettre en avant ce qui reste à vérifier (`useVerification`).
  *
  * ═══ Sans compte ═══
  *
@@ -21,9 +24,15 @@ import { useCallback, useState } from "react";
 
 import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
 import { ErreurApi } from "@/lib/http";
+
 import { lireBrouillon, lireMonCv } from "../api/cv.api";
-import type { Cv } from "../types/cv.types";
-import { useImportCv } from "./use-import-cv";
+import {
+  effacerVerification,
+  manquantsDuCv,
+  useVerification,
+} from "../services/verification";
+import type { ChampManquant, CleChapitre, Cv } from "../types/cv.types";
+import type { SourceImport } from "./use-choix-fichiers";
 
 export interface EcranCv {
   cv: Cv | null;
@@ -32,12 +41,19 @@ export interface EcranCv {
   chargement: boolean;
   erreur: string | null;
   creer: () => void;
-  /** « J'ai déjà un CV » : choisir un fichier, puis ouvrir le parcours. */
-  importer: () => void;
-  importation: boolean;
-  problemeImport: string | null;
+  importer: (source: SourceImport) => void;
+  modifier: (section: CleChapitre) => void;
+  /** Après un import : les sections à relire, coordonnées d'abord. */
+  aVerifier: readonly CleChapitre[];
+  importRecent: boolean;
+  /** Ce qui manque au CV, calculé depuis le CV lui-même. */
+  manquants: ChampManquant[];
+  /** « C'est bon » : on n'insiste plus sur la vérification. */
+  terminerVerification: () => void;
   recharger: () => void;
 }
+
+const SOURCES: readonly SourceImport[] = ["camera", "galerie", "fichier"];
 
 export function useEcranCv(): EcranCv {
   const router = useRouter();
@@ -46,7 +62,8 @@ export function useEcranCv(): EcranCv {
   const [brouillonEnCours, setBrouillonEnCours] = useState(false);
   const [chargement, setChargement] = useState(!invite);
   const [erreur, setErreur] = useState<string | null>(null);
-  const importCv = useImportCv(() => router.push("/cv/creer"));
+  const verification = useVerification();
+
   // Une seule fonction de lecture, pour le retour sur l'onglet comme pour
   // « Réessayer ». Elle rend de quoi ignorer une réponse arrivée trop tard.
   const charger = useCallback(() => {
@@ -82,14 +99,29 @@ export function useEcranCv(): EcranCv {
 
   useFocusEffect(charger);
 
+  const ouvrirImport = useCallback(
+    (source: SourceImport) =>
+      router.push({ pathname: "/cv/importer", params: { source } }),
+    [router],
+  );
   const creer = useCallback(() => {
     if (exiger("cv", { cle: "cv.creer" })) router.push("/cv/creer");
   }, [exiger, router]);
-  const importer = useCallback(() => {
-    if (exiger("cv", { cle: "cv.importer" })) importCv.importer();
-  }, [exiger, importCv]);
+  const importer = useCallback(
+    (source: SourceImport) => {
+      if (exiger("cv", { cle: "cv.importer", charge: source })) ouvrirImport(source);
+    },
+    [exiger, ouvrirImport],
+  );
+  const modifier = useCallback(
+    (section: CleChapitre) =>
+      router.push({ pathname: "/cv/modifier/[section]", params: { section } }),
+    [router],
+  );
   useReprise("cv.creer", () => router.push("/cv/creer"));
-  useReprise("cv.importer", () => importCv.importer());
+  useReprise("cv.importer", (charge) =>
+    ouvrirImport(SOURCES.find((s) => s === charge) ?? "fichier"),
+  );
 
   return {
     cv,
@@ -98,8 +130,11 @@ export function useEcranCv(): EcranCv {
     erreur,
     creer,
     importer,
-    importation: importCv.enCours,
-    problemeImport: importCv.probleme,
+    modifier,
+    aVerifier: verification.aVerifier,
+    importRecent: verification.importRecent,
+    manquants: cv === null || cv.vide ? [] : manquantsDuCv(cv),
+    terminerVerification: effacerVerification,
     recharger: () => {
       setChargement(true);
       charger();

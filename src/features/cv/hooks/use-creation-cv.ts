@@ -67,7 +67,6 @@ import {
 import { DEFINITIONS, veutPasser, type DefinitionChapitre } from "../services/chapitres";
 import { CHAPITRES, type Brouillon, type CleChapitre, type Jet } from "../types/cv.types";
 import { useChoixPhoto } from "./use-choix-photo";
-import { useImportCv } from "./use-import-cv";
 
 const PAROLE_PROPOSITION = "Voici ce que j'ai lu dans ton CV. C'est bon, ou je corrige ?";
 const PAROLE_PROPOSITION_SUIVANTE = "Et celle-ci, c'est bon ?";
@@ -127,7 +126,7 @@ export interface CreationCv {
     ameliorer: (oui: boolean) => void;
     garder: (image: string) => void;
   };
-  /** « J'ai déjà un CV » : proposé tant que rien n'est validé. */
+  /** « J'ai déjà un CV » : proposé tant que rien n'est validé ; ouvre l'écran d'import. */
   importation: {
     possible: boolean;
     importer: () => void;
@@ -264,10 +263,6 @@ export function useCreationCv(): CreationCv {
     },
     [ouvrirChapitre],
   );
-
-  // Un CV importé depuis le parcours : le brouillon revient pré-rempli,
-  // on le rouvre là où il en est — sur sa première proposition.
-  const importCv = useImportCv(avancer);
 
   const enregistrer = useCallback(
     (contenu: Jet | Jet[] | null) => {
@@ -454,7 +449,7 @@ export function useCreationCv(): CreationCv {
     elements,
     valides: brouillon === null ? [] : [...jetsValides(brouillon), ...elements],
     dictee,
-    probleme: probleme ?? dictee.probleme ?? photo.probleme ?? importCv.probleme,
+    probleme: probleme ?? dictee.probleme ?? photo.probleme,
     texte,
     // Écrire, c'est reprendre la main : le message du micro s'efface.
     setTexte: (t: string) => {
@@ -509,8 +504,10 @@ export function useCreationCv(): CreationCv {
     importation: {
       possible:
         phase.nom === "question" && correctionDe === null && rienDeValide(brouillon),
-      importer: importCv.importer,
-      enCours: importCv.enCours,
+      // L'import a son propre écran : il remplace celui-ci, et mène au CV.
+      importer: () =>
+        router.replace({ pathname: "/cv/importer", params: { source: "fichier" } }),
+      enCours: false,
     },
     fermer: () => router.back(),
     recommencer: () => {

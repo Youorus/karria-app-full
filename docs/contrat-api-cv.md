@@ -7,23 +7,31 @@ toujours dire la même chose.
 
 ## Le principe
 
-Une seule structure, toujours la même, un chapitre à la fois. À chaque
-chapitre, l'utilisateur répond librement (texte, ou voix transcrite) ;
-Karria en tire un **premier jet structuré** au format du CV V1 ;
-l'utilisateur le **valide** tel quel ou le **corrige**. Le CV n'existe
-qu'à la fin, quand tout est validé : jusque-là, c'est un **brouillon**,
-sauvegardé côté serveur pour reprendre plus tard, sur n'importe quel
-appareil.
+Trois façons d'avoir un CV, une seule forme de données.
+
+1. **L'import** (la voie principale depuis le 2026-11-04) : on envoie son
+   CV existant — PDF, Word, ou les photos de ses pages — et il **devient le
+   CV**, directement. Le serveur dit ce qu'il a vraiment lu ; l'app mène la
+   personne à vérifier ses coordonnées, puis ses expériences et formations.
+2. **La conversation**, pour qui n'a pas de CV : une seule structure, un
+   chapitre à la fois. L'utilisateur répond librement (texte, ou voix
+   transcrite) ; Karria en tire un **premier jet structuré** au format du CV
+   V1 ; l'utilisateur le **valide** ou le **corrige**. Le CV n'existe qu'à la
+   fin : jusque-là, c'est un **brouillon**, sauvegardé côté serveur pour
+   reprendre plus tard, sur n'importe quel appareil.
+3. **L'édition directe**, depuis l'écran du CV : chaque section se remplace
+   d'un bloc, revalidée par le même schéma que le chapitre.
 
 ## Ce qui reste de la V1
 
 Les données finales sont **exactement** celles de la V1 (`app/cv/schemas.py`,
 mêmes noms de champs, snake_case) : `summary`, `image_url`, `experiences`,
-`educations`, `skills`, `languages`, `interests`, `projects`. Les routes V1
-de lecture et d'édition restent : `GET /cv/me`, `PUT /cv/update`,
-`PUT /cv/image`, les sous-ressources (`/cv/experiences`…), `POST /cv/ai/…`
-(import d'un CV existant), `POST /voice/transcribe`, et
-`POST /generated-images/generate` (photo améliorée).
+`educations`, `skills`, `languages`, `interests`, `projects`. De la V1
+restent `GET /cv/me` et `POST /voice/transcribe` ; l'édition
+(`PUT /cv/update`, `PUT /cv/image`, les sous-ressources) est remplacée par
+**une** route, `PUT /cv/me/chapters/{chapitre}` ; l'import (`POST /cv/ai/…`)
+par `POST /cv/import` ; la photo améliorée (`/generated-images/generate`)
+par `POST /cv/photo`.
 
 **Ajout** : l'identité et le contact, retirés de l'inscription, vivent
 dans le CV — `identity { first_name, last_name, headline }` et
@@ -166,7 +174,8 @@ pas un `404`.
 ### `GET /cv/me`
 
 - `id` est un **UUID** (chaîne), pas un entier ; `created_at` et
-  `updated_at` sont présents.
+  `updated_at` sont présents (l'app compare `updated_at` pour retrouver un
+  import abouti pendant un passage en arrière-plan).
 - Toujours `200` : sans CV, toutes les sections sont vides et `identity`
   vaut `null` (c'est ce que `vide` déduit déjà).
 - Chaque élément de section porte un `id` (UUID) stable, destiné à la
@@ -178,9 +187,10 @@ pas un `404`.
   valent `null` quand ils sont absents.
 - Le chapitre `photo` validé revient avec `{ image_id, image_url }`
   (`image_url` recalculée à chaque lecture).
-- Un chapitre `in_progress` **avec** `data` ou `items` est une
-  **proposition** (issue d'un import) que l'utilisateur doit encore valider
-  ou corriger ; `jetsValides` ne doit compter que `validated`.
+- Depuis le 2026-11-04, l'import ne pose plus de **propositions** dans le
+  brouillon (il écrit le CV) ; un chapitre `in_progress` avec `data` ou
+  `items` ne vient donc plus que d'un ancien brouillon, et `jetsValides` ne
+  compte toujours que `validated`.
 
 ### `POST /cv/draft/interpret`
 
@@ -197,21 +207,65 @@ pas un `404`.
   peut pas être vide (passer le chapitre à la place). `identity` et
   `contact` ne se passent pas.
 
-### `POST /cv/import` — ajout
-
-Importer un CV existant dans le brouillon.
+### `POST /cv/import` — le CV existant devient le CV (2026-11-04)
 
 - Multipart `file` : PDF, DOCX, image (JPEG, PNG, WebP, HEIC) ou texte ;
-  10 Mo et 10 pages au plus.
-- `201 Draft` : les chapitres extraits sont posés en **propositions**
-  (`in_progress` avec `data` / `items`), les chapitres déjà `validated` ne
-  sont pas touchés, rien n'est validé à la place de l'utilisateur. Le
-  brouillon est créé s'il n'existait pas.
+  10 Mo et 10 pages au plus. **Plusieurs images** — les photos des pages
+  d'un même CV, dans l'ordre — s'envoient en répétant le champ `file` ;
+  plusieurs fichiers d'un autre type → `422 document_pages_must_be_images`.
+  Chaque photo est réduite (2 000 px) avant d'être lue.
+- `201 ImportRead` : le CV lu **remplace les sections** du CV de la personne
+  (la photo, non lue dans le document, reste) ; le brouillon de conversation,
+  s'il y en avait un, est **supprimé** — le CV existe désormais. Rien n'est
+  écrit si la lecture échoue.
+
+```jsonc
+// ImportRead
+{
+  "cv": { … },                       // au format GET /cv/me
+  "source": { "content_type": "application/pdf", "files": 1, "pages": 2 },
+  "kept": { "identity": 1, "contact": 1, "summary": 0, "experiences": 4,
+            "educations": 2, "skills": 12, "languages": 2, "interests": 0 },
+  "discarded": { "experiences": 1 },  // lu par le modèle, refusé par le schéma
+  "missing": ["contact.phone", "summary", "experiences.dates"]
+}
+```
+
+- `kept`, `discarded` et `missing` sont le **compte rendu réel** : c'est
+  d'eux que l'app tire ses notes de lecture (« 4 expériences trouvées »,
+  « Pas de téléphone trouvé ») — jamais d'une liste de phrases d'attente.
+- `missing`, dans l'ordre d'importance : `contact.phone`, `contact.email`,
+  `contact.city`, `identity`, `identity.headline`, `summary`, `experiences`,
+  `experiences.dates`, `educations`, `educations.dates`, `skills`.
 - Erreurs : `422` avec `details.reason` parmi `document_type_unsupported`,
-  `document_too_large`, `document_too_many_pages`, `document_empty`,
-  `document_unreadable` ; `503 ai_unavailable` si le modèle ne répond pas.
-- La photo du document n'est pas extraite ; les projets non plus (pas de
-  chapitre).
+  `document_too_large`, `document_too_many_pages`,
+  `document_pages_must_be_images`, `document_empty`, `document_unreadable`,
+  `document_not_a_cv` (rien d'un CV n'a été lu : ni nom, ni expérience, ni
+  formation) ; `503 ai_unavailable` si le modèle ne répond pas.
+- Côté serveur, l'extraction est **un appel par groupe de sections, deux
+  tentatives chacun** (trois pour les expériences), la plus riche gardée :
+  mesuré le 2026-11-04, un seul appel laissait des listes vides une fois sur
+  deux. Compter 5 à 10 s.
+
+### `PUT /cv/me/chapters/{chapitre}` → `200 CVRead` — édition directe (2026-11-04)
+
+Même corps que `PUT /cv/draft/chapters/{chapitre}` (`{ data }`, `{ items }`
+ou `{ skipped: true }`), même schéma de revalidation, deux nuances :
+
+- `skipped: true` **vide** la section (`summary`, `skills`, `interests`,
+  `experiences`, `educations`, `photo`) ; `identity` et `contact` ne se
+  vident pas (`422 chapter_required`) ;
+- `items` peut être **vide** (retirer sa dernière expérience), et son ordre
+  est l'ordre du CV (c'est ainsi qu'on réordonne).
+
+`photo` reçoit `{ "data": { "image_id": "…" } }` (rendu par `POST /cv/photo`)
+ou `{ "data": { "image_id": null } }` pour la retirer ; l'ancienne photo et
+les photos en attente sont oubliées après l'écriture.
+
+Erreurs : `404 cv_not_found` sans CV ; `422 chapter_invalid` avec
+`details.fields: [{ field, reason }]` (`field` en snake_case du contrat :
+`first_name`, `links.0.url`…) ; `chapter_items_expected` /
+`chapter_data_expected`.
 
 ### `POST /voice/transcribe`
 

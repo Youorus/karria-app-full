@@ -85,6 +85,19 @@ export default function LayoutApp() {
           name="cv/creer"
           options={{ animation: "fade", animationDuration: 320, gestureEnabled: false }}
         />
+        {/* L'import suit la même règle : Karria lit, on ne la quitte pas
+            d'un glissement ; le bouton « Fermer » reste là. */}
+        <Stack.Screen
+          name="cv/importer"
+          options={{ animation: "fade", animationDuration: 320, gestureEnabled: false }}
+        />
+        {/* Modifier une section du CV : une feuille qui monte depuis le bas,
+            comme un formulaire natif ; le geste de retour reste permis, les
+            saisies non enregistrées sont gardées (`brouillons-edition.ts`). */}
+        <Stack.Screen
+          name="cv/modifier/[section]"
+          options={{ animation: "fade_from_bottom", animationDuration: 280 }}
+        />
         {/* Les paramètres s'empilent comme un détail : on y va, on revient.
             La suppression monte en fondu depuis le bas, comme une feuille
             qu'on ouvre — et le geste de retour reste permis : on doit

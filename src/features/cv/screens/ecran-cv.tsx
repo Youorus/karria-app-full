@@ -2,9 +2,9 @@
  * L'onglet CV — « Mon CV » de la V1.
  *
  * Trois états, pas plus : on charge (le K de Karria qui respire), il n'y
- * a pas encore de CV (l'invitation à le créer en parlant), ou il y en a
- * un (l'écran CV de la V1). Le sous-titre est celui de la V1 dans chaque
- * cas.
+ * a pas encore de CV (l'invitation à l'importer, ou à le créer), ou il y
+ * en a un (l'écran CV, qui se modifie). Le sous-titre est celui de la V1
+ * dans chaque cas.
  */
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -20,18 +20,8 @@ import { InvitationCv } from "../components/invitation-cv";
 import { useEcranCv } from "../hooks/use-ecran-cv";
 
 export function EcranCv() {
-  const {
-    cv,
-    brouillonEnCours,
-    chargement,
-    erreur,
-    creer,
-    importer,
-    importation,
-    problemeImport,
-    recharger,
-  } = useEcranCv();
-  const rempli = cv !== null && !cv.vide;
+  const e = useEcranCv();
+  const rempli = e.cv !== null && !e.cv.vide;
 
   return (
     <Box style={{ flex: 1 }} className="bg-background">
@@ -41,27 +31,32 @@ export function EcranCv() {
           titre="Mon CV"
           sousTitre={rempli ? "Karria génère votre CV" : "Importez, améliorez, générez"}
         />
-        {chargement ? (
+        {e.chargement ? (
           <Box className="flex-1 items-center justify-center pb-24">
             <ChargeurKarria />
           </Box>
-        ) : erreur !== null && cv === null ? (
+        ) : e.erreur !== null && e.cv === null ? (
           <Box className="flex-1 justify-center px-5 pb-24">
             <MessageErreur
-              message={erreur}
-              action={recharger}
+              message={e.erreur}
+              action={e.recharger}
               libelleAction="Réessayer"
             />
           </Box>
-        ) : rempli ? (
-          <CvRempli cv={cv} />
+        ) : rempli && e.cv !== null ? (
+          <CvRempli
+            cv={e.cv}
+            aVerifier={e.aVerifier}
+            importRecent={e.importRecent}
+            manquants={e.manquants}
+            onModifier={e.modifier}
+            onTerminerVerification={e.terminerVerification}
+          />
         ) : (
           <InvitationCv
-            reprendre={brouillonEnCours}
-            onCreer={creer}
-            onImporter={importer}
-            importation={importation}
-            probleme={problemeImport}
+            reprendre={e.brouillonEnCours}
+            onCreer={e.creer}
+            onImporter={e.importer}
           />
         )}
       </SafeAreaView>

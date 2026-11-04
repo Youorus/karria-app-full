@@ -60,6 +60,57 @@ function enTetes(rang: number): Record<string, string> {
   return requete(rang)[1].headers as Record<string, string>;
 }
 
+/**
+ * Le `XMLHttpRequest` des formulaires : les envois de fichiers ne passent
+ * pas par `fetch` (voir `envoyerMultipart`). Le double enregistre ce qui
+ * part et répond selon le jeton, comme le serveur qui fait tourner.
+ */
+interface EnvoiXhr {
+  methode: string;
+  url: string;
+  entetes: Record<string, string>;
+  corps: unknown;
+}
+const envoisXhr: EnvoiXhr[] = [];
+let repondreXhr: (envoi: EnvoiXhr) => { status: number; texte: string } = () => ({
+  status: 200,
+  texte: "{}",
+});
+
+class FauxXhr {
+  timeout = 0;
+  status = 0;
+  responseText = "";
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  ontimeout: (() => void) | null = null;
+  private methode = "";
+  private url = "";
+  private readonly entetes: Record<string, string> = {};
+
+  open(methode: string, url: string) {
+    this.methode = methode;
+    this.url = url;
+  }
+
+  setRequestHeader(nom: string, valeur: string) {
+    this.entetes[nom] = valeur;
+  }
+
+  getAllResponseHeaders() {
+    return "content-type: application/json\r\n";
+  }
+
+  send(corps: unknown) {
+    const envoi = { methode: this.methode, url: this.url, entetes: this.entetes, corps };
+    envoisXhr.push(envoi);
+    const reponseXhr = repondreXhr(envoi);
+    this.status = reponseXhr.status;
+    this.responseText = reponseXhr.texte;
+    setTimeout(() => this.onload?.(), 0);
+  }
+}
+
 /** Les requêtes parties vers `/auth/refresh`. */
 function rafraichissements(): Requete[] {
   return recuperer.mock.calls.filter(([adresse]) => adresse.endsWith("/auth/refresh"));
@@ -78,6 +129,9 @@ async function echecDe(promesse: Promise<unknown>): Promise<ErreurApi> {
 beforeEach(() => {
   recuperer.mockReset();
   global.fetch = recuperer as unknown as typeof fetch;
+  envoisXhr.length = 0;
+  repondreXhr = () => ({ status: 200, texte: "{}" });
+  global.XMLHttpRequest = FauxXhr as unknown as typeof XMLHttpRequest;
   jest.mocked(lireJetons).mockResolvedValue(JETONS);
   jest.mocked(ecrireJetons).mockResolvedValue(undefined);
   jest.mocked(oublierSession).mockResolvedValue(undefined);
@@ -162,24 +216,45 @@ describe("La forme d'une requête", () => {
     expect(requete(0)[1].method).toBe("DELETE");
   });
 
-  it("laisse le moteur poser l'en-tête d'un formulaire : pas de Content-Type écrit à la main", async () => {
-    recuperer.mockResolvedValue(reponse(200, {}));
+  it("envoie un formulaire par XMLHttpRequest, avec le jeton et sans Content-Type écrit à la main", async () => {
     const formulaire = new FormData();
 
     await http.postFormulaire("/verifications/documents", () => formulaire);
 
-    expect(enTetes(0)["Content-Type"]).toBeUndefined();
-    expect(requete(0)[1].body).toBe(formulaire);
-    expect(requete(0)[1].method).toBe("POST");
+    expect(recuperer).not.toHaveBeenCalled();
+    const [envoi] = envoisXhr;
+    expect(envoi.entetes["Content-Type"]).toBeUndefined();
+    expect(envoi.entetes.Authorization).toBe("Bearer acces-1");
+    expect(envoi.corps).toBe(formulaire);
+    expect(envoi.methode).toBe("POST");
+    expect(envoi.url).toBe("https://api.test/api/v1/verifications/documents");
   });
 
   it("remplace un fichier par un PUT en formulaire", async () => {
-    recuperer.mockResolvedValue(reponse(200, {}));
-
     await http.putFormulaire("/verifications/documents/d-1", () => new FormData());
 
-    expect(requete(0)[1].method).toBe("PUT");
-    expect(enTetes(0)["Content-Type"]).toBeUndefined();
+    expect(envoisXhr[0].methode).toBe("PUT");
+    expect(envoisXhr[0].entetes["Content-Type"]).toBeUndefined();
+  });
+
+  it("rend les refus d'un formulaire comme ceux d'un JSON", async () => {
+    repondreXhr = () => ({
+      status: 422,
+      texte: JSON.stringify({
+        error: {
+          code: "invalid_input",
+          message: "Trop lourd.",
+          details: { reason: "document_too_large" },
+        },
+      }),
+    });
+
+    const erreur = await echecDe(
+      http.postFormulaire("/verifications/documents", () => new FormData()),
+    );
+
+    expect(erreur.statut).toBe(422);
+    expect(erreur.raison).toBe("document_too_large");
   });
 });
 
@@ -320,11 +395,17 @@ describe("La session expirée", () => {
 
   it("refabrique le formulaire à la reprise : un corps déjà envoyé partirait vide", async () => {
     serveurQuiFaitTourner();
+    repondreXhr = (envoi) =>
+      envoi.entetes.Authorization === "Bearer acces-2"
+        ? { status: 200, texte: "{}" }
+        : { status: 401, texte: "{}" };
     const fabriquer = jest.fn(() => new FormData());
 
     await http.postFormulaire("/verifications/documents", fabriquer);
 
     expect(fabriquer).toHaveBeenCalledTimes(2);
+    expect(envoisXhr).toHaveLength(2);
+    expect(rafraichissements()).toHaveLength(1);
   });
 
   it("oublie la session et prévient l'accueil quand le serveur refuse le renouvellement", async () => {
