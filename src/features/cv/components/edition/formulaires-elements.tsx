@@ -14,11 +14,24 @@
  * Début et fin passent par `SelecteurMois`. « En cours » désactive la fin
  * et l'efface : le serveur ferait pareil, autant que l'écran le montre.
  *
- * ═══ Les missions ═══
+ * ═══ Les missions, une par une ═══
  *
- * Une par ligne dans un champ multiligne : c'est la façon la plus naturelle
- * d'en taper plusieurs sur un téléphone. On découpe au retour à la ligne et
- * on ignore les lignes vides.
+ * Des puces (`ListePuces`) : « Ajouter une mission » ouvre un champ, « Terminé »
+ * pose la puce, la croix la retire, la toucher la modifie. On ne cite pas
+ * tout d'un coup — et chaque mission reste un élément à part entière,
+ * sans découpage de texte à deviner.
+ *
+ * ═══ Les suggestions ═══
+ *
+ * Poste, entreprise, lieu, diplôme, établissement : `ChampAvecSuggestions`
+ * propose ce que l'index connaît (`GET /cv/suggestions`). La saisie libre
+ * reste la règle.
+ *
+ * ═══ « Enregistrer » bloqué tant que c'est incohérent ═══
+ *
+ * Le hook juge l'élément à chaque frappe (`bloque`) ; la feuille grise le
+ * bouton et le dit au lecteur d'écran. Un manque, lui, se signale à la
+ * tentative.
  */
 
 import {
@@ -31,7 +44,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { ChampTexte } from "@/components/champ-texte";
 import { Icone } from "@/components/icone";
 import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
@@ -40,8 +52,10 @@ import { VStack } from "@/components/ui/vstack";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import type { ElementListe } from "../../hooks/use-modifier-cv";
+import { MISSION_LONGUEUR_MAX, MISSIONS_MAX } from "../../services/validation-edition";
 import type { Experience, Formation } from "../../types/cv.types";
-import { ChampMultiligne } from "./champ-multiligne";
+import { ChampAvecSuggestions } from "./champ-avec-suggestions";
+import { ListePuces } from "./liste-puces";
 import { SelecteurMois } from "./selecteur-mois";
 
 type Erreurs = Record<string, string>;
@@ -103,21 +117,24 @@ export function FormulaireExperience({
 }) {
   return (
     <VStack className="gap-4">
-      <ChampTexte
+      <ChampAvecSuggestions
+        kind="title"
         libelle="Poste"
         value={valeur.poste}
         onChangeText={(poste) => onChange({ ...valeur, poste })}
         erreur={erreurs.poste}
         autoCapitalize="sentences"
       />
-      <ChampTexte
+      <ChampAvecSuggestions
+        kind="company"
         libelle="Entreprise"
         value={valeur.entreprise}
         onChangeText={(entreprise) => onChange({ ...valeur, entreprise })}
         erreur={erreurs.entreprise}
         autoCapitalize="words"
       />
-      <ChampTexte
+      <ChampAvecSuggestions
+        kind="city"
         libelle="Lieu"
         value={valeur.lieu ?? ""}
         onChangeText={(lieu) =>
@@ -134,21 +151,16 @@ export function FormulaireExperience({
         onChange={(p) => onChange({ ...valeur, ...p })}
         erreurs={erreurs}
       />
-      <ChampMultiligne
+      <ListePuces
         libelle="Missions"
-        aide="Une par ligne, à l'infinitif. Ex. : Conseiller les clients."
-        lignes={5}
-        value={valeur.missions.join("\n")}
-        onChangeText={(texte) =>
-          onChange({ ...valeur, missions: texte.split("\n").map((m) => m.trimStart()) })
-        }
-        onBlur={() =>
-          onChange({
-            ...valeur,
-            missions: valeur.missions.map((m) => m.trim()).filter((m) => m !== ""),
-          })
-        }
+        valeurs={valeur.missions}
+        onChange={(missions) => onChange({ ...valeur, missions })}
+        libelleAjout="Ajouter une mission"
+        placeholder="Ex. : Conseiller les clients"
+        aide="Une à la fois, à l'infinitif."
         erreur={erreurs.missions}
+        max={MISSIONS_MAX}
+        maxLongueur={MISSION_LONGUEUR_MAX}
       />
     </VStack>
   );
@@ -165,21 +177,24 @@ export function FormulaireFormation({
 }) {
   return (
     <VStack className="gap-4">
-      <ChampTexte
+      <ChampAvecSuggestions
+        kind="degree"
         libelle="Diplôme ou formation"
         value={valeur.diplome}
         onChangeText={(diplome) => onChange({ ...valeur, diplome })}
         erreur={erreurs.diplome}
         autoCapitalize="sentences"
       />
-      <ChampTexte
+      <ChampAvecSuggestions
+        kind="school"
         libelle="Établissement"
         value={valeur.ecole}
         onChangeText={(ecole) => onChange({ ...valeur, ecole })}
         erreur={erreurs.ecole}
         autoCapitalize="words"
       />
-      <ChampTexte
+      <ChampAvecSuggestions
+        kind="city"
         libelle="Lieu"
         value={valeur.lieu ?? ""}
         onChangeText={(lieu) =>
@@ -205,6 +220,7 @@ export function FeuilleElement({
   valeur,
   nouveau,
   erreurs,
+  bloque = false,
   onChange,
   onValider,
   onFermer,
@@ -213,6 +229,8 @@ export function FeuilleElement({
   valeur: ElementListe | null;
   nouveau: boolean;
   erreurs: Erreurs;
+  /** Une incohérence empêche d'enregistrer : le bouton est grisé. */
+  bloque?: boolean;
   onChange: (v: ElementListe) => void;
   onValider: () => void;
   onFermer: () => void;
@@ -250,8 +268,11 @@ export function FeuilleElement({
               <Texte className="font-bold text-body text-foreground">{titre}</Texte>
               <Pressable
                 onPress={onValider}
-                className="min-h-touch flex-row items-center gap-1"
+                disabled={bloque}
+                className={`min-h-touch flex-row items-center gap-1 ${bloque ? "opacity-40" : ""}`}
                 accessibilityRole="button"
+                accessibilityLabel="Enregistrer"
+                accessibilityState={{ disabled: bloque }}
               >
                 <Icone
                   nom="coche"

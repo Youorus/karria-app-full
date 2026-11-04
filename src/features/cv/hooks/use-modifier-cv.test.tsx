@@ -163,12 +163,13 @@ describe("Modifier une section", () => {
         email: "awa@example.com",
         telephone: null,
         ville: "Montreuil",
-        liens: [{ libelle: "x", url: "javascript:1" }],
+        // Valide pour nous ; c'est le serveur (simulé) qui le refuse.
+        liens: [{ libelle: "x", url: "exemple.fr/cv" }],
       }),
     );
     act(() => result.current.m.enregistrer());
     await waitFor(() => expect(result.current.m.enregistrement).toBe("erreur"));
-    expect(result.current.m.erreursChamps.liens).toMatch(/http/);
+    expect(result.current.m.erreursChamps["liens.0.url"]).toMatch(/http/);
     expect(result.current.m.probleme).toMatch(/Corrige/);
   });
 
@@ -192,6 +193,63 @@ describe("Modifier une section", () => {
     const troisieme = renderHook(() => useModifierCv());
     await waitFor(() => expect(troisieme.result.current.chargement).toBe(false));
     expect(troisieme.result.current.restaure).toBe(false);
+  });
+
+  it("bloque l'enregistrement sur une incohérence et montre l'erreur tout de suite", async () => {
+    mockSection = "contact";
+    const { result } = renderHook(() => useModifierCv());
+    await waitFor(() => expect(result.current.chargement).toBe(false));
+    expect(result.current.bloque).toBe(false);
+
+    act(() =>
+      result.current.changer({
+        email: "awa@",
+        telephone: null,
+        ville: null,
+        liens: [{ libelle: "", url: "linkedin.com/in/awa" }],
+      }),
+    );
+    // L'incohérence s'affiche sans tentative ; le manque (libellé) attend.
+    expect(result.current.bloque).toBe(true);
+    expect(result.current.erreursChamps.email).toMatch(/e-mail/);
+    expect(result.current.erreursChamps["liens.0.libelle"]).toBeUndefined();
+
+    act(() => result.current.enregistrer());
+    expect(mockModifier).not.toHaveBeenCalled();
+    expect(result.current.erreursChamps["liens.0.libelle"]).toMatch(/nom/);
+
+    act(() =>
+      result.current.changer({
+        email: "awa@example.com",
+        telephone: null,
+        ville: null,
+        liens: [{ libelle: "LinkedIn", url: "linkedin.com/in/awa" }],
+      }),
+    );
+    expect(result.current.bloque).toBe(false);
+    expect(result.current.erreursChamps).toEqual({});
+  });
+
+  it("bloque la feuille d'un élément sur des dates incohérentes", async () => {
+    mockSection = "experiences";
+    const { result } = renderHook(() => useModifierCv());
+    await waitFor(() => expect(result.current.chargement).toBe(false));
+
+    act(() => result.current.liste.editer(1));
+    expect(result.current.bloque).toBe(false);
+    act(() =>
+      result.current.liste.changerElement({
+        ...cv.experiences[1]!,
+        debut: "2022-01",
+        fin: "2021-06",
+      }),
+    );
+    expect(result.current.bloque).toBe(true);
+    expect(result.current.erreursChamps.fin).toMatch(/avant le début/);
+
+    act(() => result.current.liste.validerElement());
+    expect(mockModifier).not.toHaveBeenCalled();
+    expect(result.current.liste.enEdition).not.toBeNull();
   });
 
   it("enregistre une liste à chaque geste : déplacer, supprimer, ajouter", async () => {

@@ -2,9 +2,11 @@
  * Les formulaires d'une seule valeur : identité, coordonnées, à propos.
  *
  * Contrôlés : la valeur vient du hook, chaque frappe remonte par
- * `onChange`. Rien n'est calculé ici — le hook garde le brouillon, le
- * serveur valide. Les erreurs arrivent par champ (`erreurs.prenom`…), déjà
- * traduites en noms français par le hook.
+ * `onChange`. Rien n'est calculé ici — le hook garde le brouillon et juge
+ * (`validation-edition.ts`), le serveur revalide. Les erreurs arrivent par
+ * champ (`erreurs.prenom`, `erreurs["liens.0.url"]`…), déjà traduites en
+ * noms français par le hook. Le poste visé et la ville proposent ce que
+ * l'index connaît (`ChampAvecSuggestions`).
  */
 
 import { Pressable } from "react-native";
@@ -17,6 +19,7 @@ import { VStack } from "@/components/ui/vstack";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import type { Contact, Identite, Lien, Presentation } from "../../types/cv.types";
+import { ChampAvecSuggestions } from "./champ-avec-suggestions";
 import { ChampMultiligne } from "./champ-multiligne";
 
 type Erreurs = Record<string, string>;
@@ -50,7 +53,8 @@ export function FormulaireIdentite({
         textContentType="familyName"
         returnKeyType="next"
       />
-      <ChampTexte
+      <ChampAvecSuggestions
+        kind="title"
         libelle="Poste visé"
         aide="Affiché sous ton nom. Ex. : Conseillère de vente."
         value={valeur.titre ?? ""}
@@ -67,10 +71,14 @@ export function FormulaireIdentite({
 
 function LigneLien({
   lien,
+  erreurLibelle,
+  erreurUrl,
   onChange,
   onSupprimer,
 }: {
   lien: Lien;
+  erreurLibelle?: string;
+  erreurUrl?: string;
   onChange: (l: Lien) => void;
   onSupprimer: () => void;
 }) {
@@ -91,15 +99,19 @@ function LigneLien({
       <ChampTexte
         libelle=""
         placeholder="Libellé (LinkedIn, Portfolio…)"
+        accessibilityLabel="Libellé du lien"
         value={lien.libelle}
         onChangeText={(libelle) => onChange({ ...lien, libelle })}
+        erreur={erreurLibelle}
         autoCapitalize="words"
       />
       <ChampTexte
         libelle=""
         placeholder="https://…"
+        accessibilityLabel="Adresse du lien"
         value={lien.url}
         onChangeText={(url) => onChange({ ...lien, url })}
+        erreur={erreurUrl}
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="url"
@@ -142,7 +154,8 @@ export function FormulaireContact({
         textContentType="emailAddress"
         returnKeyType="next"
       />
-      <ChampTexte
+      <ChampAvecSuggestions
+        kind="city"
         libelle="Ville"
         value={valeur.ville ?? ""}
         onChangeText={(t) => onChange({ ...valeur, ville: vide(t) })}
@@ -157,6 +170,8 @@ export function FormulaireContact({
           <LigneLien
             key={i}
             lien={lien}
+            erreurLibelle={erreurs[`liens.${i}.libelle`]}
+            erreurUrl={erreurs[`liens.${i}.url`]}
             onChange={(l) =>
               onChange({
                 ...valeur,

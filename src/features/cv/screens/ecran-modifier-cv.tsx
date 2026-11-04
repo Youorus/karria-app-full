@@ -6,7 +6,8 @@
  * En haut : « Annuler », le titre de la section, et l'état
  * d'enregistrement (« Enregistré » avec sa coche, ou le problème). Au
  * centre : le formulaire de la section. En bas, pour les formulaires
- * simples : « Enregistrer » en bleu plein. Les listes n'ont pas de bouton :
+ * simples : « Enregistrer » en bleu plein, grisé tant qu'une incohérence
+ * est signalée sous un champ (`bloque`). Les listes n'ont pas de bouton :
  * chaque geste s'enregistre et l'en-tête le dit.
  *
  * Une bannière discrète prévient quand des saisies non enregistrées ont
@@ -105,6 +106,7 @@ function Formulaire({ v, m }: { v: ValeurSection; m: ReturnType<typeof useModifi
             valeur={m.liste.enEdition?.valeur ?? null}
             nouveau={m.liste.enEdition?.index === null}
             erreurs={m.erreursChamps}
+            bloque={m.bloque}
             onChange={m.liste.changerElement}
             onValider={m.liste.validerElement}
             onFermer={m.liste.fermerElement}
@@ -214,7 +216,7 @@ export function EcranModifierCv() {
                     onPress={m.enregistrer}
                     enCours={m.enregistrement === "en-cours"}
                     libelleEnCours="Enregistrement…"
-                    desactive={!m.modifie && m.enregistrement !== "erreur"}
+                    desactive={m.bloque || (!m.modifie && m.enregistrement !== "erreur")}
                   />
                 </VStack>
               ) : null}

@@ -25,19 +25,21 @@
  * `brouillons-edition.ts` ; revenir sur la section la restitue et le dit.
  * Enregistrer ou « Annuler » l'efface.
  *
- * ═══ Le serveur a le dernier mot ═══
+ * ═══ Le serveur a le dernier mot, mais on ne l'attend pas ═══
  *
- * On vérifie le minimum avant d'envoyer (un prénom, un nom, un canal de
- * contact, un poste et une entreprise) pour que l'erreur apparaisse sous
- * le champ, mais c'est le serveur qui revalide (`422 chapter_invalid`,
- * avec `fields`) : ses raisons reviennent sous les champs concernés.
+ * `services/validation-edition.ts` juge ce qu'on tape : une incohérence
+ * (fin avant début, e-mail sans arobase) s'affiche tout de suite sous le
+ * champ et **bloque** le bouton (`bloque`) ; un manque (prénom, entreprise)
+ * ne s'affiche qu'à la première tentative d'enregistrement (`tentative`).
+ * Le serveur revalide ensuite (`422 chapter_invalid`, avec `fields`) et ses
+ * raisons reviennent sous les champs concernés, par-dessus les nôtres.
  *
  * Ouvrir cet écran compte comme une **vérification** de la section après un
  * import (`marquerVerifie`).
  */
 
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ErreurApi } from "@/lib/http";
 
@@ -47,6 +49,12 @@ import {
   lireBrouillon,
   oublierBrouillon,
 } from "../services/brouillons-edition";
+import {
+  estBloque,
+  messagesDe,
+  validerElement,
+  validerSection,
+} from "../services/validation-edition";
 import { marquerVerifie } from "../services/verification";
 import {
   CHAPITRES,
@@ -110,8 +118,10 @@ export interface ModifierCv {
   modifie: boolean;
   enregistrement: Enregistrement;
   probleme: string | null;
-  /** Erreurs par champ (clés françaises des types). */
+  /** Erreurs par champ (clés françaises des types), les nôtres et celles du serveur. */
   erreursChamps: Record<string, string>;
+  /** Vrai tant qu'une incohérence empêche d'enregistrer (le bouton est bloqué). */
+  bloque: boolean;
   changer: (valeur: ValeurDe) => void;
   enregistrer: () => void;
   annuler: () => void;
@@ -197,19 +207,6 @@ export function versContenu(v: ValeurSection): Jet | Jet[] | null {
   }
 }
 
-/** Ce qui doit être là avant d'envoyer : l'erreur sous le champ, pas un 422. */
-export function erreursLocales(v: ValeurSection): Record<string, string> {
-  const erreurs: Record<string, string> = {};
-  if (v.section === "identity") {
-    if (v.valeur.prenom.trim() === "") erreurs.prenom = "Ton prénom est nécessaire.";
-    if (v.valeur.nom.trim() === "") erreurs.nom = "Ton nom est nécessaire.";
-  }
-  if (v.section === "contact" && !v.valeur.email?.trim() && !v.valeur.telephone?.trim()) {
-    erreurs.telephone = "Un téléphone ou un e-mail : il faut pouvoir te joindre.";
-  }
-  return erreurs;
-}
-
 /** Les noms de champs du serveur → ceux des formulaires. */
 const CHAMPS_SERVEUR: Record<string, string> = {
   first_name: "prenom",
@@ -235,10 +232,12 @@ function erreursDuServeur(cause: unknown): Record<string, string> {
     { fields?: { field: string; reason: string }[] } | undefined;
   const erreurs: Record<string, string> = {};
   for (const f of details?.fields ?? []) {
-    // `links.0.url` → le bloc des liens ; `first_name` → le champ lui-même.
-    const premier = f.field.split(".")[0] ?? f.field;
-    const dernier = f.field.split(".").pop() ?? f.field;
-    const cle = premier === "links" ? "liens" : (CHAMPS_SERVEUR[dernier] ?? dernier);
+    // `links.0.url` → la ligne de lien (`liens.0.url`) ; `first_name` → le champ lui-même.
+    const [premier = f.field, index, dernier] = f.field.split(".");
+    const cle =
+      premier === "links" && index !== undefined
+        ? `liens.${index}.${dernier === "label" ? "libelle" : (dernier ?? "url")}`
+        : (CHAMPS_SERVEUR[premier] ?? premier);
     erreurs[cle] = f.reason;
   }
   return erreurs;
@@ -256,19 +255,6 @@ function elementVide(section: CleChapitre): ElementListe {
         missions: [],
       }
     : { diplome: "", ecole: "", lieu: null, debut: null, fin: null, enCours: false };
-}
-
-function elementComplet(section: CleChapitre, e: ElementListe): Record<string, string> {
-  const erreurs: Record<string, string> = {};
-  if (section === "experiences" && "poste" in e) {
-    if (e.poste.trim() === "") erreurs.poste = "Le poste est nécessaire.";
-    if (e.entreprise.trim() === "") erreurs.entreprise = "L'entreprise est nécessaire.";
-  }
-  if (section === "educations" && "diplome" in e) {
-    if (e.diplome.trim() === "") erreurs.diplome = "Le diplôme est nécessaire.";
-    if (e.ecole.trim() === "") erreurs.ecole = "L'établissement est nécessaire.";
-  }
-  return erreurs;
 }
 
 function messageDEnregistrement(cause: unknown): string {
@@ -296,7 +282,9 @@ export function useModifierCv(): ModifierCv {
   const [modifie, setModifie] = useState(false);
   const [enregistrement, setEnregistrement] = useState<Enregistrement>("repos");
   const [probleme, setProbleme] = useState<string | null>(null);
-  const [erreursChamps, setErreursChamps] = useState<Record<string, string>>({});
+  const [erreursServeur, setErreursServeur] = useState<Record<string, string>>({});
+  /** On a tenté d'enregistrer : les manques se montrent aussi. */
+  const [tentative, setTentative] = useState(false);
   const [enEdition, setEnEdition] = useState<EditionElement | null>(null);
   const [photoEnCours, setPhotoEnCours] = useState(false);
   const choixPhoto = useChoixPhoto();
@@ -337,17 +325,32 @@ export function useModifierCv(): ModifierCv {
     };
   }, [section, enListe]);
 
+  // ── Ce qu'on juge nous-mêmes ──────────────────────────────────────────
+
+  const erreursLocales = useMemo(() => {
+    if (enEdition !== null) return validerElement(section, enEdition.valeur);
+    if (valeur !== null && !enListe) return validerSection(valeur);
+    return [];
+  }, [enEdition, section, valeur, enListe]);
+  const bloque = estBloque(erreursLocales);
+  const erreursChamps = useMemo(
+    () => ({
+      ...messagesDe(erreursLocales, { avecRequis: tentative }),
+      ...erreursServeur,
+    }),
+    [erreursLocales, tentative, erreursServeur],
+  );
+
   const sauver = useCallback((v: ValeurSection, apres?: () => void) => {
-    const locales = erreursLocales(v);
-    if (Object.keys(locales).length > 0) {
-      setErreursChamps(locales);
+    if (validerSection(v).length > 0) {
+      setTentative(true);
       setEnregistrement("erreur");
       setProbleme("Corrige les champs signalés, puis réessaie.");
       return;
     }
     setEnregistrement("en-cours");
     setProbleme(null);
-    setErreursChamps({});
+    setErreursServeur({});
     modifierSection(v.section, versContenu(v))
       .then((cv) => {
         if (!vivant.current) return;
@@ -355,13 +358,14 @@ export function useModifierCv(): ModifierCv {
         setValeur(valeurDuCv(v.section, cv));
         setModifie(false);
         setRestaure(false);
+        setTentative(false);
         setEnregistrement("fait");
         apres?.();
       })
       .catch((cause: unknown) => {
         console.warn("[karria] enregistrement du CV en échec", cause);
         if (!vivant.current) return;
-        setErreursChamps(erreursDuServeur(cause));
+        setErreursServeur(erreursDuServeur(cause));
         setProbleme(messageDEnregistrement(cause));
         setEnregistrement("erreur");
       });
@@ -421,17 +425,17 @@ export function useModifierCv(): ModifierCv {
     [elements, remplacerListe],
   );
 
-  const validerElement = useCallback(() => {
+  const validerElementEnEdition = useCallback(() => {
     if (enEdition === null) return;
-    const erreurs = elementComplet(section, enEdition.valeur);
-    if (Object.keys(erreurs).length > 0) {
-      setErreursChamps(erreurs);
+    if (validerElement(section, enEdition.valeur).length > 0) {
+      setTentative(true);
       return;
     }
     const liste = [...elements()];
     if (enEdition.index === null) liste.push(enEdition.valeur);
     else liste[enEdition.index] = enEdition.valeur;
-    setErreursChamps({});
+    setTentative(false);
+    setErreursServeur({});
     setEnEdition(null);
     remplacerListe(liste);
   }, [enEdition, section, elements, remplacerListe]);
@@ -497,19 +501,22 @@ export function useModifierCv(): ModifierCv {
     enregistrement,
     probleme,
     erreursChamps,
+    bloque,
     changer,
     enregistrer,
     annuler,
     liste: {
       enEdition,
       ajouter: () => {
-        setErreursChamps({});
+        setTentative(false);
+        setErreursServeur({});
         setEnEdition({ index: null, valeur: elementVide(section) });
       },
       editer: (index) => {
         const element = elements()[index];
         if (element !== undefined) {
-          setErreursChamps({});
+          setTentative(false);
+          setErreursServeur({});
           setEnEdition({ index, valeur: element });
         }
       },
@@ -518,9 +525,10 @@ export function useModifierCv(): ModifierCv {
       descendre: (index) => deplacer(index, index + 1),
       changerElement: (v) =>
         setEnEdition((e) => (e === null ? null : { ...e, valeur: v })),
-      validerElement,
+      validerElement: validerElementEnEdition,
       fermerElement: () => {
-        setErreursChamps({});
+        setTentative(false);
+        setErreursServeur({});
         setEnEdition(null);
       },
     },
