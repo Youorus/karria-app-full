@@ -48,6 +48,8 @@ yarn-error.*
 # macOS
 .DS_Store
 *.pem
+# …sauf le certificat PUBLIC de signature des mises à jour (voir plus bas).
+!certs/certificate.pem
 
 # local env files
 .env*.local
@@ -68,3 +70,14 @@ example
 # local — un `.iml` versionné se contredit dès le second clone.
 .idea/
 .vscode/
+
+# ─────────────────────────────────────────────────────────────────────
+# La clé privée qui signe les mises à jour EAS Update
+#
+# `certs/certificate.pem` est PUBLIC et versionné : il est embarqué dans
+# chaque build, et c'est lui qui vérifie qu'une mise à jour vient bien de
+# nous. `keys/private-key.pem`, elle, signe : quiconque la détient peut
+# pousser du code dans l'application de tout le monde. Elle ne se commite
+# jamais ; Marc la garde hors du dépôt et la passe à `eas update` avec
+# `--private-key-path` (voir docs/REPRISE.md).
+keys/
