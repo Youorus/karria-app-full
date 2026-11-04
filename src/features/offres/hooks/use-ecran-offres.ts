@@ -62,6 +62,7 @@ import { libelleDistance } from "../services/presentation";
 import type { Offre, Tri } from "../types/offres.types";
 import { memoriser } from "./memoire-offres";
 import { useFilOffres, type FilOffres, type VueDuFil } from "./use-fil-offres";
+import { useVisibiliteStable } from "./use-visibilite-stable";
 
 export type ElementDuFil =
   /** `distance` : « à 12 km », en tri « Plus proches » seulement. */
@@ -277,25 +278,18 @@ export function useEcranOffres(): EcranOffres {
 
   const signalerDefilement = useCallback((y: number) => setDefile(y > 0), []);
 
+  // Une seule paire pour la vie de la liste (`use-visibilite-stable.ts`) :
+  // `signalerVisibles` change d'identité à la connexion, et `FlatList`
+  // refuse qu'on change ses paires après le montage — l'écran noircissait.
   const { signalerVisibles } = fil;
-  const visibilite = useMemo<ViewabilityConfigCallbackPairs>(
-    () => [
-      {
-        viewabilityConfig: { itemVisiblePercentThreshold: 60, minimumViewTime: 400 },
-        onViewableItemsChanged: ({
-          viewableItems,
-        }: {
-          viewableItems: ViewToken<ElementDuFil>[];
-        }) =>
-          signalerVisibles(
-            viewableItems.flatMap((v) =>
-              v.item.type === "offre" ? [v.item.offre.id] : [],
-            ),
-          ),
-      },
-    ],
+  const signalerOffresVisibles = useCallback(
+    (visibles: ViewToken<ElementDuFil>[]) =>
+      signalerVisibles(
+        visibles.flatMap((v) => (v.item.type === "offre" ? [v.item.offre.id] : [])),
+      ),
     [signalerVisibles],
   );
+  const visibilite = useVisibiliteStable(signalerOffresVisibles);
 
   const surRecherche = useCallback(() => {
     setAutresVisibles(false);

@@ -36,6 +36,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaListener } from "react-native-safe-area-context";
 import { Uniwind } from "uniwind";
 
+import { FrontiereErreur } from "@/components/frontiere-erreur";
 import { RenvoiClavier } from "@/components/renvoi-clavier";
 import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
 import { FournisseurDeSession, useSession } from "@/features/auth/hooks/use-session";
@@ -69,7 +70,11 @@ export default function RootLayout() {
             <GluestackUIProvider mode="system">
               <FournisseurDeSession>
                 <FondDeRacine>
-                  <Portail />
+                  {/* Sous le thème et le fond : une erreur de rendu se lit
+                      au lieu de laisser un écran noir (2026-11-04). */}
+                  <FrontiereErreur>
+                    <Portail />
+                  </FrontiereErreur>
                 </FondDeRacine>
               </FournisseurDeSession>
             </GluestackUIProvider>
