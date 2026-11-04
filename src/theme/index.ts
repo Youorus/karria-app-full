@@ -63,6 +63,9 @@ export const PREMIUM_TEXTE = { light: "#8a6414", dark: "#f2c46d" } as const;
 /** `--color-chaleur` : l'icône du café et du mot de l'équipe. */
 export const CHALEUR = { light: "#9a5b2e", dark: "#e0a872" } as const;
 
+/** `--color-chaleur-foreground` : l'icône posée sur le bouton caramel du café. */
+export const SUR_CHALEUR = { light: "#ffffff", dark: "#0e0d0c" } as const;
+
 /** `--color-salaire-foreground` : l'icône du salaire, identique dans les
  *  deux modes comme dans la V1. */
 export const SALAIRE = "#1b5e20";

@@ -138,6 +138,7 @@
     --color-surface-premium: #fbf5e6;
     /* La chaleur du profil et du café : un brun caramel, une crème. */
     --color-chaleur: #9a5b2e;
+    --color-chaleur-foreground: #ffffff; /* ce qui se pose sur le caramel : le bouton du café */
     --color-surface-chaleur: #fbf3ea;
     --color-border-chaleur: #9a5b2e24;
 
@@ -230,6 +231,7 @@
     --color-border-premium: #f2c46d59;
     --color-surface-premium: #2a2316;
     --color-chaleur: #e0a872;
+    --color-chaleur-foreground: #0e0d0c;
     --color-surface-chaleur: #221b15;
     --color-border-chaleur: #e0a87229;
 

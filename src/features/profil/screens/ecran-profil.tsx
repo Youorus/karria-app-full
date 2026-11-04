@@ -4,8 +4,8 @@
  * ═══ Ce qu'il contient, et ce qu'il ne contient plus ═══
  *
  * Trois blocs, du plus intime au plus lointain, avec beaucoup d'air
- * entre eux : qui je suis, mon CV (une ligne), un mot de l'équipe et ses
- * deux façons d'aider — sans pub, ou un café (`features/soutien`).
+ * entre eux : qui je suis, mon CV (une ligne), puis « Soutenir Karria » —
+ * deux surfaces distinctes, sans pub et un café (`features/soutien`).
  * Minimaliste et chaleureux, à la demande de Marc (2026-10-24) : une
  * seule touche de couleur chaude, sur la même aura que les autres
  * onglets — le fond fait l'unité de l'application. L'apparence, les notifications, la

@@ -10,9 +10,11 @@ import type { CatalogueBrut, FacturationBrute } from "../types/soutien.types";
 import {
   etatSansPub,
   libelleDOffre,
+  motCafe,
   nomDesTasses,
   prixMensuel,
-  tassesDessinees,
+  prixParMois,
+  TEXTES,
 } from "./presentation";
 
 const CATALOGUE: CatalogueBrut = {
@@ -79,15 +81,23 @@ describe("La facturation", () => {
 });
 
 describe("Les mots", () => {
-  it("nomme et dessine les tasses", () => {
+  it("nomme les tasses, sans émoji", () => {
     expect(nomDesTasses(5)).toBe("Cinq cafés");
-    expect(tassesDessinees(3)).toBe("☕☕☕");
-    expect(tassesDessinees(5)).toBe("☕☕☕+");
+    expect(motCafe(1)).toBe("café");
+    expect(motCafe(3)).toBe("cafés");
     expect(libelleDOffre({ tasses: 2, prixCentimes: 499 })).toBe(
       "Offrir deux cafés · 4,99 €",
     );
     expect(libelleDOffre(null)).toBe("Offrir un café");
     expect(prixMensuel(499)).toBe("4,99 € / mois");
+    expect(prixParMois(499)).toBe("4,99 € par mois");
+  });
+
+  it("promet trois bénéfices lisibles, sans engagement, et la rassurance Stripe", () => {
+    expect(TEXTES.sansPubBenefices).toHaveLength(3);
+    expect(TEXTES.sansPubPromesse).toMatch(/sans engagement/i);
+    expect(TEXTES.sansPubPromesse).toMatch(/résiliable à tout moment/i);
+    expect(TEXTES.stripe).toMatch(/Stripe/);
   });
 
   it("dit l'état de l'abonnement et quoi faire", () => {

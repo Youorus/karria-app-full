@@ -30,6 +30,10 @@
  * défait pas — supprimer son compte — et toujours **après** un écran qui a
  * dit ce qui va disparaître : la couleur avertit, le texte explique.
  *
+ * `chaleur` est caramel plein : le café qu'on offre à l'équipe, et rien
+ * d'autre. Ce n'est pas une seconde action principale — c'est un geste
+ * chaleureux, et sa couleur le dit avant son libellé.
+ *
  * ═══ Pourquoi la même hauteur que les champs ═══
  *
  * 56 points, comme `ChampTexte`. Un formulaire dont le bouton est plus
@@ -49,13 +53,14 @@ import { HStack } from "@/components/ui/hstack";
 import { Spinner } from "@/components/ui/spinner";
 import { Texte } from "@/components/texte";
 
-type Ton = "principal" | "secondaire" | "discret" | "destructif";
+type Ton = "principal" | "secondaire" | "discret" | "destructif" | "chaleur";
 
 const FOND: Record<Ton, string> = {
   principal: "bg-primary",
   secondaire: "border-[1.5px] border-border-champ bg-card",
   discret: "",
   destructif: "bg-destructive",
+  chaleur: "bg-chaleur",
 };
 
 const TEXTE: Record<Ton, string> = {
@@ -63,6 +68,7 @@ const TEXTE: Record<Ton, string> = {
   secondaire: "text-foreground",
   discret: "text-primary",
   destructif: "text-destructive-foreground",
+  chaleur: "text-chaleur-foreground",
 };
 
 export interface BoutonActionProps extends Omit<PressableProps, "children" | "style"> {
