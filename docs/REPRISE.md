@@ -3,7 +3,103 @@
 > Document de passation. À lire en premier par toute personne ou IA qui
 > reprend le travail, avec `AGENTS.md`. Mis à jour à chaque fin de session.
 
-**Dernière mise à jour : 2026-11-04**
+**Dernière mise à jour : 2026-11-05**
+
+## Session du 2026-11-05 — Mises à jour toutes seules (EAS Update), porte de version, publicité native élargie (Fable)
+
+**Trois livrables de Marc**, commits `fe595f1` (version), `63932d1` (EAS Update), `f81edaf`
+(store_url validée), `24c5db8` (signature des mises à jour), `a0ed391` (publicité). `npm run check`
+vert (471 tests), `npx expo export --platform ios` produit un paquet, `npx expo prebuild --platform
+ios --no-install` passe (`ios/` reste ignoré). **Rien n'a été lancé sur appareil ni simulateur** :
+tout ce qui suit est vérifié par les tests et l'empaquetage, pas à l'écran.
+
+### 1. Mises à jour « toutes seules » — EAS Update (`feat(mises-a-jour)`)
+
+- `expo-updates` + `expo-application` installés. `app.json` : `runtimeVersion: { policy: "appVersion" }`,
+  `updates.url` EAS (projet `f16b05cf-…`), `checkAutomatically: ON_LOAD`, `fallbackToCacheTimeout: 0`,
+  **signature** (`codeSigningCertificate: ./certs/certificate.pem`, `codeSigningMetadata`
+  `{ keyid: main, alg: rsa-v1_5-sha256 }`). `eas.json` : canaux `development` / `preview` /
+  `production` (un par profil). Fait avec `eas update:configure` (la CLI avait réécrit tout
+  `app.json` avec la config résolue ; seules les deux clés utiles ont été gardées).
+- **Pourquoi `appVersion` et pas `fingerprint`** : avec `fingerprint`, le runtime est une empreinte
+  des modules natifs calculée **sur la machine qui publie** ; si le `node_modules` local diffère de
+  celui d'EAS Build (fréquent en solo, après un `npm install` partiel), `eas update` publie vers un
+  runtime qu'aucune build n'a — en silence. Avec `appVersion`, le runtime est `0.1.0`, lisible, et
+  la règle tient en une ligne : **tout changement natif (nouveau module avec du natif, plugin dans
+  `app.json`, montée de SDK) ⇒ bumper `version` dans `app.json` puis `eas build`**. Une mise à jour
+  OTA ne touche alors jamais une build qui n'a pas le natif qu'il lui faut. À reconsidérer le jour
+  où plusieurs personnes publient.
+- `features/demarrage/hooks/use-mise-a-jour.ts` (testé, `expo-updates` moqué) : le natif vérifie
+  et télécharge au lancement, la mise à jour s'applique **au prochain lancement** ; revérification
+  au retour au premier plan après 6 h ; si une mise à jour est téléchargée et que l'app reste
+  ouverte **20 min**, bande discrète « Une amélioration est prête — Relancer »
+  (`components/bande-demarrage.tsx`, en haut, fermable pour la session). Jamais de rechargement
+  forcé.
+- **Clé privée** : `keys/private-key.pem` a été générée sur ce poste
+  (`npx expo-updates codesigning:generate …`), `keys/` est ignoré par git. **Elle n'existe nulle
+  part ailleurs** : à ranger tout de suite (trousseau, gestionnaire de mots de passe). Perdue =
+  impossible de publier une mise à jour pour les builds qui embarquent ce certificat (il faudrait
+  régénérer la paire et rebuilder). Le certificat public `certs/certificate.pem` est versionné et
+  embarqué dans chaque build (vérifié dans `ios/Karria/Supporting/Expo.plist`).
+
+**Gestes qui restent à Marc (EAS) — rien n'a été publié :**
+
+1. Ranger `keys/private-key.pem` hors du dépôt (et garder une copie sûre).
+2. `npx eas-cli@latest whoami` (le poste est connecté en `marc29`), sinon `eas login`.
+3. **Une nouvelle build est indispensable** : une mise à jour OTA ne s'applique qu'aux builds qui
+   contiennent `expo-updates` (et ce certificat). `npx eas-cli@latest build --platform ios --profile
+production` (puis Android), et soumettre aux magasins. Les builds d'avant ce commit ne recevront
+   jamais rien.
+4. Ensuite, à chaque changement JS/assets sans natif :
+   `npx eas-cli@latest update --channel production --message "<ce qui change>" --private-key-path
+keys/private-key.pem --environment production` (vérifier `--environment` : exigé depuis le SDK 55 ;
+   `npx eas-cli@latest update --help` fait foi). Pour tester avant : `--channel preview` sur une build
+   `preview`.
+5. Vérification manuelle : fermer complètement l'app, la rouvrir (téléchargement), la refermer, la
+   rouvrir (application) — **jusqu'à deux lancements à froid**. Santé : `eas-update-insights`.
+6. Changement natif ⇒ bumper `version` dans `app.json` **avant** `eas build` (voir ci-dessus).
+
+### 2. Porte de version — `GET /app/release` (`feat(version)`, `fix(version)`)
+
+- Contrat `docs/contrat-api-version.md`, faux serveur `lib/dev/version-simule.ts` (`ok` par défaut ;
+  `EXPO_PUBLIC_SIMULATION_VERSION=requise|disponible` pour exercer l'écran et la bande). La route est
+  **en cours de livraison côté API** (autre agent) ; `/app/` est déclaré servi par la v2 : tant
+  qu'elle répond 404, l'app ne fait rien (voulu).
+- `features/demarrage` : `services/version.ts` (règles pures : build entier sinon rien, 6 h,
+  bande ≤ 1/jour, `requise` sans magasin ⇒ `disponible`, **`urlDeMagasin`** : https + hôte exact
+  `apps.apple.com` / `play.google.com`, sinon `null`), `api/version.api.ts`,
+  `services/etat-version.ts` (store), `hooks/use-porte-de-version.ts` (lancement + retour au premier
+  plan après 6 h, `expo-application › nativeBuildVersion`), `screens/ecran-version-obsolete.tsx`
+  (orbe, « Une nouvelle version de Karria t'attend », un seul bouton « Mettre à jour »), montés à la
+  racine (`app/_layout.tsx`) — l'écran bloquant remplace toute la navigation. `disponible` : bande au
+  lancement (≤ 1/jour, date dans `lib/magasin-local.ts`) + badge « Nouvelle version » dans l'en-tête
+  du Profil (`BadgeEnTete.onPress`, nouveau). Tests : règles, hook, écran, bande, faux serveur.
+- **À vérifier sur iPhone** : le `CFBundleVersion` d'une build EAS est bien un entier (sinon la
+  porte se tait, par construction).
+
+### 3. Publicité native : plus d'impressions, sans oppression (`feat(publicite)`)
+
+- **Audit de l'existant** : fil des offres (une toutes les 7 offres, plafond 8, jamais en tête,
+  réserve préchargée) et détail d'une offre (sous le descriptif ; il n'y a pas d'« offres
+  similaires » dans l'app, donc rien à placer avant). Les deux conservés.
+- **Nouveaux emplacements** (`hooks/use-annonce-emplacement.ts`, un objet par emplacement, chargé
+  en arrière-plan, détruit en partant, rien sans pub) : **galerie des modèles** (une carte au format
+  modèle après la 3e, `components/carte-annonce-modele.tsx`, `regles-publicite › insererApres`) ;
+  **CV** (sous la dernière section de `cv-rempli`) ; **attente d'import** (pendant « Je lis ton
+  CV… » seulement, sous la phrase ; retirée dès les notes). **Pas d'écran de notifications en liste**
+  dans l'app (seulement l'écran qui propose de les activer, avec un bouton principal) : aucun
+  emplacement ajouté là, à reprendre si une liste naît.
+- **Règles** : un seul emplacement par écran ; jamais au-dessus d'un bouton principal ; **jamais dans
+  les 2 s suivant un toucher** (`services/calme-tactile.ts` : la racine note chaque toucher, le fil
+  comme les emplacements attendent le calme avant de _montrer_) ; UMP/ATT et drapeau sans pub
+  inchangés et respectés au plus bas.
+- **Compteur d'impressions** (`services/journal-impressions.ts`) : sur l'événement `IMPRESSION` du
+  SDK (le chiffre colle à la console AdMob), par emplacement et par jour, 7 jours, magasin local ;
+  `lireImpressions()` donne la forme à envoyer. **Aucune route d'envoi n'existe côté API** : journal
+  local seulement, groupage à brancher le jour où `POST /ads/impressions` existe.
+- **Non vérifié à l'écran** : la hauteur de `NativeMediaView` dans la tuile modèle (si le média
+  déborde ou reste vide sur appareil, c'est là), la grille à 2 colonnes avec l'annonce en 4e cellule,
+  l'annonce pendant l'import sur un vrai téléphone. `EXPO_PUBLIC_ADMOB_TEST_MODE=true` en dev.
 
 ## Session du 2026-11-04 (soir) — Profil : écran noir, e-mail sous le nom, refonte du soutien (Fable)
 
