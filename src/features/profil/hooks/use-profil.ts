@@ -25,13 +25,18 @@
  */
 
 import { useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
+import { Linking } from "react-native";
 
 import { lireMoi } from "@/features/auth/api/auth.api";
 import { usePorte } from "@/features/auth/hooks/use-porte";
 import { poserConsentementIa } from "@/features/auth/services/consentement-ia";
 import { lireBrouillon, lireMonCv } from "@/features/cv/api/cv.api";
 import type { Cv } from "@/features/cv/types/cv.types";
+import {
+  abonnerVersion,
+  lireVersionConnue,
+} from "@/features/demarrage/services/etat-version";
 import {
   useBoutonEquipe,
   type BoutonEquipe,
@@ -62,6 +67,10 @@ export interface Profil {
   ouvrirCv: () => void;
   /** Le bouton flottant « Parler à l'équipe » et son point de non-lu. */
   equipe: BoutonEquipe;
+  /** Le magasin propose une version plus récente (`features/demarrage`) :
+   *  un badge discret dans l'en-tête, qui ouvre la fiche du magasin. */
+  nouvelleVersion: boolean;
+  mettreAJour: () => void;
 }
 
 export function useProfil(): Profil {
@@ -104,6 +113,15 @@ export function useProfil(): Profil {
 
   const etat = cvLu === null ? null : etatDuCv(cvLu.cv, cvLu.brouillon);
 
+  const version = useSyncExternalStore(abonnerVersion, lireVersionConnue);
+  const urlStore = version?.etat === "disponible" ? version.urlStore : null;
+  const mettreAJour = useCallback(() => {
+    if (urlStore === null) return;
+    Linking.openURL(urlStore).catch((cause: unknown) => {
+      console.warn("[karria] magasin impossible à ouvrir", cause);
+    });
+  }, [urlStore]);
+
   const ouvrirCv = useCallback(() => {
     pousser(etat === "pret" ? "/cv" : "/cv/creer");
   }, [etat, pousser]);
@@ -118,5 +136,7 @@ export function useProfil(): Profil {
     ouvrirParametres: useCallback(() => pousser("/parametres"), [pousser]),
     ouvrirCv,
     equipe,
+    nouvelleVersion: urlStore !== null,
+    mettreAJour,
   };
 }

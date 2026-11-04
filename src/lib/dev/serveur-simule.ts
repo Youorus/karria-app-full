@@ -44,6 +44,7 @@ import { estUneRouteEquipe, repondreEquipe } from "./equipe-simule";
 import { estUneRouteModele, repondreModeles } from "./modeles-simule";
 import { estUneRouteOffres, repondreOffres } from "./offres-simule";
 import { estUneRoutePaiement, repondrePaiements } from "./paiements-simule";
+import { estUneRouteVersion, repondreVersion } from "./version-simule";
 
 /** Le flux en direct simulé de « Parler à l'équipe » (pas de WebSocket ici). */
 export { ouvrirFluxSimule } from "./equipe-simule";
@@ -67,6 +68,10 @@ const SERVI_PAR_LA_V2 = [
   "/user-templates/",
   "/payments/",
   "/support/",
+  // La porte de mise à jour (`/app/release`), en cours de livraison côté
+  // serveur (2026-11-05) : tant qu'elle répond 404, l'application ne fait
+  // rien — c'est le comportement voulu, pas une panne à simuler.
+  "/app/",
 ];
 
 /** Les routes que le contrat définit avant que le backend visé ne les
@@ -186,6 +191,8 @@ export async function repondreEnSimulation(requete: RequeteSimulee): Promise<Res
   );
 
   if (estUneRouteCv(chemin)) return repondreCv(methode, chemin, corps);
+  // La porte de mise à jour : « ok » sauf forçage par l'environnement.
+  if (estUneRouteVersion(chemin)) return repondreVersion(methode, chemin);
   // Les appareils ne sont **pas** « en avance sur le backend » : le vrai
   // serveur les sert en même temps que l'application les appelle. Ici,
   // seulement en simulation.

@@ -63,6 +63,8 @@ export function EcranProfil() {
     ouvrirParametres,
     ouvrirCv,
     equipe,
+    nouvelleVersion,
+    mettreAJour,
   } = useProfil();
 
   const entree = (rang: number) =>
@@ -76,6 +78,11 @@ export function EcranProfil() {
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         <EnTeteKarria
           titre="Mon profil"
+          badge={
+            nouvelleVersion
+              ? { libelle: "Nouvelle version", point: true, onPress: mettreAJour }
+              : undefined
+          }
           droite={
             <BoutonEnTeteRond onPress={ouvrirParametres} libelle="Ouvrir les paramètres">
               <Icone nom="reglages" couleur={couleurs.texte} taille={20} />

@@ -27,6 +27,9 @@ export interface BadgeEnTete {
   point?: boolean;
   /** Rend le badge fermable (×). */
   onFermer?: () => void;
+  /** Rend le badge touchable, sans croix : il mène quelque part
+   *  (« Nouvelle version » → le magasin). Ignoré si `onFermer` est posé. */
+  onPress?: () => void;
 }
 
 interface Props {
@@ -62,10 +65,10 @@ export function EnTeteKarria({ titre, sousTitre, badge, droite }: Props) {
         </VStack>
         {badge !== undefined ? (
           <Pressable
-            onPress={badge.onFermer}
-            disabled={badge.onFermer === undefined}
+            onPress={badge.onFermer ?? badge.onPress}
+            disabled={badge.onFermer === undefined && badge.onPress === undefined}
             className="flex-row items-center gap-1.5 rounded-full border border-primary bg-surface-primary px-3 py-1.5"
-            accessibilityRole={badge.onFermer ? "button" : "text"}
+            accessibilityRole={(badge.onFermer ?? badge.onPress) ? "button" : "text"}
             accessibilityLabel={
               badge.onFermer ? `${badge.libelle}, retirer` : badge.libelle
             }
