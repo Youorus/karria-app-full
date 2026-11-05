@@ -5,6 +5,80 @@
 
 **Dernière mise à jour : 2026-11-05**
 
+## Session du 2026-11-05 (matin) — le modèle se change à tout moment, sans rien perdre (Fable)
+
+**Demande de Marc** : dans l'onglet CV, le choix du modèle n'était proposé qu'une fois ; il
+faut pouvoir passer d'un modèle à l'autre pour voir les différences, sur **tous** les modèles
+qu'on possède (son catalogue), sans perdre ce qui est déjà inscrit si le CV a été adapté ; et
+être sûr qu'un modèle acheté est bien remis et utilisable tout de suite.
+
+### Ce qui est livré (commit `916fdf3`, `npm run check` vert, 569 tests)
+
+- **La pastille du modèle** (`atelier/components/pastille-modele.tsx`, `testID="pastille-modele"`) :
+  une capsule « Meridian · Changer » posée **sur la feuille**, en haut à gauche, **à la même place**
+  dans l'atelier d'un dossier, l'atelier libre, la lettre, et sous la carte « Mon CV » de Finaliser
+  (là, elle renvoie à l'atelier avec `?cible=modele`). Elle rouvre « Avec quel modèle ? » quand on
+  veut ; les possédés (gratuits + achetés) s'appliquent au toucher, les Premium passent par Stripe
+  comme avant (`use-choix-modele` inchangé). Le sous-titre de l'en-tête libre devient « À partir de
+  ton CV, sans le modifier » (le nom du modèle est dans la pastille).
+- **Changer de modèle ne perd rien** (`use-atelier.ts › choisirModele`) : seul le rendu est redemandé ;
+  `cvRef`, l'historique annuler/rétablir, la sauvegarde différée et le brouillon ne bougent pas.
+  **Prouvé par `hooks/use-atelier.test.tsx`** (retouche → deux changements → CV identique, annuler
+  fonctionne, brouillon = CV retouché + dernier modèle, rendu demandé avec le même CV).
+- **Dossier** : le choix part aussitôt à **`PUT /applications/{id}/template`**
+  (`candidatures.api.ts › changerModeleDuDossier`), le dossier rendu remplace le nôtre (jamais le
+  CV local) ; `403 template_locked` remet l'ancien modèle et le dit ; autre panne : le choix reste à
+  l'écran et dans le brouillon. « Garder ce modèle » à la première visite envoie aussi le choix au
+  dossier. La lettre (`use-lettre.ts`) a le même geste et appelle la même route. `modeleDuDossier`
+  (dossier → brouillon → choisi → premier gratuit) suit : Finaliser et la lettre exportent avec le
+  modèle courant.
+- **`?modele=<id>`** sur `/atelier/libre` et `/atelier/[dossierId]` : le modèle demandé est retenu
+  s'il est à la personne (sinon ignoré), la feuille ne se rouvre pas d'elle-même ; pour un dossier,
+  il part au serveur. Hook partagé `atelier/hooks/use-atelier-avec-modele.ts`
+  (`useOuvrirAtelierAvecModele`) : dossier en cours → son atelier, sinon l'atelier libre.
+- **Galerie** : « Utiliser ce modèle » (vert) sur un modèle à soi → l'atelier avec **les données de
+  la personne** (jamais l'échantillon) ; « Continuer dans l'atelier » quand un dossier est ouvert :
+  le dossier prend ce modèle. « Voir tous les modèles » n'est plus un bouton du pied (le retour suffit).
+- **Mes CV** : un rond de plus sur chaque carte, « Voir avec un autre modèle » → atelier libre dans
+  le modèle de l'export, feuille ouverte pour comparer.
+- **Faux serveur** : `candidatures-simule.ts` sert `PUT /applications/{id}/template` (idempotent,
+  `403 template_locked` via `modeles-simule › trouverModele`, `422` sans champ) ; test dans
+  `candidatures-simule.test.ts`.
+
+### Vu sur le simulateur iPhone 17 (captures dans
+
+`/private/tmp/claude-501/-Users-marc--PycharmProjects-karria-api/b728036c-016d-4c13-965e-0db7af7cdbe1/scratchpad/modele/`)
+
+Mes CV avec le rond « autre modèle » (`00-mes-cv`) → Nouveau CV → feuille « Avec quel modèle ? »
+(`01`) → Garder → pastille « Meridian · Changer » sur la feuille (`02`) → la pastille rouvre la
+feuille (`03`) → Marketing : page re-rendue en Marketing derrière la feuille, pastille « Marketing »
+(`04`) → Finaliser libre (`07`). Dossier Alan (prêt) : feuille à la première visite (`11`), pastille
+(`12`), Marketing appliqué **sans perdre l'intitulé et l'à-propos adaptés** (`13`, `14`), lettre
+rendue dans Marketing avec la pastille à la même place (`15`), Finaliser (`16`). **Achat** : détail
+Minimalist « Débloquer · 4,99 € » (`20`) → Stripe simulé livré → « ✓ Continuer dans l'atelier »
+(`22`) → le dossier rendu dans Minimalist, pastille « Minimalist » (`23`).
+
+### Non vérifié / à savoir
+
+- L'achat d'un Premium **depuis la feuille de l'atelier** (carte sous le pli : Maestro n'a pas fait
+  défiler la feuille) — le même code que la galerie (`use-choix-modele`), vérifié là.
+- **Pièges Maestro iOS** rencontrés : la hiérarchie d'accessibilité devient vide quand la WebView de
+  la feuille est chargée (les `tapOn` par texte échouent : passer par `point:` et des captures
+  `simctl`) ; `point:` n'accepte que des entiers ; les captures vont dans
+  `~/.maestro/tests/<run>/<flux>/takeScreenshot/` ; le simulateur s'est **figé** une fois (écran
+  immobile après un `curl /reload`) — `simctl shutdown/boot` l'a rendu. Les liens profonds
+  `karria:///cv/mes-cv`, `karria:///dossiers`, `karria:///modele/<id>`, `karria:///atelier/libre/finaliser`
+  évitent les touchers d'onglets.
+- **`.env` fait foi sur l'env du shell** pour `EXPO_PUBLIC_API_MODE` (vu : Metro lancé avec
+  `simulation` servait `reel` après la modification de `.env`). L'app du simulateur parlait donc à
+  la **production** : trois `POST /auth/email/start` réels pour `marc@exemple.fr` et des codes faux
+  (aucun compte ouvert). Pour la simulation, j'ai bundlé depuis un worktree avec son propre `.env`
+  (Metro 8082, retiré depuis) ; le build **Debug** simulateur de la nuit (`DerivedData/…/Debug-iphonesimulator`)
+  est réinstallé sur l'iPhone 17 (le build Release y avait été posé), pointé sur `localhost:8081`.
+- Contrat : un export (`GET /cv/me/generated-cvs`) ne porte pas le CV qui l'a produit ; « Voir avec
+  un autre modèle » repart du CV courant (brouillon libre plus récent, sinon CV de base). Un
+  `cv` embarqué dans l'export permettrait de rouvrir le texte exact.
+
 ## Session du 2026-11-05 — Android, premier passage (Fable)
 
 **Question de Marc** : « tout ce que l'on construit est aussi bien adapté pour les apps Android comme il
