@@ -30,6 +30,17 @@
  * après la création), la feuille « Avec quel modèle ? » s'ouvre d'elle-même
  * à la première visite, une fois l'adaptation finie.
  *
+ * ═══ Le mode libre : « Nouveau CV », sans dossier ═══
+ *
+ * `useAtelier(true)` ouvre la même feuille sur le **CV de base** (`/cv/me`),
+ * sans dossier : pas de propositions de Karria, pas de lettre, pas de
+ * `PUT` — les retouches vivent dans le brouillon local
+ * (`CLE_BROUILLON_LIBRE`) et partent dans le champ `cv` de l'export, à
+ * Finaliser. **Le CV de base n'est jamais modifié en silence** : rien ici
+ * n'écrit sur `/cv/me`. Le choix du modèle est la première étape (la feuille
+ * s'ouvre d'elle-même tant qu'il n'y a pas de brouillon) ; Finaliser mène
+ * directement aux exports, et « Mes CV » retrouve la nouvelle entrée.
+ *
  * ═══ Karria propose, la personne décide ═══
  *
  * L'intitulé et l'à-propos arrivent déjà appliqués (`acceptee`, `before`
@@ -80,6 +91,7 @@ import { lireModeleChoisi, rendreCv } from "../api/documents.api";
 import type { FeuilleCvHandle } from "../components/feuille-cv";
 import {
   brouillonPrime,
+  CLE_BROUILLON_LIBRE,
   ecrireBrouillonAtelier,
   lireBrouillonAtelier,
 } from "../services/brouillon-atelier";
@@ -130,6 +142,8 @@ export interface NoteKarria {
 }
 
 export interface Atelier {
+  /** Sans dossier : le CV de base retouché, exporté tel quel (« Nouveau CV »). */
+  libre: boolean;
   dossier: Dossier | null;
   chargement: boolean;
   erreur: string | null;
@@ -198,13 +212,14 @@ interface EntreeDeRendu {
   cv: Cv;
 }
 
-function messageDe(cause: unknown): string {
+function messageDe(cause: unknown, libre: boolean): string {
   if (cause instanceof ErreurApi) {
-    if (cause.statut === 404) return "Ce dossier n'existe plus.";
+    if (cause.statut === 404)
+      return libre ? TEXTES.sansCvPhrase : "Ce dossier n'existe plus.";
     if (cause.estReseau)
       return "Pas de connexion. L'atelier s'ouvrira dès que le réseau sera là.";
   }
-  return "Ton dossier n'a pas pu être chargé.";
+  return libre ? "Ton CV n'a pas pu être chargé." : "Ton dossier n'a pas pu être chargé.";
 }
 
 /** Les notes déjà fermées, pour la session : on ne la remontre pas à chaque retour. */
@@ -241,11 +256,12 @@ function feuilleDemandeePar(cible: string | undefined): FeuilleOuverte | null {
   return c === null ? null : { type: "modifier", cible: c };
 }
 
-export function useAtelier(): Atelier {
-  const { dossierId, cible: cibleDemandee } = useLocalSearchParams<{
-    dossierId: string;
-    cible?: string;
-  }>();
+export function useAtelier(libre = false): Atelier {
+  const params = useLocalSearchParams<{ dossierId?: string; cible?: string }>();
+  const cibleDemandee = params.cible;
+  // En mode libre, la clé du brouillon tient lieu d'identifiant : aucune
+  // route serveur ne la reçoit (voir les gardes `libre` plus bas).
+  const dossierId = libre ? CLE_BROUILLON_LIBRE : (params.dossierId ?? "");
   const router = useRouter();
   const { pousser: pousserRoute } = useNavigationUnique();
   const { avecConsentement, rejouerSiConsentementRequis } = useActionIa();
@@ -319,14 +335,14 @@ export function useAtelier(): Atelier {
 
   useEffect(() => {
     vivant.current = true;
-    poserDossierEnCours(dossierId);
+    if (!libre) poserDossierEnCours(dossierId);
     const s = sauvegarde.current;
     return () => {
       vivant.current = false;
       file.arreter();
       if (s.minuterie !== null) clearTimeout(s.minuterie);
     };
-  }, [dossierId, file]);
+  }, [dossierId, file, libre]);
 
   const rendre = useCallback(
     (immediat: boolean) => {
@@ -386,6 +402,7 @@ export function useAtelier(): Atelier {
   // ── La sauvegarde différée ─────────────────────────────────────────────
 
   const sauverMaintenant = useCallback(async (): Promise<void> => {
+    if (libre) return;
     const s = sauvegarde.current;
     if (s.minuterie !== null) {
       clearTimeout(s.minuterie);
@@ -413,10 +430,13 @@ export function useAtelier(): Atelier {
       s.cv ??= aSauver;
       setEnregistrement("erreur");
     }
-  }, [dossierId, poserDossier]);
+  }, [libre, dossierId, poserDossier]);
 
   const planifierSauvegarde = useCallback(
     (courant: Cv) => {
+      // Libre : le brouillon local (`retenir`) est la seule mémoire ; on ne
+      // sauve rien sur le serveur, et l'en-tête ne dit pas « Enregistré ».
+      if (libre) return;
       const s = sauvegarde.current;
       s.cv = courant;
       if (s.minuterie !== null) clearTimeout(s.minuterie);
@@ -426,12 +446,81 @@ export function useAtelier(): Atelier {
         void sauverMaintenant();
       }, DELAI_SAUVEGARDE_MS);
     },
-    [sauverMaintenant],
+    [libre, sauverMaintenant],
   );
 
   // ── Le chargement ──────────────────────────────────────────────────────
 
+  // Libre : le CV de base, le modèle choisi, la galerie ; pas de dossier.
   useEffect(() => {
+    if (!libre) return undefined;
+    let actif = true;
+    Promise.all([
+      lireMonCv(),
+      lireModeleChoisi().catch((cause: unknown) => {
+        console.warn("[karria] modèle choisi illisible", cause);
+        return null;
+      }),
+      lireModeles().catch((cause: unknown) => {
+        console.warn("[karria] galerie illisible dans l'atelier", cause);
+        return [] as Modele[];
+      }),
+      lireMesModeles().catch((cause: unknown) => {
+        console.warn("[karria] modèles possédés illisibles", cause);
+        return new Set<string>();
+      }),
+    ])
+      .then(([base, choisi, galerie, miens]) => {
+        if (!actif) return;
+        if (base.vide) {
+          setErreur(TEXTES.sansCvPhrase);
+          return;
+        }
+        setCvDeBase(base);
+        setModeles(galerie);
+        setPossedes(miens);
+        // Le brouillon libre prime s'il est plus récent que le CV de base :
+        // sinon, le CV a changé depuis (import, modification), on repart de lui.
+        const brouillon = lireBrouillonAtelier(CLE_BROUILLON_LIBRE);
+        const reprise = brouillon !== null && brouillonPrime(brouillon, base.misAJour);
+        const cvInitial = reprise ? brouillon.cv : base;
+        cvRef.current = cvInitial;
+        setHistorique(historiqueDe(cvInitial));
+        const gratuits = galerie.filter((m) => !m.premium || miens.has(m.id));
+        const modele =
+          (reprise ? brouillon.modeleId : null) ??
+          choisi?.modeleId ??
+          gratuits[0]?.id ??
+          null;
+        modeleRef.current = modele;
+        setModeleId(modele);
+        if (reprise && brouillon.dernierChemin !== null) {
+          cheminRef.current = brouillon.dernierChemin;
+          setCheminChoisi(brouillon.dernierChemin);
+        }
+        setErreur(null);
+        rendre(true);
+        // Première étape : le modèle — sauf si l'adresse demande autre chose
+        // (« Je corrige »), ou si l'on reprend un brouillon.
+        const demandee = feuilleDemandee.current;
+        feuilleDemandee.current = null;
+        if (demandee !== null) setFeuille(demandee);
+        else if (!reprise) setFeuille({ type: "modele" });
+      })
+      .catch((cause: unknown) => {
+        console.warn("[karria] atelier libre : CV illisible", cause);
+        if (actif) setErreur(messageDe(cause, true));
+      })
+      .finally(() => {
+        if (actif) setChargement(false);
+      });
+    return () => {
+      actif = false;
+    };
+  }, [libre, rendre]);
+
+  useEffect(() => {
+    if (libre) return undefined;
     let actif = true;
     Promise.all([
       lireDossier(dossierId),
@@ -486,7 +575,7 @@ export function useAtelier(): Atelier {
       })
       .catch((cause: unknown) => {
         console.warn("[karria] atelier : dossier illisible", cause);
-        if (actif) setErreur(messageDe(cause));
+        if (actif) setErreur(messageDe(cause, false));
       })
       .finally(() => {
         if (actif) setChargement(false);
@@ -494,7 +583,7 @@ export function useAtelier(): Atelier {
     return () => {
       actif = false;
     };
-  }, [dossierId, poserDossier, rendre, ouvrirLaSuite]);
+  }, [libre, dossierId, poserDossier, rendre, ouvrirLaSuite]);
 
   // Tant que Karria adapte : relecture toutes les deux secondes.
   const adaptation = dossier?.adaptation ?? null;
@@ -581,7 +670,7 @@ export function useAtelier(): Atelier {
 
   const decider = useCallback(
     (propositionId: string, choix: Decision) => {
-      if (decision !== null) return;
+      if (libre || decision !== null) return;
       setDecision(propositionId);
       void (async () => {
         try {
@@ -604,11 +693,11 @@ export function useAtelier(): Atelier {
         }
       })();
     },
-    [decision, dossierId, sauverMaintenant, poserDossierEtCv],
+    [libre, decision, dossierId, sauverMaintenant, poserDossierEtCv],
   );
 
   const toutAccepter = useCallback(() => {
-    if (dossier === null || decision !== null) return;
+    if (libre || dossier === null || decision !== null) return;
     const aAccepter = dossier.propositions.filter((p) => p.etat === "proposee");
     if (aAccepter.length === 0) return;
     setDecision("toutes");
@@ -633,10 +722,10 @@ export function useAtelier(): Atelier {
         if (vivant.current) setDecision(null);
       }
     })();
-  }, [dossier, decision, dossierId, sauverMaintenant, poserDossierEtCv]);
+  }, [libre, dossier, decision, dossierId, sauverMaintenant, poserDossierEtCv]);
 
   const relancer = useCallback(() => {
-    if (relance) return;
+    if (libre || relance) return;
     const geste = () => {
       setRelance(true);
       relancerAdaptation(dossierId)
@@ -660,6 +749,7 @@ export function useAtelier(): Atelier {
     };
     avecConsentement("application", geste);
   }, [
+    libre,
     relance,
     dossierId,
     poserDossierEtCv,
@@ -787,8 +877,8 @@ export function useAtelier(): Atelier {
   const retour = useCallback(() => {
     void sauverMaintenant();
     if (router.canGoBack()) router.back();
-    else router.replace("/dossiers");
-  }, [router, sauverMaintenant]);
+    else router.replace(libre ? "/cv/mes-cv" : "/dossiers");
+  }, [router, sauverMaintenant, libre]);
 
   const poserFeuille = useCallback((poignee: FeuilleCvHandle | null) => {
     feuilleCv.current = poignee;
@@ -809,10 +899,13 @@ export function useAtelier(): Atelier {
 
   const allerAFinaliser = useCallback(() => {
     void sauverMaintenant();
-    pousserRoute({ pathname: "/atelier/[dossierId]/finaliser", params: { dossierId } });
-  }, [sauverMaintenant, pousserRoute, dossierId]);
+    if (libre) pousserRoute("/atelier/libre/finaliser");
+    else
+      pousserRoute({ pathname: "/atelier/[dossierId]/finaliser", params: { dossierId } });
+  }, [sauverMaintenant, pousserRoute, dossierId, libre]);
 
   return {
+    libre,
     dossier,
     chargement,
     erreur,

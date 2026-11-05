@@ -10,16 +10,19 @@
  * DOCX, 1 à 3 s chacun) : l'écran le dit, l'orbe tourne, une annonce
  * native occupe l'attente. Le score ATS est celui de **ce** CV.
  *
+ * ═══ Le mode libre ═══
+ *
+ * `useFinaliser(true)` (route `/atelier/libre/finaliser`) : un seul export,
+ * le brouillon libre de l'atelier (`CLE_BROUILLON_LIBRE`) dans le champ `cv`,
+ * **sans** `dossier_id` — c'est l'entrée de « Mes CV ». Pas de lettre, pas
+ * de question « As-tu candidaté ? » ; à la place, « Voir mes CV » ramène à
+ * la liste, où la nouvelle entrée est. Le CV de base n'est pas touché.
+ *
  * ═══ Télécharger ═══
  *
- * Le fichier est enregistré dans `cache/atelier/exports/` (`expo-file-system`),
- * sous son nom lisible (« CV - Awa Diallo.pdf »), puis la feuille de partage
- * du système s'ouvre (`expo-sharing`) : Fichiers, AirDrop, Mail, WhatsApp —
- * c'est le téléphone qui décide où. Dès qu'elle rend la main, le fichier
- * est **supprimé** : le système a déjà sa copie là où la personne l'a mise,
- * et un CV ne reste pas dans le cache d'un téléphone qu'on peut prêter. Le
- * répertoire est de toute façon purgé avec la session. Les URL signées
- * valent une heure.
+ * `services/telechargement.ts` : le fichier dans `cache/atelier/exports/`
+ * sous son nom lisible, la feuille de partage du système, puis le fichier
+ * supprimé. Les URL signées valent une heure.
  *
  * ═══ Envoyer par e-mail ═══
  *
@@ -32,11 +35,16 @@
  *
  * Après un téléchargement ou un envoi réussi, la feuille du domaine
  * Candidatures : « Oui » marque le dossier et y renvoie.
+ *
+ * ═══ Deux annonces, deux moments ═══
+ *
+ * Une pendant la génération (`finaliser`), une autre une fois les documents
+ * là, sous le score ATS et au-dessus des documents (`finaliser_score`) —
+ * jamais au-dessus du bouton « Envoyer par e-mail ». Deux emplacements, deux
+ * objets, deux impressions : on ne réutilise pas la première.
  */
 
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { File } from "expo-file-system";
-import * as Sharing from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { lireMoi } from "@/features/auth/api/auth.api";
@@ -46,6 +54,8 @@ import {
   memoriserDossier,
 } from "@/features/candidatures/services/memoire-dossiers";
 import type { Dossier } from "@/features/candidatures/types/candidatures.types";
+import { lireMonCv } from "@/features/cv/api/cv.api";
+import type { Cv } from "@/features/cv/types/cv.types";
 import { lireMesModeles, lireModeles } from "@/features/modeles/api/modeles.api";
 import type { Modele } from "@/features/modeles/types/modeles.types";
 import type { NativeAd } from "@/features/publicite/api/publicite.api";
@@ -56,13 +66,14 @@ import { useNavigationUnique } from "@/lib/navigation";
 import {
   envoyerExports,
   exporterCvDuDossier,
+  exporterCvLibre,
   exporterLettre,
   lireModeleChoisi,
 } from "../api/documents.api";
 import {
-  fichierDExport,
+  brouillonPrime,
+  CLE_BROUILLON_LIBRE,
   lireBrouillonAtelier,
-  supprimerExport,
 } from "../services/brouillon-atelier";
 import { documentDeLettre } from "../services/lettre";
 import { modeleDuDossier } from "../services/modele";
@@ -76,9 +87,10 @@ import {
   TEXTES,
   type CorrectionAts,
 } from "../services/presentation";
+import { telechargerEtPartager, type Format } from "../services/telechargement";
 import type { ControleAts, Export, ScoreAts } from "../types/atelier.types";
 
-export type Format = "pdf" | "docx";
+export type { Format };
 export type Document = "cv" | "lettre";
 
 export interface Telechargement {
@@ -87,6 +99,7 @@ export interface Telechargement {
 }
 
 export interface EcranFinaliser {
+  libre: boolean;
   dossier: Dossier | null;
   erreur: string | null;
   /** Les documents se génèrent : l'attente. */
@@ -98,7 +111,10 @@ export interface EcranFinaliser {
   score: ScoreAts | null;
   phrase: string | null;
   points: ControleAts[];
+  /** Pendant la génération. */
   annonce: NativeAd | null;
+  /** Une fois les documents là : sous le score, au-dessus des documents. */
+  annonceScore: NativeAd | null;
   telechargement: Telechargement | null;
   telecharger: (document: Document, format: Format) => void;
   corriger: (controle: ControleAts) => void;
@@ -119,19 +135,13 @@ export interface EcranFinaliser {
   fermerQuestion: () => void;
   reessayer: () => void;
   retour: () => void;
+  /** Libre : « Voir mes CV » — la liste, avec la nouvelle entrée. */
+  terminer: () => void;
 }
 
-const MIME: Record<Format, string> = {
-  pdf: "application/pdf",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-};
-const UTI: Record<Format, string> = {
-  pdf: "com.adobe.pdf",
-  docx: "org.openxmlformats.wordprocessingml.document",
-};
-
-export function useFinaliser(): EcranFinaliser {
-  const { dossierId } = useLocalSearchParams<{ dossierId: string }>();
+export function useFinaliser(libre = false): EcranFinaliser {
+  const params = useLocalSearchParams<{ dossierId?: string }>();
+  const dossierId = libre ? CLE_BROUILLON_LIBRE : (params.dossierId ?? "");
   const router = useRouter();
   const { pousser, remplacer } = useNavigationUnique();
 
@@ -143,6 +153,8 @@ export function useFinaliser(): EcranFinaliser {
   const [optimisation, setOptimisation] = useState(false);
   const [exportCv, setExportCv] = useState<Export | null>(null);
   const [exportLettre, setExportLettre] = useState<Export | null>(null);
+  /** Libre : le CV exporté, pour nommer les fichiers. */
+  const [cvLibre, setCvLibre] = useState<Cv | null>(null);
   const [telechargement, setTelechargement] = useState<Telechargement | null>(null);
   const [adresseDuCompte, setAdresseDuCompte] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState<EcranFinaliser["envoi"]>({
@@ -157,6 +169,10 @@ export function useFinaliser(): EcranFinaliser {
   const vivant = useRef(true);
 
   const annonce = useAnnonceEmplacement("finaliser", generation || optimisation);
+  const annonceScore = useAnnonceEmplacement(
+    "finaliser_score",
+    !generation && !optimisation && exportCv !== null,
+  );
 
   useEffect(() => {
     vivant.current = true;
@@ -176,7 +192,35 @@ export function useFinaliser(): EcranFinaliser {
 
   // ── La génération ──────────────────────────────────────────────────────
 
-  const generer = useCallback(
+  /** Libre : le brouillon de l'atelier s'il est plus récent que le CV de
+   *  base, sinon le CV de base ; le modèle du brouillon, sinon le choisi. */
+  const genererLibre = useCallback(async (atsSafe: boolean) => {
+    const [base, choisi, galerie, miens] = await Promise.all([
+      lireMonCv(),
+      lireModeleChoisi().catch(() => null),
+      lireModeles().catch(() => [] as Modele[]),
+      lireMesModeles().catch(() => new Set<string>()),
+    ]);
+    if (!vivant.current) return;
+    if (base.vide) throw new ErreurApi(TEXTES.sansCvPhrase, 409, "cv_missing");
+    const brouillon = lireBrouillonAtelier(CLE_BROUILLON_LIBRE);
+    const reprise = brouillon !== null && brouillonPrime(brouillon, base.misAJour);
+    const cv = reprise ? brouillon.cv : base;
+    const gratuit = galerie.find((m) => !m.premium || miens.has(m.id));
+    const modeleId =
+      (reprise ? brouillon.modeleId : null) ?? choisi?.modeleId ?? gratuit?.id ?? null;
+    if (modeleId === null) {
+      throw new ErreurApi("Choisis un modèle dans l'atelier.", 404, "template_not_found");
+    }
+    modeleRef.current = modeleId;
+    setCvLibre(cv);
+    const exporte = await exporterCvLibre({ cv, modeleId, atsSafe });
+    if (!vivant.current) return;
+    setExportCv(exporte);
+    setExportLettre(null);
+  }, []);
+
+  const genererDossier = useCallback(
     async (atsSafe: boolean) => {
       const [lu, choisi, galerie, miens] = await Promise.all([
         lireDossier(dossierId),
@@ -223,6 +267,8 @@ export function useFinaliser(): EcranFinaliser {
     [dossierId],
   );
 
+  const generer = libre ? genererLibre : genererDossier;
+
   // `generation` part à vrai, et « Réessayer » le remet avant de relancer :
   // l'effet ne pose aucun état lui-même.
   useEffect(() => {
@@ -259,39 +305,29 @@ export function useFinaliser(): EcranFinaliser {
     (document: Document, format: Format) => {
       const exporte = document === "cv" ? exportCv : exportLettre;
       const url = exporte === null ? null : format === "pdf" ? exporte.pdf : exporte.docx;
-      if (url === null || telechargement !== null || dossier === null) return;
+      const cv = libre ? cvLibre : (dossier?.cv ?? null);
+      if (url === null || telechargement !== null || cv === null) return;
       setTelechargement({ document, format });
       const nom = nomDeFichier(
         document,
-        `${dossier.cv.identite?.prenom ?? ""} ${dossier.cv.identite?.nom ?? ""}`.trim(),
-        dossier.offre.entreprise,
+        `${cv.identite?.prenom ?? ""} ${cv.identite?.nom ?? ""}`.trim(),
+        dossier?.offre.entreprise ?? null,
         format,
       );
       void (async () => {
-        let destination: File | null = null;
         try {
-          destination = fichierDExport(nom);
-          const fichier = await File.downloadFileAsync(url, destination);
-          if (!vivant.current) return;
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(fichier.uri, {
-              mimeType: MIME[format],
-              UTI: UTI[format],
-              dialogTitle: nom,
-            });
-          }
-          if (vivant.current) setQuestion(true);
+          await telechargerEtPartager(url, nom, format);
+          if (vivant.current && !libre) setQuestion(true);
         } catch (cause) {
           console.warn("[karria] téléchargement en échec", cause);
           if (vivant.current)
             setErreur("Le fichier n'a pas pu être enregistré. Réessaie dans un instant.");
         } finally {
-          if (destination !== null) supprimerExport(destination);
           if (vivant.current) setTelechargement(null);
         }
       })();
     },
-    [exportCv, exportLettre, telechargement, dossier],
+    [exportCv, exportLettre, telechargement, dossier, libre, cvLibre],
   );
 
   // ── Envoyer ────────────────────────────────────────────────────────────
@@ -305,7 +341,7 @@ export function useFinaliser(): EcranFinaliser {
         .then((fait) => {
           if (!vivant.current) return;
           setEnvoi({ ouvert: false, enCours: false, erreur: null, fait: fait.a });
-          setQuestion(true);
+          if (!libre) setQuestion(true);
         })
         .catch((cause: unknown) => {
           console.warn("[karria] envoi en échec", cause);
@@ -313,7 +349,7 @@ export function useFinaliser(): EcranFinaliser {
             setEnvoi((e) => ({ ...e, enCours: false, erreur: messageDEnvoi(cause) }));
         });
     },
-    [exportCv, exportLettre, envoi.enCours],
+    [exportCv, exportLettre, envoi.enCours, libre],
   );
 
   // ── « Je corrige » ─────────────────────────────────────────────────────
@@ -325,20 +361,27 @@ export function useFinaliser(): EcranFinaliser {
         optimiser();
         return;
       }
+      // Sans dossier, « mots-clés » n'a pas de Karria à ouvrir : on va à l'à-propos.
+      const geste =
+        libre && correction.geste === "karria"
+          ? ({ geste: "modifier", section: "summary" } as const)
+          : correction;
       const cible =
-        correction.geste === "modifier"
-          ? correction.section === "contact"
+        geste.geste === "modifier"
+          ? geste.section === "contact"
             ? "contact.email"
             : "summary"
-          : correction.geste;
-      remplacer({ pathname: "/atelier/[dossierId]", params: { dossierId, cible } });
+          : geste.geste;
+      if (libre) remplacer({ pathname: "/atelier/libre", params: { cible } });
+      else remplacer({ pathname: "/atelier/[dossierId]", params: { dossierId, cible } });
     },
-    [optimiser, remplacer, dossierId],
+    [optimiser, remplacer, dossierId, libre],
   );
 
   const score = exportCv?.ats ?? null;
 
   return {
+    libre,
     dossier,
     erreur,
     generation,
@@ -349,6 +392,7 @@ export function useFinaliser(): EcranFinaliser {
     phrase: score === null ? null : phraseAts(score.niveau),
     points: score === null ? [] : pointsAAmeliorer(score),
     annonce,
+    annonceScore,
     telechargement,
     telecharger,
     corriger,
@@ -370,8 +414,13 @@ export function useFinaliser(): EcranFinaliser {
     }, []),
     retour: useCallback(() => {
       if (router.canGoBack()) router.back();
+      else if (libre) pousser("/atelier/libre");
       else pousser({ pathname: "/atelier/[dossierId]", params: { dossierId } });
-    }, [router, pousser, dossierId]),
+    }, [router, pousser, dossierId, libre]),
+    // « Mes CV » est sous l'atelier dans la pile : on y redescend, et la
+    // liste relue au focus montre la nouvelle entrée. Arrivé autrement
+    // (lien), `dismissTo` y va quand même.
+    terminer: useCallback(() => router.dismissTo("/cv/mes-cv"), [router]),
   };
 }
 

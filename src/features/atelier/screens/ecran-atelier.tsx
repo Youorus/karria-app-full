@@ -15,6 +15,9 @@
  * « Réessayer » ou « Continuer à la main ».
  *
  * Les feuilles basses sont montées une fois, ouvertes par l'état du hook.
+ *
+ * En mode **libre** (`/atelier/libre`, « Nouveau CV ») : le même écran sur le
+ * CV de base, sans Karria ni note, et « Finaliser » mène droit aux exports.
  */
 
 import { Pressable } from "react-native";
@@ -42,6 +45,7 @@ import { NoteKarria } from "../components/note-karria";
 import { useAtelier } from "../hooks/use-atelier";
 import { useChoixModele } from "../hooks/use-choix-modele";
 import { cleDeCible } from "../hooks/use-edition-element";
+import { TEXTES } from "../services/presentation";
 
 function BoutonRond({
   icone,
@@ -74,9 +78,9 @@ function BoutonRond({
   );
 }
 
-export function EcranAtelier() {
+export function EcranAtelier({ libre = false }: { libre?: boolean }) {
   const couleurs = useCouleurs();
-  const a = useAtelier();
+  const a = useAtelier(libre);
   const feuilleModifier = a.feuille?.type === "modifier" ? a.feuille : null;
   const choix = useChoixModele(
     a.feuille?.type === "modele",
@@ -112,10 +116,12 @@ export function EcranAtelier() {
                 className="font-bold text-footnote text-foreground"
                 numberOfLines={1}
               >
-                {a.dossier?.offre.entreprise ?? "Mon CV"}
+                {a.dossier?.offre.entreprise ?? TEXTES.nouveauCv}
               </Texte>
               <Texte className="text-caption text-muted-foreground" numberOfLines={1}>
-                {a.dossier?.offre.titre ?? ""}
+                {a.dossier?.offre.titre ??
+                  a.modeles.find((m) => m.id === a.modeleId)?.libelle ??
+                  ""}
               </Texte>
             </VStack>
           </Pressable>
@@ -170,15 +176,20 @@ export function EcranAtelier() {
           <Box className="flex-1 items-center justify-center">
             <ChargeurKarria />
           </Box>
-        ) : a.erreur !== null || a.dossier === null ? (
+        ) : a.erreur !== null || a.cv === null ? (
           <Box className="flex-1 justify-center px-5">
             <MessageErreur
-              message={a.erreur ?? "Ce dossier n'a pas pu être chargé."}
+              message={
+                a.erreur ??
+                (a.libre
+                  ? "Ton CV n'a pas pu être chargé."
+                  : "Ce dossier n'a pas pu être chargé.")
+              }
               action={a.retour}
               libelleAction="Revenir"
             />
           </Box>
-        ) : attente ? (
+        ) : attente && a.dossier !== null ? (
           <AttenteAdaptation
             etat={a.dossier.adaptation === "en_cours" ? "en_cours" : "echouee"}
             annonce={a.annonce}
@@ -215,13 +226,15 @@ export function EcranAtelier() {
         )}
       </SafeAreaView>
 
-      {!a.chargement && a.dossier !== null && !attente ? (
+      {!a.chargement && a.cv !== null && a.erreur === null && !attente ? (
         <BarreAtelier
           enAttente={a.enAttente}
+          avecKarria={!a.libre}
           onGeste={(geste) => {
             // « Finaliser » passe d'abord par la lettre (« Et ta lettre ? »),
             // qui mène à Finaliser ; on ne saute pas une étape du dossier.
-            if (geste === "finaliser") a.allerALaLettre();
+            // Sans dossier, il n'y a pas de lettre : droit aux exports.
+            if (geste === "finaliser") (a.libre ? a.allerAFinaliser : a.allerALaLettre)();
             else if (geste === "modifier") a.ouvrir({ type: "modifier", cible: null });
             else a.ouvrir({ type: geste });
           }}

@@ -11,6 +11,12 @@
  *
  * La feuille « As-tu candidaté ? » (domaine Candidatures) monte après un
  * téléchargement ou un envoi ; « Oui » renvoie vers Candidatures.
+ *
+ * Une seconde annonce native, une fois les documents là : sous le score et
+ * ses points, au-dessus des documents — loin du bouton bleu du pied.
+ *
+ * En mode **libre** (« Nouveau CV ») : un seul document, pas de lettre, pas
+ * de question ; « Voir mes CV » sous le document ramène à la liste.
  */
 
 import { Pressable, ScrollView } from "react-native";
@@ -32,41 +38,11 @@ import { FeuilleCandidature } from "@/features/candidatures/components/feuille-c
 import { CarteAnnonce } from "@/features/publicite/components/carte-annonce";
 import { useCouleurs } from "@/theme/use-couleurs";
 
+import { BoutonFormat } from "../components/bouton-format";
 import { CadranAts } from "../components/cadran-ats";
 import { FeuilleEnvoi } from "../components/feuille-envoi";
 import { TEXTES, useFinaliser, type Document, type Format } from "../hooks/use-finaliser";
 import type { Export } from "../types/atelier.types";
-
-function BoutonFormat({
-  format,
-  enCours,
-  desactive,
-  onPress,
-}: {
-  format: Format;
-  enCours: boolean;
-  desactive: boolean;
-  onPress: () => void;
-}) {
-  const couleurs = useCouleurs();
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={desactive}
-      className={`h-10 flex-row items-center gap-1.5 rounded-full border-[1.5px] border-border-champ px-3.5 ${
-        desactive ? "opacity-40" : ""
-      }`}
-      accessibilityRole="button"
-      accessibilityLabel={`${TEXTES.telecharger} en ${format === "pdf" ? "PDF" : "Word"}`}
-      accessibilityState={{ busy: enCours, disabled: desactive }}
-    >
-      <Icone nom="importer" couleur={couleurs.texte} taille={13} graisse="semibold" />
-      <Texte className="font-bold text-footnote text-foreground">
-        {enCours ? "…" : format === "pdf" ? "PDF" : "Word"}
-      </Texte>
-    </Pressable>
-  );
-}
 
 function CarteDocument({
   document,
@@ -127,10 +103,10 @@ function CarteDocument({
   );
 }
 
-export function EcranFinaliser() {
+export function EcranFinaliser({ libre = false }: { libre?: boolean }) {
   const couleurs = useCouleurs();
   const reduit = useReducedMotion();
-  const f = useFinaliser();
+  const f = useFinaliser(libre);
   const entree = (rang: number) =>
     reduit ? undefined : FadeInDown.duration(380).delay(80 + rang * 70);
   const attente = f.generation || f.optimisation;
@@ -156,7 +132,7 @@ export function EcranFinaliser() {
                     {TEXTES.generation}
                   </Texte>
                   <Texte className="text-center text-body leading-6 text-muted-foreground">
-                    {TEXTES.generationPhrase}
+                    {f.libre ? TEXTES.generationPhraseLibre : TEXTES.generationPhrase}
                   </Texte>
                 </VStack>
               </VStack>
@@ -232,14 +208,20 @@ export function EcranFinaliser() {
               </Animated.View>
             ) : null}
 
+            {f.annonceScore !== null ? (
+              <Animated.View entering={reduit ? undefined : FadeIn.duration(300)}>
+                <CarteAnnonce annonce={f.annonceScore} />
+              </Animated.View>
+            ) : null}
+
             <Animated.View entering={entree(2)}>
               <VStack className="gap-3">
                 <Texte className="font-display text-callout text-foreground">
-                  {TEXTES.finaliserTitre}
+                  {f.libre ? TEXTES.finaliserTitreLibre : TEXTES.finaliserTitre}
                 </Texte>
                 <CarteDocument
                   document="cv"
-                  titre="Mon CV adapté"
+                  titre={f.libre ? "Mon CV" : "Mon CV adapté"}
                   detail={
                     f.exportCv.modele?.libelle
                       ? `Modèle ${f.exportCv.modele.libelle} · PDF et Word`
@@ -249,7 +231,7 @@ export function EcranFinaliser() {
                   telechargement={f.telechargement}
                   onTelecharger={(format) => f.telecharger("cv", format)}
                 />
-                {f.dossier?.lettre !== null ? (
+                {!f.libre && f.dossier?.lettre !== null ? (
                   <CarteDocument
                     document="lettre"
                     titre="Ma lettre de motivation"
@@ -284,6 +266,13 @@ export function EcranFinaliser() {
                     </Texte>
                   </HStack>
                 ) : null}
+                {f.libre ? (
+                  <BoutonAction
+                    libelle={TEXTES.voirMesCv}
+                    ton="secondaire"
+                    onPress={f.terminer}
+                  />
+                ) : null}
               </VStack>
             </Animated.View>
           </ScrollView>
@@ -305,7 +294,7 @@ export function EcranFinaliser() {
         onEnvoyer={f.envoyer}
         onFermer={f.fermerEnvoi}
       />
-      {f.dossier !== null ? (
+      {!f.libre && f.dossier !== null ? (
         <FeuilleCandidature
           visible={f.question}
           dossierId={f.dossier.id}

@@ -45,6 +45,14 @@ import { Directory, File, Paths } from "expo-file-system";
 
 import type { Cv } from "@/features/cv/types/cv.types";
 
+/**
+ * La clé du brouillon de l'atelier **libre** (« Nouveau CV », sans dossier).
+ * Un seul CV libre à la fois : on reprend là où l'on en était, ou l'on
+ * repart du CV de base. Ce n'est pas un identifiant serveur — aucun dossier
+ * ne porte ce nom, le faux serveur comme le vrai refusent un UUID pareil.
+ */
+export const CLE_BROUILLON_LIBRE = "libre";
+
 export interface BrouillonAtelier {
   dossierId: string;
   cv: Cv;

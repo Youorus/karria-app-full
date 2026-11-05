@@ -118,6 +118,15 @@ export default function LayoutApp() {
         />
         <Stack.Screen name="atelier/[dossierId]/lettre" />
         <Stack.Screen name="atelier/[dossierId]/finaliser" />
+        {/* « Mes CV » (depuis l'en-tête de l'onglet CV) s'empile comme un
+            détail ; l'atelier libre (« Nouveau CV ») monte comme celui d'un
+            dossier, et son Finaliser par-dessus. */}
+        <Stack.Screen name="cv/mes-cv" />
+        <Stack.Screen
+          name="atelier/libre/index"
+          options={{ animation: "fade_from_bottom", animationDuration: 280 }}
+        />
+        <Stack.Screen name="atelier/libre/finaliser" />
         {/* Les paramètres s'empilent comme un détail : on y va, on revient.
             La suppression monte en fondu depuis le bas, comme une feuille
             qu'on ouvre — et le geste de retour reste permis : on doit

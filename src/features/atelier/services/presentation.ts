@@ -104,8 +104,13 @@ export const TEXTES = {
   lettreGarderNouveau: "Garder le nouveau",
   lettreHorsLettre:
     "Ces informations viennent de ton CV et de l'offre : modifie-les dans l'atelier.",
+  // L'atelier libre (« Nouveau CV », sans dossier).
+  nouveauCv: "Nouveau CV",
+  voirMesCv: "Voir mes CV",
   // Finaliser.
   finaliserTitre: "Ton dossier",
+  finaliserTitreLibre: "Ton CV",
+  generationPhraseLibre: "Le PDF et le Word de ton CV. Une poignée de secondes.",
   generation: "Karria met en page…",
   generationPhrase:
     "Le PDF et le Word de ton CV, puis de ta lettre. Une poignée de secondes.",

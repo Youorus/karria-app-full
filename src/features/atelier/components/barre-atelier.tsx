@@ -13,6 +13,9 @@
  * Un petit nombre sur « Karria » quand des propositions attendent : la
  * personne sait qu'il y a quelque chose à relire, sans qu'on l'interrompe.
  * Pas de point rouge, pas d'étincelle : un chiffre.
+ *
+ * Sans dossier (l'atelier libre), Karria n'a rien à proposer : son geste
+ * n'est pas là, la barre a quatre places.
  */
 
 import { Pressable } from "react-native";
@@ -40,6 +43,8 @@ interface Props {
   enAttente: number;
   onGeste: (geste: GesteAtelier) => void;
   desactivee?: boolean;
+  /** Faux : pas de geste « Karria » (atelier libre, sans dossier). */
+  avecKarria?: boolean;
 }
 
 const RESSORT = { duration: 150, dampingRatio: 1 } as const;
@@ -89,7 +94,12 @@ function Geste({
   );
 }
 
-export function BarreAtelier({ enAttente, onGeste, desactivee = false }: Props) {
+export function BarreAtelier({
+  enAttente,
+  onGeste,
+  desactivee = false,
+  avecKarria = true,
+}: Props) {
   const couleurs = useCouleurs();
   return (
     <PiedFlottant>
@@ -100,13 +110,15 @@ export function BarreAtelier({ enAttente, onGeste, desactivee = false }: Props) 
           onPress={() => onGeste("modifier")}
           desactive={desactivee}
         />
-        <Geste
-          icone="bulle"
-          libelle={TEXTES.karria}
-          pastille={enAttente}
-          onPress={() => onGeste("karria")}
-          desactive={desactivee}
-        />
+        {avecKarria ? (
+          <Geste
+            icone="bulle"
+            libelle={TEXTES.karria}
+            pastille={enAttente}
+            onPress={() => onGeste("karria")}
+            desactive={desactivee}
+          />
+        ) : null}
         <Geste
           icone="filtres"
           libelle={TEXTES.enAvant}
