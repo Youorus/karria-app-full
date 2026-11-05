@@ -36,6 +36,8 @@ import {
 
 import { desinscrireAppareil } from "@/features/notifications/api/appareils.api";
 import { poserConsentementIa } from "../services/consentement-ia";
+import { oublierTousLesBrouillonsAtelier } from "@/features/atelier/services/brouillon-atelier";
+import { poserDossierEnCours } from "@/features/atelier/services/dossier-en-cours";
 import { oublierTousLesBrouillons } from "@/features/cv/services/brouillons-edition";
 import { effacerVerification } from "@/features/cv/services/verification";
 import { liberer as libererLesAnnonces } from "@/features/publicite/hooks/reserve-annonces";
@@ -115,6 +117,10 @@ export function FournisseurDeSession({ children }: { children: ReactNode }) {
     // sections « à vérifier » ne doivent pas survivre pour le suivant.
     oublierTousLesBrouillons();
     effacerVerification();
+    // Les brouillons de l'atelier (un CV adapté par dossier) et le dossier
+    // en cours sont ceux d'un compte, eux aussi.
+    oublierTousLesBrouillonsAtelier();
+    poserDossierEnCours(null);
     poserConsentementIa(null);
     setEtat("anonyme");
     router.replace("/bienvenue");
@@ -180,6 +186,10 @@ export function FournisseurDeSession({ children }: { children: ReactNode }) {
     // sections « à vérifier » ne doivent pas survivre pour le suivant.
     oublierTousLesBrouillons();
     effacerVerification();
+    // Les brouillons de l'atelier (un CV adapté par dossier) et le dossier
+    // en cours sont ceux d'un compte, eux aussi.
+    oublierTousLesBrouillonsAtelier();
+    poserDossierEnCours(null);
     poserConsentementIa(null);
     setEtat("anonyme");
     router.replace({ pathname: "/bienvenue", params: { [PARAMETRE_ADIEU]: "1" } });

@@ -8,8 +8,18 @@
  * modèle choisi, le dernier élément touché. Mais un CV pèse quelques
  * dizaines de kilo-octets, et le trousseau d'iOS tolère mal au-delà de
  * 2 Ko (`lib/magasin-local.ts`). Un fichier JSON par dossier, dans le
- * dossier de documents de l'app (il survit aux mises à jour, pas à la
- * désinstallation), fait exactement ce qu'il faut.
+ * **cache** de l'app : le système peut le reprendre s'il manque de place
+ * (le serveur a la vérité, rien n'est perdu), et il n'est pas sauvegardé
+ * dans iCloud — un CV est une donnée personnelle, il ne voyage pas sans
+ * qu'on le lui demande.
+ *
+ * ═══ Effacé avec la session ═══
+ *
+ * Un brouillon est celui d'un compte. À la déconnexion comme à la
+ * suppression du compte, `oublierTousLesBrouillonsAtelier` retire tout le
+ * répertoire (`use-session.tsx`), au même endroit où les brouillons des
+ * formulaires du CV s'oublient : le compte suivant sur ce téléphone ne
+ * trouve rien.
  *
  * ═══ Jamais d'exception ═══
  *
@@ -38,12 +48,12 @@ export interface BrouillonAtelier {
   ecritLe: string;
 }
 
-function dossier(): Directory {
-  return new Directory(Paths.document, "atelier");
+function repertoire(): Directory {
+  return new Directory(Paths.cache, "atelier");
 }
 
 function fichier(dossierId: string): File {
-  return new File(dossier(), `${dossierId.replace(/[^a-zA-Z0-9_-]/g, "_")}.json`);
+  return new File(repertoire(), `${dossierId.replace(/[^a-zA-Z0-9_-]/g, "_")}.json`);
 }
 
 function estUnBrouillon(v: unknown): v is BrouillonAtelier {
@@ -71,7 +81,7 @@ export function lireBrouillonAtelier(dossierId: string): BrouillonAtelier | null
 
 export function ecrireBrouillonAtelier(brouillon: BrouillonAtelier): void {
   try {
-    const d = dossier();
+    const d = repertoire();
     if (!d.exists) d.create({ intermediates: true, idempotent: true });
     fichier(brouillon.dossierId).write(JSON.stringify(brouillon));
   } catch (cause) {
@@ -85,6 +95,16 @@ export function oublierBrouillonAtelier(dossierId: string): void {
     if (f.exists) f.delete();
   } catch (cause) {
     console.warn("[karria] brouillon d'atelier non effacé", cause);
+  }
+}
+
+/** À la déconnexion et à la suppression du compte : tout le répertoire. */
+export function oublierTousLesBrouillonsAtelier(): void {
+  try {
+    const d = repertoire();
+    if (d.exists) d.delete();
+  } catch (cause) {
+    console.warn("[karria] brouillons d'atelier non effacés", cause);
   }
 }
 
