@@ -41,7 +41,7 @@ import type { Dossier, Lettre } from "@/features/candidatures/types/candidatures
 import { lireMesModeles, lireModeles } from "@/features/modeles/api/modeles.api";
 import type { Modele } from "@/features/modeles/types/modeles.types";
 import { ErreurApi } from "@/lib/http";
-import { useNavigationUnique, type Chemin } from "@/lib/navigation";
+import { useNavigationUnique } from "@/lib/navigation";
 
 import { lireModeleChoisi, rendreLettre } from "../api/documents.api";
 import type { FeuilleCvHandle } from "../components/feuille-cv";
@@ -476,7 +476,7 @@ export function useLettre(): EcranLettre {
 
   const continuer = useCallback(() => {
     void sauverMaintenant();
-    pousser(`/atelier/${dossierId}/finaliser` as Chemin);
+    pousser({ pathname: "/atelier/[dossierId]/finaliser", params: { dossierId } });
   }, [sauverMaintenant, pousser, dossierId]);
 
   const retour = useCallback(() => {

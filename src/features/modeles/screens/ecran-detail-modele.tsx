@@ -73,6 +73,8 @@ export function EcranDetailModele() {
     partager,
     retour,
     voirLaGalerie,
+    atelierEnCours,
+    continuerDansLAtelier,
     recharger,
   } = useDetailModele();
 
@@ -287,6 +289,8 @@ export function EcranDetailModele() {
           paiementsActifs={paiementsActifs}
           onObtenir={obtenir}
           onVoirLaGalerie={voirLaGalerie}
+          atelierEnCours={atelierEnCours}
+          onContinuerDansLAtelier={continuerDansLAtelier}
         />
       ) : null}
     </Box>

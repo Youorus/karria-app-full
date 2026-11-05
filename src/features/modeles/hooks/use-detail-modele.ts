@@ -24,6 +24,12 @@
  * « Obtenir ce modèle » passe par « Ajout en cours… » puis « Ajouté à ta
  * collection ! » une fois le serveur d'accord — jamais avant.
  *
+ * ═══ Et l'atelier, s'il y en a un ═══
+ *
+ * Un dossier ouvert dans l'atelier (`features/atelier/services/dossier-en-cours.ts`)
+ * change le bouton d'un modèle à soi : « Continuer dans l'atelier » y
+ * retourne, avec ce modèle à choisir. Sinon, « Voir tous les modèles ».
+ *
  * ═══ Un modèle Premium s'achète chez Stripe ═══
  *
  * « Débloquer ce modèle · 4,99 € » ouvre la page de paiement dans le
@@ -39,6 +45,7 @@ import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform, Share } from "react-native";
 
+import { useDossierEnCours } from "@/features/atelier/services/dossier-en-cours";
 import {
   lireCatalogue,
   lireStatut,
@@ -83,6 +90,9 @@ export interface DetailModele {
   partager: () => void;
   retour: () => void;
   voirLaGalerie: () => void;
+  /** Un dossier est ouvert dans l'atelier : on peut y continuer. */
+  atelierEnCours: boolean;
+  continuerDansLAtelier: () => void;
   recharger: () => void;
 }
 
@@ -212,6 +222,15 @@ export function useDetailModele(): DetailModele {
 
   const voirLaGalerie = useCallback(() => router.replace("/modeles"), [router]);
 
+  const dossierEnCours = useDossierEnCours();
+  const continuerDansLAtelier = useCallback(() => {
+    if (dossierEnCours === null) return;
+    router.push({
+      pathname: "/atelier/[dossierId]",
+      params: { dossierId: dossierEnCours },
+    });
+  }, [router, dossierEnCours]);
+
   const recharger = useCallback(() => {
     setChargement(true);
     setTentative((t) => t + 1);
@@ -229,6 +248,8 @@ export function useDetailModele(): DetailModele {
     partager,
     retour,
     voirLaGalerie,
+    atelierEnCours: dossierEnCours !== null,
+    continuerDansLAtelier,
     recharger,
   };
 }

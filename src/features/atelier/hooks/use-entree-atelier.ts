@@ -26,7 +26,7 @@ import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
 import { ouvrirDossier } from "@/features/candidatures/api/candidatures.api";
 import { memoriserDossier } from "@/features/candidatures/services/memoire-dossiers";
 import { ErreurApi } from "@/lib/http";
-import { useNavigationUnique, type Chemin } from "@/lib/navigation";
+import { useNavigationUnique } from "@/lib/navigation";
 
 import { lireModeleChoisi } from "../api/documents.api";
 import { TEXTES } from "../services/presentation";
@@ -54,7 +54,10 @@ export function useEntreeAtelier(offreId: string | null): EntreeAtelier {
           const choisi = await lireModeleChoisi().catch(() => null);
           const dossier = await ouvrirDossier(offreId, choisi?.modeleId ?? null);
           memoriserDossier(dossier);
-          pousser(`/atelier/${dossier.id}` as Chemin);
+          pousser({
+            pathname: "/atelier/[dossierId]",
+            params: { dossierId: dossier.id },
+          });
         } catch (cause) {
           if (rejouerSiConsentementRequis(cause, "application", ouvrirLeDossier)) return;
           console.warn("[karria] dossier non ouvert", cause);

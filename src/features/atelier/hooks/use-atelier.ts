@@ -74,7 +74,7 @@ import type { Modele } from "@/features/modeles/types/modeles.types";
 import type { NativeAd } from "@/features/publicite/api/publicite.api";
 import { useAnnonceEmplacement } from "@/features/publicite/hooks/use-annonce-emplacement";
 import { ErreurApi } from "@/lib/http";
-import { useNavigationUnique, type Chemin } from "@/lib/navigation";
+import { useNavigationUnique } from "@/lib/navigation";
 
 import { lireModeleChoisi, rendreCv } from "../api/documents.api";
 import type { FeuilleCvHandle } from "../components/feuille-cv";
@@ -796,12 +796,12 @@ export function useAtelier(): Atelier {
 
   const allerALaLettre = useCallback(() => {
     void sauverMaintenant();
-    pousserRoute(`/atelier/${dossierId}/lettre` as Chemin);
+    pousserRoute({ pathname: "/atelier/[dossierId]/lettre", params: { dossierId } });
   }, [sauverMaintenant, pousserRoute, dossierId]);
 
   const allerAFinaliser = useCallback(() => {
     void sauverMaintenant();
-    pousserRoute(`/atelier/${dossierId}/finaliser` as Chemin);
+    pousserRoute({ pathname: "/atelier/[dossierId]/finaliser", params: { dossierId } });
   }, [sauverMaintenant, pousserRoute, dossierId]);
 
   return {

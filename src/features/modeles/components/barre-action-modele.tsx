@@ -6,7 +6,8 @@
  * l'état, comme dans la V1 :
  *
  * - déjà possédé → « Voir tous les modèles », en vert, « Ce modèle est
- *   déjà à toi » au-dessus ;
+ *   déjà à toi » au-dessus — ou « Continuer dans l'atelier » quand un
+ *   dossier y est ouvert (acheté pendant qu'on adaptait son CV) ;
  * - gratuit → « Obtenir ce modèle », puis « Ajout en cours… », puis
  *   « Ajouté à ta collection ! » ;
  * - Premium → « Débloquer ce modèle · 4,99 € » en or, avec le cadenas : le
@@ -36,6 +37,9 @@ interface Props {
   paiementsActifs: boolean;
   onObtenir: () => void;
   onVoirLaGalerie: () => void;
+  /** Un dossier est ouvert dans l'atelier : le bouton y renvoie. */
+  atelierEnCours?: boolean;
+  onContinuerDansLAtelier?: () => void;
 }
 
 export function BarreActionModele({
@@ -44,15 +48,20 @@ export function BarreActionModele({
   paiementsActifs,
   onObtenir,
   onVoirLaGalerie,
+  atelierEnCours = false,
+  onContinuerDansLAtelier,
 }: Props) {
   const possede = acquisition === "possede" || acquisition === "ajoute";
   const occupe = acquisition === "en-cours" || acquisition === "paiement";
   const prix = prixLisible(modele.prix);
 
+  const versLAtelier = possede && atelierEnCours && onContinuerDansLAtelier !== undefined;
   const libelle = possede
-    ? acquisition === "ajoute"
-      ? "Ajouté à ta collection !"
-      : "Voir tous les modèles"
+    ? versLAtelier
+      ? "Continuer dans l'atelier"
+      : acquisition === "ajoute"
+        ? "Ajouté à ta collection !"
+        : "Voir tous les modèles"
     : acquisition === "en-cours"
       ? "Ajout en cours…"
       : acquisition === "paiement"
@@ -64,7 +73,9 @@ export function BarreActionModele({
           : "Obtenir ce modèle";
 
   const aide = possede
-    ? "Ce modèle est à toi — prêt pour ton prochain CV."
+    ? versLAtelier
+      ? "Ce modèle est à toi — ton CV en cours t'attend dans l'atelier."
+      : "Ce modèle est à toi — prêt pour ton prochain CV."
     : acquisition === "erreur"
       ? modele.premium
         ? "Le paiement n'a pas pu s'ouvrir. Réessaie dans un instant."
@@ -88,7 +99,9 @@ export function BarreActionModele({
   return (
     <PiedFlottant aide={aide}>
       <Pressable
-        onPress={possede ? onVoirLaGalerie : onObtenir}
+        onPress={
+          versLAtelier ? onContinuerDansLAtelier : possede ? onVoirLaGalerie : onObtenir
+        }
         disabled={desactive}
         className={`h-[52px] items-center justify-center rounded-[14px] ${fond} ${
           desactive ? "opacity-60" : ""

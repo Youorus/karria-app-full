@@ -47,7 +47,7 @@ import type { Modele } from "@/features/modeles/types/modeles.types";
 import type { NativeAd } from "@/features/publicite/api/publicite.api";
 import { useAnnonceEmplacement } from "@/features/publicite/hooks/use-annonce-emplacement";
 import { ErreurApi } from "@/lib/http";
-import { useNavigationUnique, type Chemin } from "@/lib/navigation";
+import { useNavigationUnique } from "@/lib/navigation";
 
 import {
   envoyerExports,
@@ -322,10 +322,7 @@ export function useFinaliser(): EcranFinaliser {
             ? "contact.email"
             : "summary"
           : correction.geste;
-      remplacer({
-        pathname: `/atelier/${dossierId}`,
-        params: { cible },
-      } as unknown as Chemin);
+      remplacer({ pathname: "/atelier/[dossierId]", params: { dossierId, cible } });
     },
     [optimiser, remplacer, dossierId],
   );
@@ -364,7 +361,7 @@ export function useFinaliser(): EcranFinaliser {
     }, []),
     retour: useCallback(() => {
       if (router.canGoBack()) router.back();
-      else pousser(`/atelier/${dossierId}` as Chemin);
+      else pousser({ pathname: "/atelier/[dossierId]", params: { dossierId } });
     }, [router, pousser, dossierId]),
   };
 }
