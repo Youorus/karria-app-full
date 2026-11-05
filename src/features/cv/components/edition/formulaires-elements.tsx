@@ -49,6 +49,7 @@ import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
+import { BORDS_FEUILLE_NATIVE } from "@/lib/feuille-native";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import type { ElementListe } from "../../hooks/use-modifier-cv";
@@ -252,7 +253,7 @@ export function FeuilleElement({
       onRequestClose={onFermer}
     >
       <Box style={{ flex: 1 }} className="bg-popover">
-        <SafeAreaView style={{ flex: 1 }} edges={["bottom"]}>
+        <SafeAreaView style={{ flex: 1 }} edges={BORDS_FEUILLE_NATIVE}>
           <KeyboardAvoidingView
             style={{ flex: 1 }}
             behavior={Platform.OS === "ios" ? "padding" : undefined}

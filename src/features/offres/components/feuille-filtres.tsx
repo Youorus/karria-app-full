@@ -26,6 +26,7 @@ import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
+import { BORDS_FEUILLE_NATIVE } from "@/lib/feuille-native";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import {
@@ -176,7 +177,7 @@ export function FeuilleFiltres({
       onDismiss={() => setVue("principale")}
     >
       <Box style={{ flex: 1 }} className="bg-popover">
-        <SafeAreaView style={{ flex: 1 }} edges={["bottom"]}>
+        <SafeAreaView style={{ flex: 1 }} edges={BORDS_FEUILLE_NATIVE}>
           <HStack className="h-[50px] items-center justify-between px-4 pt-2">
             {vue === "principale" ? (
               <Pressable

@@ -35,6 +35,7 @@ import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
+import { BORDS_FEUILLE_NATIVE } from "@/lib/feuille-native";
 import { PREMIUM_TEXTE } from "@/theme";
 import { useCouleurs } from "@/theme/use-couleurs";
 
@@ -90,7 +91,7 @@ export function FeuilleSansPub({ visible, soutien, onFermer }: Props) {
       {/* Le fond en classe sur une `Box` : la feuille native est blanche par
           défaut, et `SafeAreaView` ne porte pas de classe. */}
       <Box style={{ flex: 1 }} className="bg-background">
-        <SafeAreaView style={{ flex: 1 }} edges={["bottom"]}>
+        <SafeAreaView style={{ flex: 1 }} edges={BORDS_FEUILLE_NATIVE}>
           <HStack className="items-center justify-end px-4 pt-3">
             <Pressable
               onPress={onFermer}
