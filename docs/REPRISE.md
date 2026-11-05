@@ -112,7 +112,22 @@ EXPO_PUBLIC_SIMULATION_CV=rempli npx expo start --port 8081` (**sans `CI=1`** : 
   annonces natives échouent en `internal-error` (ID de test Android absent de `.env`, `EMULATOR` comme
   appareil de test). **Aucune annonce native n'a donc été vue sur Android** : fil, fiche, Mes CV, score.
   À rejouer avec `EXPO_PUBLIC_ADMOB_NATIVE_ANDROID` de test et un appareil réel.
-- **Notifications push Android** : aucun `google-services.json` (`config/` est vide, `.gitignore` en
+- **Repris de la V1 le 2026-11-05 au matin (coordinateur, commit `5a879fb`)** — Marc a rappelé que la V1
+  (`~/Documents/HelloWorkk/karria`) avait tout cela en marche, et c'est vrai : même `com.karria.app`,
+  même projet EAS, projet Firebase `karria-notifications-push`. Posé en V2 :
+  `config/firebase/google-services.json` et `GoogleService-Info.plist` (fichiers CLIENT, versionnés,
+  référencés par `android.googleServicesFile` / `ios.googleServicesFile`) → push Android ;
+  `EXPO_PUBLIC_GOOGLE_ANDROID_WEB_CLIENT_ID` (client **web du projet Firebase**, celui qui contient le
+  client Android OAuth avec l'empreinte SHA-1 du keystore — `social.ts` l'emploie sur Android, l'API
+  l'accepte via `SOCIAL__GOOGLE_ANDROID_WEB_CLIENT_ID`) → Google Sign-In Android ; les trois
+  identifiants Google dans les profils EAS `preview`/`production` (le `.env` n'est pas versionné, un
+  build EAS ne le voit pas). Le keystore Android de la V1 et son `credentials.json` sont copiés dans
+  `~/.karria/android/` (hors dépôt, mode 600) ; son SHA-1 est **celui enregistré dans Firebase**
+  (vérifié). Le projet EAS porte des builds Android de la V1 (juin 2026) : les identifiants distants
+  (keystore, clé FCM) devraient y être — à confirmer dans expo.dev › Credentials avant le premier
+  `eas build --platform android`. Les deux points qui suivent sont donc **réglés sur le papier**, à
+  vérifier sur un vrai Android ; reste AdMob (message UMP à publier dans la console pour l'app Android).
+- **Notifications push Android (constat avant reprise)** : aucun `google-services.json` (`config/` est vide, `.gitignore` en
   parle, `app.json` n'a pas `android.googleServicesFile`) → `getExpoPushTokenAsync` échouera sur un
   vrai Android (« Default FirebaseApp is not initialized »). Le code le rattrape et avertit, mais
   **aucun Android ne recevra de notification** tant que le fichier Firebase n'est pas posé.
