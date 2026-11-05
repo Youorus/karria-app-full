@@ -30,8 +30,18 @@
 - Faux serveur : `retarderLaLivraison(n)` (`paiements-simule.ts`) pour voir l'attente puis le merci
   au retour au premier plan ; `docs/contrat-api-paiements.md` § merci et revérification.
 
+- **Revue de sécurité (coordinateur, même jour), corrigée** : l'enregistrement porte le
+  **`userId`** du compte qui a ouvert le paiement (lu par `lireMoi()` ; sans compte lisible, rien
+  n'est retenu) et un autre compte le **jette sans le relire** (`autre_compte`) ;
+  `purgerAchatALaDeconnexion()` (achat + merci + génération) est appelé par `use-session.tsx` à la
+  déconnexion (`revenirALAccueil`) et à la suppression du compte (`oublierApresSuppression`) ; une
+  relecture en vol pendant une déconnexion rend `abandonne` sans rien appliquer ; **« sans pub »
+  n'est jamais posé depuis l'enregistrement local** : après « livré », `lireFacturation` du serveur
+  fait foi pour le compte courant. Tests : 11 cas du service (propriétaire, purge/abandon, droits
+  serveur) ; le branchement dans `use-session.tsx` n'est couvert que par le typage.
+
 **Non vérifié** : sur un vrai téléphone (le retour au premier plan avec une vraie session Stripe
-en attente ; le push `purchase` touché). Tests : service (9 cas), routeur, faux serveur.
+en attente ; le push `purchase` touché ; la déconnexion pendant une relecture).
 
 
 ## Session du 2026-11-05 (matin) — le modèle se change à tout moment, sans rien perdre (Fable)

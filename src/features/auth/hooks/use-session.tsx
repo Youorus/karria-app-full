@@ -41,6 +41,7 @@ import { poserDossierEnCours } from "@/features/atelier/services/dossier-en-cour
 import { oublierTousLesBrouillons } from "@/features/cv/services/brouillons-edition";
 import { effacerVerification } from "@/features/cv/services/verification";
 import { liberer as libererLesAnnonces } from "@/features/publicite/hooks/reserve-annonces";
+import { purgerAchatALaDeconnexion } from "@/features/soutien/services/achat-en-attente";
 import { auMomentDeLaDeconnexion } from "@/lib/http";
 import { poserSansPub } from "@/lib/sans-pub";
 import { lireInstallationId, oublierReponseNotifications } from "@/lib/installation";
@@ -122,6 +123,8 @@ export function FournisseurDeSession({ children }: { children: ReactNode }) {
     oublierTousLesBrouillonsAtelier();
     poserDossierEnCours(null);
     poserConsentementIa(null);
+    // L'achat laissé en attente et son merci sont ceux d'un compte, eux aussi.
+    void purgerAchatALaDeconnexion();
     setEtat("anonyme");
     router.replace("/bienvenue");
   }, [router]);
@@ -191,6 +194,8 @@ export function FournisseurDeSession({ children }: { children: ReactNode }) {
     oublierTousLesBrouillonsAtelier();
     poserDossierEnCours(null);
     poserConsentementIa(null);
+    // L'achat laissé en attente et son merci sont ceux d'un compte, eux aussi.
+    await purgerAchatALaDeconnexion();
     setEtat("anonyme");
     router.replace({ pathname: "/bienvenue", params: { [PARAMETRE_ADIEU]: "1" } });
   }, [router]);

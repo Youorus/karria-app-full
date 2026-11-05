@@ -25,6 +25,18 @@
  * `type: purchase` du serveur, lui, ouvre l'écran utile ; les deux se
  * complètent sans se répéter : la bande ne se montre qu'une fois.
  *
+ * ═══ À qui appartient l'achat ═══
+ *
+ * Le téléphone peut changer de compte (revue de sécurité du 2026-11-05).
+ * L'enregistrement porte donc l'identifiant du compte qui a ouvert le
+ * paiement ; à la relecture, un autre compte le jette sans le relire. À la
+ * déconnexion et à la suppression du compte, tout est purgé
+ * (`purgerAchatALaDeconnexion`, appelé par `use-session.tsx`), et une
+ * relecture encore en vol à ce moment-là ne produit rien. Enfin, « sans
+ * pub » n'est **jamais** posé depuis l'enregistrement local : après
+ * « livré », ce sont les droits relus au serveur, pour le compte courant,
+ * qui font foi.
+ *
  * ═══ Une seule session à la fois ═══
  *
  * On ne retient que la dernière : deux achats laissés en attente en moins
@@ -33,13 +45,19 @@
  */
 
 import { useSyncExternalStore } from "react";
+import { Platform } from "react-native";
 
+import { lireMoi as lireMoiVraiment } from "@/features/auth/api/auth.api";
 import { ErreurApi } from "@/lib/http";
 import { ecrireLocal, lireLocal } from "@/lib/magasin-local";
 import { poserSansPub } from "@/lib/sans-pub";
 
-import { lireStatut } from "../api/soutien.api";
+import {
+  lireFacturation as lireFacturationVraiment,
+  lireStatut as lireStatutVraiment,
+} from "../api/soutien.api";
 import type {
+  Facturation,
   SessionPaiement,
   StatutPaiement,
   TypeDePaiement,
@@ -57,12 +75,29 @@ export interface AchatEnAttente {
   modeleId: string | null;
   /** Quand l'attente a commencé (ms). */
   depuis: number;
+  /** Le compte qui a ouvert le paiement : un autre ne le relit pas. */
+  userId: string;
 }
 
 export interface Remerciement {
   type: TypeDePaiement;
   modeleId: string | null;
 }
+
+/** Ce que le service demande au dehors — remplaçable dans les tests. */
+export interface Dependances {
+  readonly lireStatut: (sessionId: string) => Promise<StatutPaiement>;
+  readonly lireMoi: () => Promise<{ id: string }>;
+  readonly lireFacturation: () => Promise<Facturation>;
+  readonly maintenant: () => number;
+}
+
+const REELLES: Dependances = {
+  lireStatut: lireStatutVraiment,
+  lireMoi: lireMoiVraiment,
+  lireFacturation: () => lireFacturationVraiment(Platform.OS),
+  maintenant: Date.now,
+};
 
 const TYPES: readonly string[] = ["ad_free", "coffee", "template"];
 
@@ -76,22 +111,38 @@ function estAchatEnAttente(valeur: unknown): valeur is AchatEnAttente {
     TYPES.includes(v.type) &&
     (v.modeleId === null || typeof v.modeleId === "string") &&
     typeof v.depuis === "number" &&
-    Number.isFinite(v.depuis)
+    Number.isFinite(v.depuis) &&
+    typeof v.userId === "string" &&
+    v.userId !== ""
   );
 }
 
 // ─── La session retenue ────────────────────────────────────────────────
 
+/**
+ * Retient la session au nom du compte courant. Si le compte ne se lit
+ * pas, rien n'est retenu : un enregistrement sans propriétaire pourrait
+ * être relu par le suivant.
+ */
 export async function retenirAchatEnAttente(
   session: SessionPaiement,
   modeleId: string | null = null,
-  maintenant: number = Date.now(),
+  dependances: Partial<Dependances> = {},
 ): Promise<void> {
+  const { lireMoi, maintenant } = { ...REELLES, ...dependances };
+  let userId: string;
+  try {
+    userId = (await lireMoi()).id;
+  } catch (cause) {
+    console.warn("[karria] achat en attente non retenu : compte illisible", cause);
+    return;
+  }
   const achat: AchatEnAttente = {
     sessionId: session.id,
     type: session.type,
     modeleId,
-    depuis: maintenant,
+    depuis: maintenant(),
+    userId,
   };
   await ecrireLocal(CLE, achat);
 }
@@ -151,47 +202,80 @@ export function abonnerRemerciement(rappel: (valeur: Remerciement) => void): () 
   });
 }
 
+// ─── La déconnexion ────────────────────────────────────────────────────
+
+/** Change à chaque déconnexion : une relecture partie avant ne compte plus. */
+let generation = 0;
+
+/**
+ * À la déconnexion et à la suppression du compte : l'achat retenu et le
+ * merci sont ceux d'un compte, ils ne survivent pas pour le suivant.
+ */
+export async function purgerAchatALaDeconnexion(): Promise<void> {
+  generation += 1;
+  effacerRemerciement();
+  await oublierAchatEnAttente();
+}
+
 // ─── La revérification ─────────────────────────────────────────────────
 
 export type IssueReverification =
-  "aucun" | "livre" | "en_attente" | "perime" | "illisible";
+  | "aucun"
+  | "livre"
+  | "en_attente"
+  | "perime"
+  | "illisible"
+  /** L'enregistrement est à un autre compte : jeté sans être relu. */
+  | "autre_compte"
+  /** La session a changé pendant la relecture : rien n'est appliqué. */
+  | "abandonne";
 
 let enCours: Promise<IssueReverification> | null = null;
 
 /**
  * Relit la session retenue, une seule fois à la fois. « livré » oublie la
- * session, pose le merci et, pour le sans pub, coupe la publicité sans
- * attendre la relecture des droits.
+ * session, relit les droits **au serveur** (c'est lui qui dit « sans pub »
+ * pour le compte courant) et pose le merci.
  */
 export function reverifierAchatEnAttente(
-  options: {
-    readonly lireStatut?: (sessionId: string) => Promise<StatutPaiement>;
-    readonly maintenant?: () => number;
-  } = {},
+  dependances: Partial<Dependances> = {},
 ): Promise<IssueReverification> {
   if (enCours !== null) return enCours;
-  enCours = reverifier(options).finally(() => {
+  enCours = reverifier({ ...REELLES, ...dependances }).finally(() => {
     enCours = null;
   });
   return enCours;
 }
 
-async function reverifier(options: {
-  readonly lireStatut?: (sessionId: string) => Promise<StatutPaiement>;
-  readonly maintenant?: () => number;
-}): Promise<IssueReverification> {
+async function reverifier(d: Dependances): Promise<IssueReverification> {
+  const depart = generation;
   const achat = await lireAchatEnAttente();
   if (achat === null) return "aucun";
-  const maintenant = options.maintenant ?? Date.now;
-  if (maintenant() - achat.depuis > DUREE_MAX_MS) {
+  if (depart !== generation) return "abandonne";
+  if (d.maintenant() - achat.depuis > DUREE_MAX_MS) {
     await oublierAchatEnAttente();
     return "perime";
   }
-  const relire = options.lireStatut ?? lireStatut;
+
+  let moi: { id: string };
   try {
-    const statut = await relire(achat.sessionId);
+    moi = await d.lireMoi();
+  } catch (cause) {
+    console.warn("[karria] achat en attente : compte illisible", cause);
+    return "illisible";
+  }
+  if (depart !== generation) return "abandonne";
+  if (moi.id !== achat.userId) {
+    await oublierAchatEnAttente();
+    return "autre_compte";
+  }
+
+  try {
+    const statut = await d.lireStatut(achat.sessionId);
+    if (depart !== generation) return "abandonne";
     if (!statut.livre) return "en_attente";
   } catch (cause) {
+    if (depart !== generation) return "abandonne";
     // Une session que le serveur ne connaît pas (ou plus) ne reviendra pas.
     if (cause instanceof ErreurApi && cause.statut === 404) {
       await oublierAchatEnAttente();
@@ -200,8 +284,18 @@ async function reverifier(options: {
     console.warn("[karria] achat en attente non revérifié", cause);
     return "illisible";
   }
+
   await oublierAchatEnAttente();
-  if (achat.type === "ad_free") poserSansPub(true);
+  // Les droits viennent du serveur, jamais de l'enregistrement local : un
+  // échec de lecture garde la dernière réponse connue.
+  try {
+    const facturation = await d.lireFacturation();
+    if (depart !== generation) return "abandonne";
+    poserSansPub(facturation.sansPub.actif);
+  } catch (cause) {
+    console.warn("[karria] droits illisibles après la livraison", cause);
+  }
+  if (depart !== generation) return "abandonne";
   poserRemerciement({ type: achat.type, modeleId: achat.modeleId });
   return "livre";
 }
