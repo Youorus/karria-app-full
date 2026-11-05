@@ -310,17 +310,20 @@ export function useFinaliser(libre = false): EcranFinaliser {
 
   const optimiser = useCallback(() => {
     if (optimisation || generation) return;
-    setOptimisation(true);
-    generer(true)
-      .catch((cause: unknown) => {
-        if (!vivant.current) return;
-        if (rejouerSiConsentementRequis(cause, usageIa, optimiser)) return;
-        console.warn("[karria] export optimisé en échec", cause);
-        setErreur(messageDExport(cause));
-      })
-      .finally(() => {
-        if (vivant.current) setOptimisation(false);
-      });
+    const geste = () => {
+      setOptimisation(true);
+      generer(true)
+        .catch((cause: unknown) => {
+          if (!vivant.current) return;
+          if (rejouerSiConsentementRequis(cause, usageIa, geste)) return;
+          console.warn("[karria] export optimisé en échec", cause);
+          setErreur(messageDExport(cause));
+        })
+        .finally(() => {
+          if (vivant.current) setOptimisation(false);
+        });
+    };
+    geste();
   }, [optimisation, generation, generer, rejouerSiConsentementRequis, usageIa]);
 
   // ── Télécharger ────────────────────────────────────────────────────────
