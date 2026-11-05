@@ -10,12 +10,12 @@
  * - « Description — L'annonce », avec son chargeur ;
  * - une annonce native propre au détail, quand il y en a une et que la
  *   personne n'est pas sans pub (aucune carte de remplacement sinon) ;
- * - « Voir l'annonce d'origine », dans le pied flottant.
+ * - dans le pied flottant : **« Adapter mon CV à cette offre »** (l'action
+ *   principale, en bleu : elle ouvre le dossier et l'atelier,
+ *   `features/atelier`) et « Voir l'annonce d'origine », en contour.
  *
- * Le pied « Créer mon CV / Créer ma lettre » de la V1 arrive avec le
- * Studio (onglet CV) ; d'ici là, l'action est l'annonce d'origine. Les
- * étiquettes disent tout ce que l'API type : lieu, contrat, télétravail,
- * horaires, expérience, salaire, et la source de l'annonce.
+ * Les étiquettes disent tout ce que l'API type : lieu, contrat,
+ * télétravail, horaires, expérience, salaire, et la source de l'annonce.
  *
  * ═══ L'entrée ═══
  *
@@ -37,7 +37,7 @@ import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
-import { SALAIRE, SUR_PRIMAIRE } from "@/theme";
+import { SALAIRE } from "@/theme";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import { CarteAnnonce } from "@/features/publicite/components/carte-annonce";
@@ -85,6 +85,8 @@ export function EcranDetailOffre() {
     basculerSignet,
     partager,
     postuler,
+    adapterCv,
+    ouvertureDossier,
     ecarter,
     recharger,
     retour,
@@ -201,24 +203,40 @@ export function EcranDetailOffre() {
         )}
       </SafeAreaView>
 
-      {/* L'action, en pied flottant — le même que le détail d'un modèle. */}
-      {offre !== null && offre.lienCandidature !== null ? (
+      {/* Les actions, en pied flottant — le même que le détail d'un modèle.
+          Une seule en bleu : adapter son CV. L'annonce d'origine, en contour. */}
+      {offre !== null ? (
         <PiedFlottant>
           <Pressable
-            onPress={postuler}
-            className="h-[52px] flex-row items-center justify-center gap-2 rounded-[14px] bg-primary"
-            accessibilityRole="link"
+            onPress={adapterCv}
+            disabled={ouvertureDossier}
+            className={`h-[52px] flex-row items-center justify-center gap-2 rounded-[14px] bg-primary ${
+              ouvertureDossier ? "opacity-60" : ""
+            }`}
+            accessibilityRole="button"
+            accessibilityState={{ busy: ouvertureDossier }}
           >
             <Texte className="font-bold text-callout text-primary-foreground">
-              Voir l&apos;annonce d&apos;origine
+              {ouvertureDossier ? "J'ouvre ton dossier…" : "Adapter mon CV à cette offre"}
             </Texte>
-            <Icone
-              nom="ouvrir"
-              couleur={SUR_PRIMAIRE[couleurs.mode]}
-              taille={16}
-              graisse="semibold"
-            />
           </Pressable>
+          {offre.lienCandidature !== null ? (
+            <Pressable
+              onPress={postuler}
+              className="h-[48px] flex-row items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-border-champ"
+              accessibilityRole="link"
+            >
+              <Texte className="font-bold text-callout text-foreground">
+                Voir l&apos;annonce d&apos;origine
+              </Texte>
+              <Icone
+                nom="ouvrir"
+                couleur={couleurs.texte}
+                taille={15}
+                graisse="semibold"
+              />
+            </Pressable>
+          ) : null}
         </PiedFlottant>
       ) : null}
     </Box>

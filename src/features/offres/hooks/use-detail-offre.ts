@@ -38,6 +38,7 @@ import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useState } from "react";
 import { Linking, Platform, Share } from "react-native";
 
+import { useEntreeAtelier } from "@/features/atelier/hooks/use-entree-atelier";
 import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
 import { useAnnonceEmplacement } from "@/features/publicite/hooks/use-annonce-emplacement";
 import type { NativeAd } from "@/features/publicite/api/publicite.api";
@@ -66,6 +67,9 @@ export interface DetailOffre {
   basculerSignet: () => void;
   partager: () => void;
   postuler: () => void;
+  /** « Adapter mon CV à cette offre » : ouvre (ou reprend) le dossier, puis l'atelier. */
+  adapterCv: () => void;
+  ouvertureDossier: boolean;
   ouvrirCarte: () => void;
   /** Écarte l'offre du fil, et revient au fil. */
   ecarter: () => void;
@@ -97,6 +101,7 @@ export function useDetailOffre(): DetailOffre {
   const [tentative, setTentative] = useState(0);
   const [enregistrement, setEnregistrement] = useState(false);
   const annonce = useAnnonceEmplacement("detail_offre");
+  const entree = useEntreeAtelier(offre?.id ?? null);
 
   // L'offre complète : toujours lue, sauf si la mémoire a déjà son texte.
   useEffect(() => {
@@ -207,6 +212,8 @@ export function useDetailOffre(): DetailOffre {
     basculerSignet,
     partager,
     postuler,
+    adapterCv: entree.adapter,
+    ouvertureDossier: entree.ouverture,
     ouvrirCarte,
     ecarter,
     recharger,

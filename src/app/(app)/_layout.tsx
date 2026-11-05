@@ -108,6 +108,14 @@ export default function LayoutApp() {
           name="cv/modifier/[section]"
           options={{ animation: "fade_from_bottom", animationDuration: 280 }}
         />
+        {/* L'atelier CV : l'écran, c'est la feuille. Il monte en fondu depuis le
+            bas comme un détail ; le geste de retour reste permis, le brouillon
+            local et la sauvegarde différée gardent ce qui a été fait. La lettre
+            et Finaliser s'empilent par-dessus. */}
+        <Stack.Screen
+          name="atelier/[dossierId]/index"
+          options={{ animation: "fade_from_bottom", animationDuration: 280 }}
+        />
         {/* Les paramètres s'empilent comme un détail : on y va, on revient.
             La suppression monte en fondu depuis le bas, comme une feuille
             qu'on ouvre — et le geste de retour reste permis : on doit

@@ -28,7 +28,15 @@
 import { ecrireLocal, lireLocal } from "@/lib/magasin-local";
 
 export type Emplacement =
-  "fil" | "detail_offre" | "galerie" | "cv" | "attente_import" | "candidatures";
+  | "fil"
+  | "detail_offre"
+  | "galerie"
+  | "cv"
+  | "attente_import"
+  | "candidatures"
+  /** L'atelier : pendant que Karria adapte le CV, et pendant la génération des documents. */
+  | "atelier_attente"
+  | "finaliser";
 
 /** Par emplacement, par jour (`AAAA-MM-JJ`), un nombre. */
 export type Journal = Partial<Record<Emplacement, Record<string, number>>>;
