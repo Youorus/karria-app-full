@@ -128,15 +128,21 @@ lettres assorties). `404 template_not_found`.
   `404 template_not_found`, `422 template_not_free` (un modèle Premium s'achète par l'achat
   intégré, hors de ce contrat).
 - **Nouveau** — `GET /user-templates/me/selected` → `200 Selection` | `204` (aucun choix) ;
-  `PUT /user-templates/me/selected` `{ "template_id": "…", "ats_safe": false }` →
+  `PUT /user-templates/me/selected` `{ "template_id": "…", "ats_safe": false, "primary_color": "#7b1e2b" | null }` →
   `200 Selection`. `403 template_locked` (`details.reason`) si le modèle est Premium et non
-  possédé. Le choix sert de modèle par défaut aux exports.
+  possédé. Le choix sert de modèle par défaut aux exports. **2026-11-05 (ADR-0034)** :
+  `primary_color` est la couleur principale posée par la personne (`#RRGGBB`, `null` = celle
+  du modèle, `422` sur un autre code) ; `default_primary_color` est la couleur d'origine du
+  modèle choisi (sa `primary_color` de galerie), pour afficher « D'origine ». Le `PUT`
+  **remplace** le choix entier : omettre `primary_color` la retire.
 
 ```json
 {
   "template": { "id": "6f1c…", "label": "Meridian", "version": 1 },
   "ats_safe": false,
-  "updated_at": "2026-10-24T10:00:00Z"
+  "updated_at": "2026-10-24T10:00:00Z",
+  "primary_color": "#7B1E2B",
+  "default_primary_color": "#1A5276"
 }
 ```
 

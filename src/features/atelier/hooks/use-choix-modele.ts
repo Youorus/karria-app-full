@@ -21,6 +21,8 @@
  * pas de changer le modèle d'un dossier après sa création, et c'est ce
  * choix que les exports lisent sans `template_id`. Sans attendre, sans
  * bloquer : un refus est journalisé, le modèle reste appliqué localement.
+ * Le `PUT` remplace le choix entier : la couleur principale courante
+ * (`couleur`) repart avec lui, sinon elle serait retirée.
  */
 
 import * as WebBrowser from "expo-web-browser";
@@ -64,6 +66,7 @@ export function useChoixModele(
   possedes: Set<string>,
   modeleId: string | null,
   onApplique: (modeleId: string) => void,
+  couleur: string | null = null,
 ): ChoixModele {
   const { invite } = usePorte();
   const [paiementsActifs, setPaiementsActifs] = useState(false);
@@ -88,11 +91,11 @@ export function useChoixModele(
   const appliquer = useCallback(
     (id: string) => {
       onApplique(id);
-      retenirModele(id).catch((cause: unknown) =>
+      retenirModele(id, couleur).catch((cause: unknown) =>
         console.warn("[karria] modèle par défaut non retenu", cause),
       );
     },
-    [onApplique],
+    [onApplique, couleur],
   );
 
   const choisir = useCallback(

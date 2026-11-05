@@ -154,6 +154,7 @@ export function versDossier(b: DossierBrut): Dossier {
     id: b.id,
     offre: versOffreFigee(b.offer),
     modeleId: b.template_id,
+    couleur: b.primary_color ?? null,
     cv: versCv({ ...b.cv, updated_at: b.updated_at }),
     empreinteCvDeBase: b.cv_base_hash,
     baseChangee: b.base_changed,
@@ -175,6 +176,7 @@ export function versCarteDossier(b: CarteDossierBrute): CarteDossier {
     id: b.id,
     offre: versOffreFigee(b.offer),
     modeleId: b.template_id,
+    couleur: b.primary_color ?? null,
     statut: b.status,
     adaptation: b.adaptation,
     couverture: b.coverage_ratio,
@@ -317,6 +319,20 @@ export async function changerModeleDuDossier(
   return versDossier(
     await http.put<DossierBrut>(`/applications/${id}/template`, {
       template_id: modeleId,
+    }),
+  );
+}
+
+/** La couleur principale du dossier (`#RRGGBB`), à tout moment ; `null` rend la
+ *  main à la couleur du modèle. Elle survit au changement de modèle. `422` sur
+ *  un code qui n'est pas `#rrggbb` (on envoie toujours un code normalisé). */
+export async function changerCouleurDuDossier(
+  id: string,
+  couleur: string | null,
+): Promise<Dossier> {
+  return versDossier(
+    await http.put<DossierBrut>(`/applications/${id}/color`, {
+      primary_color: couleur,
     }),
   );
 }

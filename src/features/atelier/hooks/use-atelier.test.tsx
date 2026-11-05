@@ -90,11 +90,23 @@ jest.mock("@/features/publicite/hooks/use-annonce-emplacement", () => ({
   useAnnonceEmplacement: () => null,
 }));
 
-const mockRendre = jest.fn<(modeleId: string, cv: Cv) => Promise<unknown>>();
+const mockRendre =
+  jest.fn<
+    (
+      modeleId: string,
+      cv: Cv,
+      atsSafe?: boolean,
+      couleur?: string | null,
+    ) => Promise<unknown>
+  >();
+const mockChoisir =
+  jest.fn<(modeleId: string, couleur: string | null) => Promise<void>>();
 jest.mock("../api/documents.api", () => ({
   lireModeleChoisi: async () => null,
-  choisirModele: async () => undefined,
-  rendreCv: (modeleId: string, cv: Cv) => mockRendre(modeleId, cv),
+  choisirModele: (modeleId: string, couleur: string | null) =>
+    mockChoisir(modeleId, couleur),
+  rendreCv: (modeleId: string, cv: Cv, atsSafe?: boolean, couleur?: string | null) =>
+    mockRendre(modeleId, cv, atsSafe, couleur),
 }));
 
 const LIBRE = "a0000000-0000-4000-8000-000000000001";
@@ -117,7 +129,8 @@ function unModele(id: string, libelle: string, premium: boolean): Modele {
     utilisations: 0,
     note: 0,
     nombreDAvis: 0,
-    couleur: null,
+    // Meridian (LIBRE) a une couleur mesurée : « D'origine » ; les autres non.
+    couleur: id === LIBRE ? "#1A5276" : null,
     police: null,
     avecPhoto: true,
     apercus: [],
@@ -154,6 +167,7 @@ jest.mock("@/features/cv/api/cv.api", () => ({ lireMonCv: async () => mockCv }))
 
 const mockDossier: Dossier = {
   id: "dos_1",
+  couleur: null,
   offre: {
     id: "offre_1",
     titre: "Conseillère de vente",
@@ -193,10 +207,14 @@ const mockDossier: Dossier = {
 };
 const mockChangerModele =
   jest.fn<(id: string, modeleId: string | null) => Promise<Dossier>>();
+const mockChangerCouleur =
+  jest.fn<(id: string, couleur: string | null) => Promise<Dossier>>();
 jest.mock("@/features/candidatures/api/candidatures.api", () => ({
   lireDossier: async () => mockDossier,
   changerModeleDuDossier: (id: string, modeleId: string | null) =>
     mockChangerModele(id, modeleId),
+  changerCouleurDuDossier: (id: string, couleur: string | null) =>
+    mockChangerCouleur(id, couleur),
   modifierCvDuDossier: async () => mockDossier,
   deciderProposition: async () => mockDossier,
   relancerAdaptation: async () => mockDossier,
@@ -215,7 +233,87 @@ describe("L'atelier : changer de modèle ne perd rien", () => {
       ...mockDossier,
       modeleId,
     }));
+    mockChoisir.mockReset();
+    mockChoisir.mockResolvedValue(undefined);
+    mockChangerCouleur.mockReset();
+    mockChangerCouleur.mockImplementation(async (_id, couleur) => ({
+      ...mockDossier,
+      couleur,
+    }));
     jest.spyOn(Alert, "alert").mockImplementation(() => {});
+  });
+
+  it("libre : la couleur se pose, se voit au rendu, survit au modèle, part au choix à « Garder »", async () => {
+    const { result } = renderHook(() => useAtelier(true));
+    await waitFor(() => expect(result.current.chargement).toBe(false));
+    expect(result.current.couleur).toBeNull();
+    expect(result.current.couleurOrigine).toBe("#1A5276");
+    act(() => result.current.garderModele());
+    mockRendre.mockClear();
+
+    act(() => result.current.ouvrir({ type: "couleur" }));
+    act(() => result.current.choisirCouleur("7b1e2b"));
+    expect(result.current.couleur).toBe("#7B1E2B");
+    await waitFor(() => expect(mockRendre).toHaveBeenCalledTimes(1));
+    expect(mockRendre.mock.calls[0]?.[3]).toBe("#7B1E2B");
+    // Le CV n'a pas bougé, le brouillon porte la couleur.
+    expect(result.current.peutAnnuler).toBe(false);
+    expect(lireBrouillonAtelier("libre")?.couleur).toBe("#7B1E2B");
+    // Rien ne part tant que la feuille est ouverte ; « Garder » envoie une fois.
+    expect(mockChoisir).not.toHaveBeenCalled();
+    act(() => result.current.garderCouleur());
+    expect(result.current.feuille).toBeNull();
+    expect(mockChoisir).toHaveBeenCalledWith(LIBRE, "#7B1E2B");
+
+    // Changer de modèle garde la couleur choisie.
+    act(() => result.current.choisirModele(ACHETE));
+    expect(result.current.couleur).toBe("#7B1E2B");
+    await waitFor(() => expect(mockRendre).toHaveBeenCalledTimes(2));
+    expect(mockRendre.mock.calls[1]?.[3]).toBe("#7B1E2B");
+
+    // La couleur d'origine du modèle courant se retient comme « aucune ».
+    act(() => result.current.choisirModele(LIBRE));
+    act(() => result.current.choisirCouleur("#1a5276"));
+    expect(result.current.couleur).toBeNull();
+    // Rouvrir sans rien changer, puis garder : pas d'envoi de plus.
+    mockChoisir.mockClear();
+    act(() => result.current.ouvrir({ type: "couleur" }));
+    act(() => result.current.garderCouleur());
+    expect(mockChoisir).not.toHaveBeenCalled();
+  });
+
+  it("dossier : la couleur part au dossier à « Garder », et `?couleur=` la pose à l'ouverture", async () => {
+    mockParams = { dossierId: "dos_1" };
+    const { result } = renderHook(() => useAtelier(false));
+    await waitFor(() => expect(result.current.chargement).toBe(false));
+    act(() => result.current.garderModele());
+
+    act(() => result.current.ouvrir({ type: "couleur" }));
+    act(() => result.current.choisirCouleur("#2E7D32", false));
+    act(() => result.current.garderCouleur());
+    expect(mockChangerCouleur).toHaveBeenCalledWith("dos_1", "#2E7D32");
+    await waitFor(() => expect(result.current.dossier?.couleur).toBe("#2E7D32"));
+
+    // « Revenir à la couleur d'origine » : null part au dossier.
+    act(() => result.current.ouvrir({ type: "couleur" }));
+    act(() => result.current.choisirCouleur(null));
+    act(() => result.current.garderCouleur());
+    expect(mockChangerCouleur).toHaveBeenLastCalledWith("dos_1", null);
+  });
+
+  it("libre : `?couleur=` (Mes CV) pose la couleur de l'export, un code invalide est ignoré", async () => {
+    mockParams = { modele: ACHETE, couleur: "2e7d32" };
+    const { result } = renderHook(() => useAtelier(true));
+    await waitFor(() => expect(result.current.chargement).toBe(false));
+    expect(result.current.couleur).toBe("#2E7D32");
+    expect(mockRendre).toHaveBeenCalledWith(ACHETE, mockCv, false, "#2E7D32");
+
+    // Le brouillon écrit par la première ouverture porte la couleur : on repart à vide.
+    mockDisque.clear();
+    mockParams = { couleur: "bleu" };
+    const second = renderHook(() => useAtelier(true));
+    await waitFor(() => expect(second.result.current.chargement).toBe(false));
+    expect(second.result.current.couleur).toBeNull();
   });
 
   it("libre : deux changements laissent le CV retouché, l'historique et le brouillon intacts", async () => {
@@ -261,7 +359,7 @@ describe("L'atelier : changer de modèle ne perd rien", () => {
     await waitFor(() => expect(result.current.chargement).toBe(false));
     expect(result.current.modeleId).toBe(ACHETE);
     expect(result.current.feuille).toBeNull();
-    expect(mockRendre).toHaveBeenCalledWith(ACHETE, mockCv);
+    expect(mockRendre).toHaveBeenCalledWith(ACHETE, mockCv, false, null);
   });
 
   it("libre : un Premium non possédé demandé par l'adresse est ignoré", async () => {
@@ -286,7 +384,7 @@ describe("L'atelier : changer de modèle ne perd rien", () => {
     expect(result.current.modeleId).toBe(ACHETE);
     expect(result.current.cv).toBe(avant);
     expect(result.current.propositions).toEqual(mockDossier.propositions);
-    expect(mockRendre).toHaveBeenCalledWith(ACHETE, avant);
+    expect(mockRendre).toHaveBeenCalledWith(ACHETE, avant, false, null);
 
     // Le même modèle redemandé : aucun appel.
     act(() => result.current.choisirModele(ACHETE));

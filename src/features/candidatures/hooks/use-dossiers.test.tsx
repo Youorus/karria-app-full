@@ -46,6 +46,7 @@ function carte(
 ): CarteDossier {
   return {
     id,
+    couleur: null,
     offre: {
       id: `offre-${id}`,
       titre: `Offre ${id}`,

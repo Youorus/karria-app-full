@@ -118,6 +118,8 @@ export interface DossierBrut {
   id: string;
   offer: OffreFigeeBrute;
   template_id: string | null;
+  /** La couleur principale posée par la personne (`#RRGGBB`), ou `null` (ADR-0034). */
+  primary_color?: string | null;
   cv: CvDeDossierBrut;
   cv_base_hash: string;
   /** Le CV de base a changé (ou disparu) depuis la copie. */
@@ -138,6 +140,7 @@ export interface CarteDossierBrute {
   id: string;
   offer: OffreFigeeBrute;
   template_id: string | null;
+  primary_color?: string | null;
   status: StatutBrut;
   adaptation: AdaptationBrute;
   coverage_ratio: number;
@@ -236,6 +239,8 @@ export interface Dossier {
   id: string;
   offre: OffreFigee;
   modeleId: string | null;
+  /** La couleur principale posée sur le modèle du dossier ; `null` : celle du modèle. */
+  couleur: string | null;
   /** La copie adaptée — sans photo : celle du CV de base sert à l'aperçu. */
   cv: Cv;
   empreinteCvDeBase: string;
@@ -255,6 +260,7 @@ export interface CarteDossier {
   id: string;
   offre: OffreFigee;
   modeleId: string | null;
+  couleur: string | null;
   statut: StatutDossier;
   adaptation: EtatAdaptation;
   /** De 0 à 1. */

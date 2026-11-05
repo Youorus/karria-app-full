@@ -29,6 +29,8 @@ import { dossierEnCours } from "../services/dossier-en-cours";
 
 export interface OuvertureAvecModele {
   modeleId: string;
+  /** La couleur principale de l'export (`#RRGGBB`), pour la revoir telle quelle. */
+  couleur?: string | null;
   /** Ouvrir aussitôt « Avec quel modèle ? », pour comparer. */
   feuille?: "modele";
   /** Vrai : ignorer le dossier en cours, aller droit à l'atelier libre. */
@@ -38,8 +40,11 @@ export interface OuvertureAvecModele {
 export function useOuvrirAtelierAvecModele(): (o: OuvertureAvecModele) => void {
   const { pousser } = useNavigationUnique();
   return useCallback(
-    ({ modeleId, feuille, libre = false }: OuvertureAvecModele) => {
-      const cible = feuille === "modele" ? { cible: "modele" } : {};
+    ({ modeleId, couleur, feuille, libre = false }: OuvertureAvecModele) => {
+      const cible = {
+        ...(feuille === "modele" ? { cible: "modele" } : {}),
+        ...(couleur ? { couleur } : {}),
+      };
       const dossierId = libre ? null : dossierEnCours();
       if (dossierId !== null) {
         pousser({

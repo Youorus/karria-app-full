@@ -92,6 +92,8 @@ interface DossierSimule {
   id: string;
   offer: OffreFigee;
   template_id: string | null;
+  /** La couleur principale posée par la personne (`#RRGGBB`), ou `null` (ADR-0034). */
+  primary_color: string | null;
   cv: Record<string, unknown>;
   cv_base_hash: string;
   base_changed: boolean;
@@ -523,6 +525,7 @@ function versDossier(d: DossierSimule) {
     id: d.id,
     offer: d.offer,
     template_id: d.template_id,
+    primary_color: d.primary_color,
     cv: d.cv,
     cv_base_hash: d.cv_base_hash,
     base_changed: d.base_changed,
@@ -545,6 +548,7 @@ function versCarte(d: DossierSimule) {
     id: d.id,
     offer: { offer_id, title, company, logo_url, city, contract_label, source_url },
     template_id: d.template_id,
+    primary_color: d.primary_color,
     status: statutDe(d),
     adaptation: d.adaptation,
     coverage_ratio: couverture(d.offer, d.cv).ratio,
@@ -567,6 +571,7 @@ function nouveauDossier(
     id: identifiant("dos"),
     offer: offre,
     template_id: template,
+    primary_color: null,
     cv: copie(cv),
     cv_base_hash: empreinte(cv),
     base_changed: false,
@@ -865,6 +870,36 @@ export function repondreCandidatures(
     // Idempotent : le même modèle redemandé ne touche pas `updated_at`.
     if (dossier.template_id !== template) {
       dossier.template_id = template;
+      toucher(dossier, maintenant);
+    }
+    return json(200, versDossier(dossier));
+  }
+
+  if (reste === "color" && methode === "PUT") {
+    // La couleur principale du dossier (ADR-0034) : `#RRGGBB`, `null` = celle
+    // du modèle ; elle survit au changement de modèle. Idempotent.
+    if (!("primary_color" in ((corps ?? {}) as Record<string, unknown>))) {
+      return erreur(422, "invalid_input", "`primary_color` est requis (ou null).", {
+        field: "primary_color",
+      });
+    }
+    const brut = champ(corps, "primary_color");
+    let couleur: string | null = null;
+    if (brut !== null) {
+      const m =
+        typeof brut === "string"
+          ? /^#?([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.exec(brut.trim())
+          : null;
+      if (m === null) {
+        return erreur(422, "invalid_input", "Un code couleur s'écrit #rrggbb.", {
+          field: "primary_color",
+        });
+      }
+      const d = m[1].length === 3 ? [...m[1]].map((c) => c + c).join("") : m[1];
+      couleur = `#${d.toUpperCase()}`;
+    }
+    if (dossier.primary_color !== couleur) {
+      dossier.primary_color = couleur;
       toucher(dossier, maintenant);
     }
     return json(200, versDossier(dossier));

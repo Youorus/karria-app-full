@@ -67,6 +67,8 @@ export interface ExportBrut {
   kind?: "cv" | "letter";
   template: { id: string; label: string; version: number } | null;
   ats_safe?: boolean;
+  /** La couleur principale du rendu, si la personne en a posé une (ADR-0034). */
+  primary_color?: string | null;
   dossier_id?: string | null;
   company_name?: string | null;
   created_at: string;
@@ -92,6 +94,10 @@ export interface SelectionBrute {
   template: { id: string; label: string; version: number };
   ats_safe: boolean;
   updated_at: string;
+  /** La couleur posée par la personne (`#RRGGBB`), ou `null` (ADR-0034). */
+  primary_color?: string | null;
+  /** La couleur d'origine du modèle choisi. */
+  default_primary_color?: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -136,6 +142,8 @@ export interface Export {
   docx: string | null;
   /** `null` sur une lettre, ou quand le serveur n'a pas noté. */
   ats: ScoreAts | null;
+  /** La couleur principale avec laquelle l'export a été rendu ; `null` : celle du modèle. */
+  couleur: string | null;
 }
 
 export type StatutEnvoi = "en_file" | "envoye" | "echoue";
@@ -153,4 +161,8 @@ export interface Selection {
   modeleId: string;
   libelle: string;
   atsSafe: boolean;
+  /** La couleur principale retenue par défaut ; `null` : celle du modèle. */
+  couleur: string | null;
+  /** La couleur d'origine du modèle choisi, si le serveur la connaît. */
+  couleurOrigine: string | null;
 }

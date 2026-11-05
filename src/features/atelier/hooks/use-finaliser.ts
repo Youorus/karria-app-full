@@ -122,6 +122,10 @@ export interface EcranFinaliser {
   corriger: (controle: ControleAts) => void;
   /** Revoir le CV dans un autre modèle : l'atelier, la feuille du modèle ouverte. */
   changerDeModele: () => void;
+  /** Changer la couleur principale : l'atelier, la feuille « Quelle couleur ? » ouverte. */
+  changerDeCouleur: () => void;
+  /** La couleur d'origine du modèle exporté, si la galerie la connaît. */
+  couleurOrigine: string | null;
   optimiser: () => void;
   /** L'adresse du compte, pour la pré-remplir. */
   adresseDuCompte: string | null;
@@ -164,6 +168,8 @@ export function useFinaliser(libre = false): EcranFinaliser {
   const [exportLettre, setExportLettre] = useState<Export | null>(null);
   /** Libre : le CV exporté, pour nommer les fichiers. */
   const [cvLibre, setCvLibre] = useState<Cv | null>(null);
+  /** La galerie, pour la couleur d'origine du modèle exporté. */
+  const [galerie, setGalerie] = useState<Modele[]>([]);
   const [telechargement, setTelechargement] = useState<Telechargement | null>(null);
   const [adresseDuCompte, setAdresseDuCompte] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState<EcranFinaliser["envoi"]>({
@@ -211,6 +217,7 @@ export function useFinaliser(libre = false): EcranFinaliser {
       lireMesModeles().catch(() => new Set<string>()),
     ]);
     if (!vivant.current) return;
+    setGalerie(galerie);
     if (base.vide) throw new ErreurApi(TEXTES.sansCvPhrase, 409, "cv_missing");
     const brouillon = lireBrouillonAtelier(CLE_BROUILLON_LIBRE);
     const reprise = brouillon !== null && brouillonPrime(brouillon, base.misAJour);
@@ -223,7 +230,10 @@ export function useFinaliser(libre = false): EcranFinaliser {
     }
     modeleRef.current = modeleId;
     setCvLibre(cv);
-    const exporte = await exporterCvLibre({ cv, modeleId, atsSafe });
+    // La couleur : celle du brouillon repris, sinon celle du choix par défaut.
+    const duBrouillon = reprise ? brouillon.couleur : undefined;
+    const couleur = duBrouillon ?? choisi?.couleur ?? null;
+    const exporte = await exporterCvLibre({ cv, modeleId, atsSafe, couleur });
     if (!vivant.current) return;
     setExportCv(exporte);
     setExportLettre(null);
@@ -238,6 +248,7 @@ export function useFinaliser(libre = false): EcranFinaliser {
         lireMesModeles().catch(() => new Set<string>()),
       ]);
       if (!vivant.current) return;
+      setGalerie(galerie);
       memoriserDossier(lu);
       setDossier(lu);
       const modeleId = modeleDuDossier({
@@ -255,14 +266,18 @@ export function useFinaliser(libre = false): EcranFinaliser {
         );
       }
       modeleRef.current = modeleId;
+      // Le dossier porte la couleur (elle survit au changement d'appareil) ;
+      // le CV et la lettre partent avec la même.
+      const couleur = lu.couleur;
       const [cv, lettre] = await Promise.all([
-        exporterCvDuDossier({ cv: lu.cv, modeleId, dossierId, atsSafe }),
+        exporterCvDuDossier({ cv: lu.cv, modeleId, dossierId, atsSafe, couleur }),
         lu.lettre === null
           ? Promise.resolve(null)
           : exporterLettre({
               lettre: documentDeLettre(lu, lu.lettre, lu.cv),
               modeleId,
               dossierId,
+              couleur,
             }).catch((cause: unknown) => {
               // Le CV compte d'abord : une lettre qui échoue se dit, ne bloque pas.
               console.warn("[karria] export de la lettre en échec", cause);
@@ -414,7 +429,18 @@ export function useFinaliser(libre = false): EcranFinaliser {
       });
   }, [remplacer, dossierId, libre]);
 
+  const changerDeCouleur = useCallback(() => {
+    if (libre) remplacer({ pathname: "/atelier/libre", params: { cible: "couleur" } });
+    else
+      remplacer({
+        pathname: "/atelier/[dossierId]",
+        params: { dossierId, cible: "couleur" },
+      });
+  }, [remplacer, dossierId, libre]);
+
   const score = exportCv?.ats ?? null;
+  const couleurOrigine =
+    galerie.find((m) => m.id === exportCv?.modele?.id)?.couleur ?? null;
 
   return {
     libre,
@@ -433,6 +459,8 @@ export function useFinaliser(libre = false): EcranFinaliser {
     telecharger,
     corriger,
     changerDeModele,
+    changerDeCouleur,
+    couleurOrigine,
     optimiser,
     adresseDuCompte,
     envoi,

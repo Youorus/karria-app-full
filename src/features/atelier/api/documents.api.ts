@@ -16,7 +16,13 @@
  * - `POST /documents/exports/send` : plusieurs exports dans un seul e-mail ;
  *   `POST /documents/exports/{id}/send` : un seul.
  * - `GET /documents/sends/{id}` : où en est l'envoi.
- * - `GET|PUT /user-templates/me/selected` : le modèle choisi par la personne.
+ * - `GET|PUT /user-templates/me/selected` : le modèle choisi par la personne,
+ *   et sa couleur principale par défaut.
+ *
+ * La **couleur principale** (`primary_color`, ADR-0034) part à chaque rendu et
+ * à chaque export ; `null` = la couleur du modèle. Le serveur la normalise en
+ * `#RRGGBB` et répond `422` sur un autre code : on envoie toujours
+ * `normaliserCode` (`services/couleur.ts`).
  *
  * Le CV part dans la forme de `GET /cv/me` : on réutilise `versCvBrut` des
  * dossiers — une seule traduction du CV dans l'application.
@@ -73,6 +79,7 @@ export function versExport(b: ExportBrut): Export {
     pdf: b.pdf_url ?? null,
     docx: b.docx_url ?? null,
     ats: versScoreAts(b.ats),
+    couleur: b.primary_color ?? null,
   };
 }
 
@@ -102,23 +109,29 @@ export async function rendreCv(
   modeleId: string,
   cv: Cv,
   atsSafe = false,
+  couleur: string | null = null,
 ): Promise<Rendu> {
   return versRendu(
     await http.post<RenduBrut>(`/documents/${modeleId}/render`, {
       cv: versCvBrut(cv),
       letter: null,
       ats_safe: atsSafe,
+      primary_color: couleur,
     }),
   );
 }
 
-/** La lettre, ancrée, dans le modèle du dossier. */
+/** La lettre, ancrée, dans le modèle du dossier — et sa couleur. */
 export async function rendreLettre(
   modeleId: string,
   lettre: LettreDocumentBrute,
+  couleur: string | null = null,
 ): Promise<Rendu> {
   return versRendu(
-    await http.post<RenduBrut>(`/documents/${modeleId}/render`, { letter: lettre }),
+    await http.post<RenduBrut>(`/documents/${modeleId}/render`, {
+      letter: lettre,
+      primary_color: couleur,
+    }),
   );
 }
 
@@ -138,6 +151,7 @@ export async function exporterCvDuDossier(options: {
   modeleId: string;
   dossierId: string;
   atsSafe?: boolean;
+  couleur?: string | null;
 }): Promise<Export> {
   return versExport(
     await http.post<ExportBrut>("/cv/me/generated-cvs", {
@@ -146,6 +160,7 @@ export async function exporterCvDuDossier(options: {
       ats_safe: options.atsSafe ?? false,
       dossier_id: options.dossierId,
       cv: versCvBrut(options.cv),
+      primary_color: options.couleur ?? null,
     }),
   );
 }
@@ -159,6 +174,7 @@ export async function exporterCvLibre(options: {
   cv: Cv;
   modeleId: string;
   atsSafe?: boolean;
+  couleur?: string | null;
 }): Promise<Export> {
   return versExport(
     await http.post<ExportBrut>("/cv/me/generated-cvs", {
@@ -166,6 +182,7 @@ export async function exporterCvLibre(options: {
       formats: ["pdf", "docx"],
       ats_safe: options.atsSafe ?? false,
       cv: versCvBrut(options.cv),
+      primary_color: options.couleur ?? null,
     }),
   );
 }
@@ -188,6 +205,7 @@ export async function exporterLettre(options: {
   lettre: LettreDocumentBrute;
   modeleId: string;
   dossierId: string;
+  couleur?: string | null;
 }): Promise<Export> {
   return versExport(
     await http.post<ExportBrut>("/documents/letters/export", {
@@ -195,6 +213,7 @@ export async function exporterLettre(options: {
       letter: options.lettre,
       formats: ["pdf", "docx"],
       dossier_id: options.dossierId,
+      primary_color: options.couleur ?? null,
     }),
   );
 }
@@ -229,13 +248,20 @@ export async function lireModeleChoisi(): Promise<Selection | null> {
     modeleId: brut.template.id,
     libelle: brut.template.label,
     atsSafe: brut.ats_safe,
+    couleur: brut.primary_color ?? null,
+    couleurOrigine: brut.default_primary_color ?? null,
   };
 }
 
-/** Retient ce modèle comme modèle par défaut. `403 template_locked`. */
-export async function choisirModele(modeleId: string): Promise<void> {
+/** Retient ce modèle — et cette couleur, `null` = celle du modèle — comme
+ *  choix par défaut. Le `PUT` remplace le choix entier. `403 template_locked`. */
+export async function choisirModele(
+  modeleId: string,
+  couleur: string | null = null,
+): Promise<void> {
   await http.put("/user-templates/me/selected", {
     template_id: modeleId,
     ats_safe: false,
+    primary_color: couleur,
   });
 }

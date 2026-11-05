@@ -217,6 +217,52 @@ describe("le faux serveur de l'atelier", () => {
     );
   });
 
+  it("rend et exporte dans la couleur choisie, la retient sur le choix, refuse un faux code", async () => {
+    const cv = {
+      identity: { first_name: "Awa", last_name: "Diallo", headline: "Vendeuse" },
+    };
+    const rendu = await lire(
+      repondreAtelier("POST", `/documents/${MERIDIAN}/render`, {
+        cv,
+        primary_color: "7b1e2b",
+      }),
+    );
+    expect(rendu.statut).toBe(200);
+    expect(rendu.corps?.html).toContain("#7B1E2B");
+    const faux = await lire(
+      repondreAtelier("POST", `/documents/${MERIDIAN}/render`, {
+        cv,
+        primary_color: "bleu",
+      }),
+    );
+    expect(faux.statut).toBe(422);
+
+    const choix = await lire(
+      repondreAtelier("PUT", "/user-templates/me/selected", {
+        template_id: MERIDIAN,
+        ats_safe: false,
+        primary_color: "#2e7d32",
+      }),
+    );
+    expect(choix.corps?.primary_color).toBe("#2E7D32");
+    expect(typeof choix.corps?.default_primary_color).toBe("string");
+
+    const exporte = await lire(
+      repondreAtelier("POST", "/cv/me/generated-cvs", {
+        template_id: MERIDIAN,
+        cv,
+        primary_color: "#7B1E2B",
+      }),
+    );
+    expect(exporte.statut).toBe(201);
+    expect(exporte.corps?.primary_color).toBe("#7B1E2B");
+    const sansCouleur = await lire(
+      repondreAtelier("POST", "/cv/me/generated-cvs", { template_id: MERIDIAN, cv }),
+    );
+    // Sans couleur dans le corps : celle du choix par défaut, comme le vrai serveur.
+    expect(sansCouleur.corps?.primary_color).toBe("#2E7D32");
+  });
+
   it("retient le modèle choisi", async () => {
     expect(
       (await lire(repondreAtelier("GET", "/user-templates/me/selected", undefined)))

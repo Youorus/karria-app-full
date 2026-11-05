@@ -5,7 +5,9 @@
  *
  * À gauche, la vignette du modèle (celle de la galerie : on reconnaît le
  * dessin avant de lire le nom) dans un cadre de feuille ; à droite, le nom
- * du modèle et « Créé hier ». Toucher cette partie ouvre l'aperçu. Dessous,
+ * du modèle — précédé d'un rond de la couleur principale quand la personne
+ * en a posé une (ADR-0034) — et « Créé hier ». Toucher cette partie ouvre
+ * l'aperçu. Dessous,
  * les gestes : PDF et Word (les mêmes boutons que Finaliser), puis, à
  * droite, envoyer par e-mail et supprimer — deux ronds au ton de l'écran,
  * 40 pt, nommés pour le lecteur d'écran.
@@ -149,9 +151,21 @@ export function CarteExportCv({
         >
           <Vignette modele={modele} />
           <VStack className="flex-1 gap-0.5">
-            <Texte className="font-bold text-body text-foreground" numberOfLines={1}>
-              {libelle}
-            </Texte>
+            <HStack className="items-center gap-2">
+              {exporte.couleur !== null ? (
+                <Box
+                  className="h-3 w-3 rounded-full"
+                  style={{ backgroundColor: exporte.couleur }}
+                  accessibilityLabel={`Couleur ${exporte.couleur}`}
+                />
+              ) : null}
+              <Texte
+                className="shrink font-bold text-body text-foreground"
+                numberOfLines={1}
+              >
+                {libelle}
+              </Texte>
+            </HStack>
             <Texte className="text-footnote text-muted-foreground" numberOfLines={1}>
               {ligneDeCreation(exporte, maintenant)}
             </Texte>

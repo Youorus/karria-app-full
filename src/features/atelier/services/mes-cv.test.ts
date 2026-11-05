@@ -18,6 +18,7 @@ function exporte(partiel: Partial<Export>): Export {
     pdf: "https://x/1.pdf",
     docx: null,
     ats: null,
+    couleur: null,
     ...partiel,
   };
 }

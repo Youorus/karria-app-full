@@ -130,6 +130,7 @@ export function EcranMesCv() {
                     item.exporte.modele !== null &&
                     ouvrirAvecModele({
                       modeleId: item.exporte.modele.id,
+                      couleur: item.exporte.couleur,
                       feuille: "modele",
                       libre: true,
                     })

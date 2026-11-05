@@ -25,7 +25,8 @@ redemande le rendu. Aucun fichier n'est écrit.
 {
   "cv": { …le CV au format de GET /cv/me, tel que l'app tient le brouillon… },
   "letter": null,
-  "ats_safe": false
+  "ats_safe": false,
+  "primary_color": "#7B1E2B"
 }
 ```
 
@@ -36,6 +37,13 @@ redemande le rendu. Aucun fichier n'est écrit.
 - `?sample=true` (sans corps) : **l'exemple du modèle**, pour la galerie — sans ancres,
   permis même sur un modèle Premium non possédé.
 - `ats_safe: true` : la variante « optimisée ATS » (interlettrage plafonné), comme à l'export.
+- `primary_color` (ADR-0034, **2026-11-05**) : `#rrggbb` (ou `rrggbb`, `#rgb`), la couleur
+  principale choisie par la personne, à la place de celle du modèle (`primary_color` de la
+  galerie, celle des titres de rubrique) : toute occurrence de cette couleur — titres, puces,
+  filets, bandes — et ses teintes dérivées (une bande pâle reste pâle) ; le texte noir et les
+  gris ne bougent pas. Appliquée après `ats_safe`, à l'exemple comme au CV ou à la lettre.
+  `null` ou absent : la couleur du modèle. `422` (erreur de validation) sur un autre code.
+  Les pictogrammes de contact rastérisés gardent leur couleur (limite connue).
 
 ### Réponse
 
@@ -67,18 +75,18 @@ redemande le rendu. Aucun fichier n'est écrit.
 Chemins JSON du CV reçu. Champs **composés** : chemin virtuel, l'app patche le texte à la
 frappe et retrouve la vérité au prochain rendu.
 
-| Élément                          | `data-chemin`                                                                                                                               |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| nom complet (en-tête)            | `identity.full_name` (virtuel : prénom + nom) — ou `identity.first_name` / `identity.last_name` si le modèle les sépare                     |
-| poste visé                       | `identity.headline`                                                                                                                         |
-| téléphone, e-mail, ville, site   | `contact.phone`, `contact.email`, `contact.city`, `contact.links.0.url` (affiché raccourci)                                                 |
-| résumé                           | `summary`                                                                                                                                   |
+| Élément | `data-chemin` |
+|---|---|
+| nom complet (en-tête) | `identity.full_name` (virtuel : prénom + nom) — ou `identity.first_name` / `identity.last_name` si le modèle les sépare |
+| poste visé | `identity.headline` |
+| téléphone, e-mail, ville, site | `contact.phone`, `contact.email`, `contact.city`, `contact.links.0.url` (affiché raccourci) |
+| résumé | `summary` |
 | expérience i : poste, entreprise | `experiences.i.position`, `experiences.i.company` — ou `experiences.i` (virtuel) quand le modèle écrit « Poste - Entreprise » sur une ligne |
-| dates, lieu, description         | `experiences.i.dates` (virtuel), `experiences.i.location`, `experiences.i.description`                                                      |
-| mission j                        | `experiences.i.missions.j`                                                                                                                  |
-| formation i                      | `educations.i.degree`, `educations.i.school`, `educations.i.dates`, `educations.i.location`, `educations.i.description`                     |
-| compétence, langue, intérêt      | `skills.i`, `languages.i`, `interests.i` (index dans la liste du CV, même regroupés par catégorie)                                          |
-| projet i                         | `projects.i.title`, `projects.i.technologies` (virtuel), `projects.i.description`                                                           |
+| dates, lieu, description | `experiences.i.dates` (virtuel), `experiences.i.location`, `experiences.i.description` |
+| mission j | `experiences.i.missions.j` |
+| formation i | `educations.i.degree`, `educations.i.school`, `educations.i.dates`, `educations.i.location`, `educations.i.description` |
+| compétence, langue, intérêt | `skills.i`, `languages.i`, `interests.i` (index dans la liste du CV, même regroupés par catégorie) |
+| projet i | `projects.i.title`, `projects.i.technologies` (virtuel), `projects.i.description` |
 
 Les titres de rubrique (« Expériences professionnelles ») n'ont pas de chemin : ce n'est
 pas une donnée du CV. Une ligne qui réunit plusieurs champs (« Entreprise | 2020 ») ancre
@@ -86,14 +94,14 @@ pas une donnée du CV. Une ligne qui réunit plusieurs champs (« Entreprise | 2
 
 ### Erreurs
 
-| Statut | `details.reason`                      | Quand                                                               |
-| ------ | ------------------------------------- | ------------------------------------------------------------------- |
-| 401    | `unauthenticated` / `session_expired` | sans session                                                        |
-| 403    | `template_not_owned`                  | modèle Premium non possédé (hors `sample`)                          |
-| 404    | `template_not_found`                  | modèle inconnu ou non publié                                        |
-| 422    | `nothing_to_render`                   | ni `cv`, ni `letter`, ni `sample`                                   |
-| 422    | `render_too_large`                    | HTML > 1,5 Mo (`details.max_bytes`)                                 |
-| 429    | `render_rate_limited`                 | plus de **90 rendus par minute** par compte (`details.retry_after`) |
+| Statut | `details.reason` | Quand |
+|---|---|---|
+| 401 | `unauthenticated` / `session_expired` | sans session |
+| 403 | `template_not_owned` | modèle Premium non possédé (hors `sample`) |
+| 404 | `template_not_found` | modèle inconnu ou non publié |
+| 422 | `nothing_to_render` | ni `cv`, ni `letter`, ni `sample` |
+| 422 | `render_too_large` | HTML > 1,5 Mo (`details.max_bytes`) |
+| 429 | `render_rate_limited` | plus de **90 rendus par minute** par compte (`details.retry_after`) |
 
 ### Façade pour un autre module
 
@@ -111,11 +119,7 @@ pas une donnée du CV. Une ligne qui réunit plusieurs champs (« Entreprise | 2
 
 ```json
 {
-  "recipient": {
-    "company": "Acme",
-    "logo_url": "https://storage.karria.fr/karria-production-logos/<condensat>/256.webp",
-    "city": "Lyon"
-  },
+  "recipient": { "company": "Acme", "logo_url": "https://storage.karria.fr/karria-production-logos/<condensat>/256.webp", "city": "Lyon" },
   "subject": "Candidature au poste de vendeuse",
   "greeting": "Madame, Monsieur,",
   "paragraphs": [
@@ -125,14 +129,7 @@ pas une donnée du CV. Une ligne qui réunit plusieurs champs (« Entreprise | 2
     { "kind": "pourquoi_moi", "text": "…" }
   ],
   "closing": "Je vous prie d'agréer, Madame, Monsieur, l'expression de mes salutations distinguées.",
-  "sender": {
-    "first_name": "Awa",
-    "last_name": "Diallo",
-    "headline": "Vendeuse",
-    "email": "…",
-    "phone": "…",
-    "city": "Montreuil"
-  }
+  "sender": { "first_name": "Awa", "last_name": "Diallo", "headline": "Vendeuse", "email": "…", "phone": "…", "city": "Montreuil" }
 }
 ```
 
@@ -157,8 +154,11 @@ pas une donnée du CV. Une ligne qui réunit plusieurs champs (« Entreprise | 2
 ### `POST /documents/letters/export` → `201 GeneratedCv`
 
 ```json
-{ "template_id": "…" | null, "letter": { … }, "formats": ["pdf", "docx"] | null, "dossier_id": "…" | null }
+{ "template_id": "…" | null, "letter": { … }, "formats": ["pdf", "docx"] | null, "dossier_id": "…" | null, "primary_color": "#7B1E2B" | null }
 ```
+
+`primary_color` : la couleur du dossier, pour que la lettre suive le CV (§ 1) ; sans
+`template_id` ni couleur, celle du choix de la personne (`/user-templates/me/selected`).
 
 Sans `template_id`, le modèle choisi (`PUT /user-templates/me/selected`) ; sans choix,
 `404 template_not_found`. Modèle Premium non possédé : `403 template_locked`. Format
@@ -178,6 +178,10 @@ Réponse : un `GeneratedCv` (même forme que l'export de CV) avec `kind: "letter
   ainsi qu'un dossier de candidature exporte sa copie adaptée (PDF, DOCX, score ATS sur ce
   CV-là). La photo reste celle du CV de la personne. Absent : comportement inchangé (le CV de
   base, `409 cv_missing` s'il n'existe pas). `cv` hors bornes → `422`.
+- `POST /cv/me/generated-cvs` accepte aussi **`primary_color`** (§ 1) ; sans `template_id` ni
+  couleur, celle du choix de la personne. `GeneratedCv` porte **`primary_color`** (`#RRGGBB`
+  ou `null`) : la couleur avec laquelle l'export a été rendu, pour que « Mes CV » la montre et
+  la réutilise (« Voir avec un autre modèle » repart avec elle).
 - `GET /cv/me/generated-cvs?kind=cv|letter&dossier_id=…` filtre ; `kind` inconnu → `422`.
 - `GET` / `DELETE /cv/me/generated-cvs/{id}` valent pour les deux genres.
 
@@ -210,14 +214,7 @@ pièces sont filtrés (jeu strict, 60 caractères) et remplacés par « Une pers
 ### Réponse (`Envoi`)
 
 ```json
-{
-  "id": "…",
-  "status": "queued",
-  "to": "rh@acme.fr",
-  "generated_ids": ["…"],
-  "created_at": "…",
-  "sent_at": null
-}
+{ "id": "…", "status": "queued", "to": "rh@acme.fr", "generated_ids": ["…"], "created_at": "…", "sent_at": null }
 ```
 
 L'API répond tout de suite ; la remise est un travail de file. `GET /documents/sends/{id}`
@@ -226,15 +223,15 @@ la raison d'un échec reste dans le journal, jamais dans la réponse).
 
 ### Erreurs
 
-| Statut | `details.reason`                  | Quand                                                                                                                                                                                                                                                                                                            |
-| ------ | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 404    | `generated_cv_not_found`          | export inconnu ou d'une autre personne                                                                                                                                                                                                                                                                           |
-| 404    | `send_not_found`                  | envoi inconnu ou d'une autre personne                                                                                                                                                                                                                                                                            |
-| 409    | `document_file_missing`           | export sans fichier                                                                                                                                                                                                                                                                                              |
-| 409    | `account_email_unknown`           | `to: null` et adresse du compte introuvable                                                                                                                                                                                                                                                                      |
-| 422    | `recipient_invalid` (`field: to`) | adresse mal formée                                                                                                                                                                                                                                                                                               |
-| 422    | `documents_count_invalid`         | 0 ou > 4 documents                                                                                                                                                                                                                                                                                               |
-| 429    | `send_quota_exceeded`             | un plafond est atteint (`details.retry_after`, secondes). La réponse ne dit **pas** lequel : **5 envois par jour civil (UTC)** par compte ; vers une adresse **tierce**, 2 envois par jour par compte vers la même boîte (casse et étiquette `+` ignorées), 10 tous comptes confondus, 10 par heure par origine. |
+| Statut | `details.reason` | Quand |
+|---|---|---|
+| 404 | `generated_cv_not_found` | export inconnu ou d'une autre personne |
+| 404 | `send_not_found` | envoi inconnu ou d'une autre personne |
+| 409 | `document_file_missing` | export sans fichier |
+| 409 | `account_email_unknown` | `to: null` et adresse du compte introuvable |
+| 422 | `recipient_invalid` (`field: to`) | adresse mal formée |
+| 422 | `documents_count_invalid` | 0 ou > 4 documents |
+| 429 | `send_quota_exceeded` | un plafond est atteint (`details.retry_after`, secondes). La réponse ne dit **pas** lequel : **5 envois par jour civil (UTC)** par compte ; vers une adresse **tierce**, 2 envois par jour par compte vers la même boîte (casse et étiquette `+` ignorées), 10 tous comptes confondus, 10 par heure par origine. |
 
 Les quotas comptent les envois demandés qui n'ont pas échoué. Vers l'adresse du compte
 (`to: null`, ou la même boîte), seul le quota du compte s'applique. L'adresse est refusée

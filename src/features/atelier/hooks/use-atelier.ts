@@ -42,6 +42,18 @@
  * refus `template_locked` remet l'ancien ; une panne réseau garde le choix
  * local (le brouillon le porte), le prochain « Garder » le renvoie.
  *
+ * ═══ La couleur principale (ADR-0034) ═══
+ *
+ * La feuille « Quelle couleur ? » pose une couleur à la place de celle du
+ * modèle : chaque choix (pastille, curseur, code) redemande le rendu avec
+ * `primary_color` — rien d'autre ne bouge, pas même le brouillon du CV. La
+ * couleur d'origine est celle du modèle dans la galerie (`modele.couleur`) ;
+ * `null` veut dire « celle du modèle », et c'est ce qu'on retient : changer
+ * de modèle garde une couleur choisie, et suit l'origine du nouveau sinon.
+ * Le brouillon la porte ; le serveur aussi, au « Garder » : le dossier
+ * (`PUT /applications/{id}/color`) ou, en mode libre, le choix par défaut
+ * (`PUT /user-templates/me/selected`, avec le modèle courant).
+ *
  * ═══ Le mode libre : « Nouveau CV », sans dossier ═══
  *
  * `useAtelier(true)` ouvre la même feuille sur le **CV de base** (`/cv/me`),
@@ -75,6 +87,7 @@ import { Alert } from "react-native";
 
 import { useActionIa } from "@/features/auth/hooks/use-action-ia";
 import {
+  changerCouleurDuDossier,
   changerModeleDuDossier,
   deciderProposition,
   lireDossier,
@@ -100,7 +113,11 @@ import { useAnnonceEmplacement } from "@/features/publicite/hooks/use-annonce-em
 import { ErreurApi } from "@/lib/http";
 import { useNavigationUnique } from "@/lib/navigation";
 
-import { lireModeleChoisi, rendreCv } from "../api/documents.api";
+import {
+  choisirModele as retenirChoix,
+  lireModeleChoisi,
+  rendreCv,
+} from "../api/documents.api";
 import type { FeuilleCvHandle } from "../components/feuille-cv";
 import {
   brouillonPrime,
@@ -114,6 +131,7 @@ import {
   differences,
   type Cible,
 } from "../services/chemins";
+import { couleurAEnvoyer, normaliserCode } from "../services/couleur";
 import { poserDossierEnCours } from "../services/dossier-en-cours";
 import { cvAvecElement, cvAvecIntitule, cvAvecSection } from "../services/edition";
 import { creerFileDeRendu } from "../services/file-de-rendu";
@@ -145,7 +163,8 @@ export type FeuilleOuverte =
   | { type: "karria" }
   | { type: "mise-en-avant" }
   | { type: "intitule" }
-  | { type: "modele" };
+  | { type: "modele" }
+  | { type: "couleur" };
 
 export type Enregistrement = "repos" | "en-cours" | "fait" | "erreur";
 
@@ -211,6 +230,15 @@ export interface Atelier {
   choisirModele: (modeleId: string) => void;
   /** « Garder ce modèle » : le choix est retenu, la feuille ne se rouvrira plus d'elle-même. */
   garderModele: () => void;
+  /** La couleur principale choisie (`#RRGGBB`) ; `null` : celle du modèle. */
+  couleur: string | null;
+  /** La couleur d'origine du modèle courant, si la galerie la connaît. */
+  couleurOrigine: string | null;
+  /** Pose une couleur (ou `null` : revenir à l'origine) ; la feuille se redessine.
+   *  `immediat` faux : au repos, pour le curseur. */
+  choisirCouleur: (couleur: string | null, immediat?: boolean) => void;
+  /** « Garder cette couleur » : la couleur part au serveur si elle a changé, la feuille se ferme. */
+  garderCouleur: () => void;
   miseEnAvant: {
     deplacer: (rubrique: RubriqueEnListe, index: number, vers: number) => void;
     masquer: (rubrique: RubriqueEnListe, index: number) => void;
@@ -225,6 +253,7 @@ export interface Atelier {
 interface EntreeDeRendu {
   modeleId: string;
   cv: Cv;
+  couleur: string | null;
 }
 
 function messageDe(cause: unknown, libre: boolean): string {
@@ -265,7 +294,12 @@ function noteDe(dossier: Dossier): NoteKarria | null {
 /** La feuille que l'adresse demande (« Je corrige » depuis Finaliser). */
 function feuilleDemandeePar(cible: string | undefined): FeuilleOuverte | null {
   if (!cible) return null;
-  if (cible === "karria" || cible === "mise-en-avant" || cible === "modele")
+  if (
+    cible === "karria" ||
+    cible === "mise-en-avant" ||
+    cible === "modele" ||
+    cible === "couleur"
+  )
     return { type: cible };
   const c = cibleDuChemin(cible);
   return c === null ? null : { type: "modifier", cible: c };
@@ -287,11 +321,16 @@ export function useAtelier(libre = false): Atelier {
     dossierId?: string;
     cible?: string;
     modele?: string;
+    couleur?: string;
   }>();
   const cibleDemandee = params.cible;
   /** Le modèle que l'adresse demande (galerie « Utiliser ce modèle », Mes CV
    *  « Voir avec un autre modèle ») ; retenu s'il est utilisable. */
   const modeleDemande = useRef<string | null>(params.modele ?? null);
+  /** La couleur que l'adresse demande (Mes CV : celle de l'export), si c'est un code. */
+  const couleurDemandee = useRef<string | null>(
+    params.couleur === undefined ? null : normaliserCode(params.couleur),
+  );
   // En mode libre, la clé du brouillon tient lieu d'identifiant : aucune
   // route serveur ne la reçoit (voir les gardes `libre` plus bas).
   const dossierId = libre ? CLE_BROUILLON_LIBRE : (params.dossierId ?? "");
@@ -307,6 +346,7 @@ export function useAtelier(libre = false): Atelier {
   const [cvDeBase, setCvDeBase] = useState<Cv | null>(null);
   const [historique, setHistorique] = useState<Historique<Cv> | null>(null);
   const [modeleId, setModeleId] = useState<string | null>(null);
+  const [couleur, setCouleur] = useState<string | null>(null);
   const [modeles, setModeles] = useState<Modele[]>([]);
   const [possedes, setPossedes] = useState<Set<string>>(new Set());
   const [html, setHtml] = useState<string | null>(null);
@@ -325,6 +365,9 @@ export function useAtelier(libre = false): Atelier {
   const feuilleCv = useRef<FeuilleCvHandle | null>(null);
   const cvRef = useRef<Cv | null>(null);
   const modeleRef = useRef<string | null>(null);
+  const couleurRef = useRef<string | null>(null);
+  /** La couleur à l'ouverture de la feuille « Quelle couleur ? » : « Garder » n'envoie que si elle a changé. */
+  const couleurOuverte = useRef<string | null>(null);
   const cheminRef = useRef<string | null>(null);
   const vivant = useRef(true);
   /** Vrai tant que la feuille du modèle doit s'ouvrir d'elle-même (première visite). */
@@ -351,7 +394,7 @@ export function useAtelier(libre = false): Atelier {
       // Rien n'est livré après `arreter()` (au démontage) : pas besoin de
       // garde ici — et le compilateur React refuse une référence lue dans
       // un initialiseur.
-      rendre: (e) => rendreCv(e.modeleId, e.cv),
+      rendre: (e) => rendreCv(e.modeleId, e.cv, false, e.couleur),
       surResultat: (rendu) => {
         setHtml(rendu.html);
         setPages(rendu.pages);
@@ -382,8 +425,9 @@ export function useAtelier(libre = false): Atelier {
       const courant = cvRef.current;
       const modele = modeleRef.current;
       if (courant === null || modele === null) return;
-      if (immediat) file.rendreMaintenant({ modeleId: modele, cv: courant });
-      else file.demander({ modeleId: modele, cv: courant });
+      const entree = { modeleId: modele, cv: courant, couleur: couleurRef.current };
+      if (immediat) file.rendreMaintenant(entree);
+      else file.demander(entree);
     },
     [file],
   );
@@ -425,6 +469,7 @@ export function useAtelier(libre = false): Atelier {
         dossierId,
         cv: courant,
         modeleId: modeleRef.current,
+        couleur: couleurRef.current,
         dernierChemin: cheminRef.current,
         ecritLe: new Date().toISOString(),
       });
@@ -511,6 +556,28 @@ export function useAtelier(libre = false): Atelier {
     [libre, dossierId, poserDossier, rendre],
   );
 
+  // ── La couleur, au serveur ─────────────────────────────────────────────
+
+  /** Dossier : `PUT /{id}/color` ; libre : le choix par défaut, avec le modèle
+   *  courant. Une panne ne défait rien : la couleur reste à l'écran et dans le
+   *  brouillon, le prochain « Garder » la renverra. */
+  const retenirCouleurSurLeServeur = useCallback(
+    (c: string | null) => {
+      const envoi = libre
+        ? modeleRef.current === null
+          ? Promise.resolve()
+          : retenirChoix(modeleRef.current, c)
+        : changerCouleurDuDossier(dossierId, c).then((lu) => {
+            if (vivant.current) poserDossier(lu);
+          });
+      envoi.catch((cause: unknown) => {
+        console.warn("[karria] couleur non retenue", cause);
+        if (vivant.current) Alert.alert(TEXTES.couleurNonRetenue);
+      });
+    },
+    [libre, dossierId, poserDossier],
+  );
+
   // ── Le chargement ──────────────────────────────────────────────────────
 
   // Libre : le CV de base, le modèle choisi, la galerie ; pas de dossier.
@@ -559,13 +626,19 @@ export function useAtelier(libre = false): Atelier {
           null;
         modeleRef.current = modele;
         setModeleId(modele);
+        const demandeC = couleurDemandee.current;
+        couleurDemandee.current = null;
+        const duBrouillon = reprise ? brouillon.couleur : undefined;
+        const c = demandeC ?? duBrouillon ?? choisi?.couleur ?? null;
+        couleurRef.current = c;
+        setCouleur(c);
         if (reprise && brouillon.dernierChemin !== null) {
           cheminRef.current = brouillon.dernierChemin;
           setCheminChoisi(brouillon.dernierChemin);
         }
         setErreur(null);
         rendre(true);
-        if (demande !== null) retenir(cvInitial);
+        if (demande !== null || demandeC !== null) retenir(cvInitial);
         // Première étape : le modèle — sauf si l'adresse demande autre chose
         // (« Je corrige »), si elle apporte déjà un modèle, ou si l'on
         // reprend un brouillon.
@@ -634,6 +707,14 @@ export function useAtelier(libre = false): Atelier {
         // Venu de la galerie avec un modèle : le dossier le retient tout de suite.
         if (demande !== null && demande !== lu.modeleId)
           retenirSurLeDossier(demande, null);
+        // La couleur : celle de l'adresse, sinon le dossier (il survit au
+        // changement d'appareil), sinon le brouillon (posée hors réseau).
+        const demandeC = couleurDemandee.current;
+        couleurDemandee.current = null;
+        const c = demandeC ?? lu.couleur ?? brouillon?.couleur ?? null;
+        couleurRef.current = c;
+        setCouleur(c);
+        if (c !== lu.couleur) retenirCouleurSurLeServeur(c);
         premiereVisite.current =
           lu.modeleId === null && brouillon === null && demande === null;
         if (reprise && brouillon.dernierChemin !== null) {
@@ -657,7 +738,15 @@ export function useAtelier(libre = false): Atelier {
     return () => {
       actif = false;
     };
-  }, [libre, dossierId, poserDossier, rendre, ouvrirLaSuite, retenirSurLeDossier]);
+  }, [
+    libre,
+    dossierId,
+    poserDossier,
+    rendre,
+    ouvrirLaSuite,
+    retenirSurLeDossier,
+    retenirCouleurSurLeServeur,
+  ]);
 
   // Tant que Karria adapte : relecture toutes les deux secondes.
   const adaptation = dossier?.adaptation ?? null;
@@ -860,6 +949,7 @@ export function useAtelier(libre = false): Atelier {
         choisirChemin(chemin);
         feuilleCv.current?.choisir(chemin);
       }
+      if (f.type === "couleur") couleurOuverte.current = couleurRef.current;
       setFeuille(f);
     },
     [choisirChemin],
@@ -919,6 +1009,35 @@ export function useAtelier(libre = false): Atelier {
       retenirSurLeDossier(modele, null);
     setFeuille(null);
   }, [libre, dossier, retenir, retenirSurLeDossier]);
+
+  // ── La couleur ─────────────────────────────────────────────────────────
+
+  const modele = useMemo(
+    () => modeles.find((m) => m.id === modeleId) ?? null,
+    [modeles, modeleId],
+  );
+  const couleurOrigine = modele?.couleur ?? null;
+
+  const choisirCouleur = useCallback(
+    (c: string | null, immediat = true) => {
+      // La couleur d'origine se retient comme `null` : elle suivra le modèle.
+      const suivante = couleurAEnvoyer(c, couleurOrigine);
+      if (suivante === couleurRef.current) return;
+      couleurRef.current = suivante;
+      setCouleur(suivante);
+      rendre(immediat);
+      const courant = cvRef.current;
+      if (courant !== null) retenir(courant);
+    },
+    [couleurOrigine, rendre, retenir],
+  );
+
+  const garderCouleur = useCallback(() => {
+    if (couleurRef.current !== couleurOuverte.current)
+      retenirCouleurSurLeServeur(couleurRef.current);
+    couleurOuverte.current = couleurRef.current;
+    setFeuille(null);
+  }, [retenirCouleurSurLeServeur]);
 
   const miseEnAvant = useMemo<Atelier["miseEnAvant"]>(
     () => ({
@@ -987,11 +1106,6 @@ export function useAtelier(libre = false): Atelier {
       pousserRoute({ pathname: "/atelier/[dossierId]/finaliser", params: { dossierId } });
   }, [sauverMaintenant, pousserRoute, dossierId, libre]);
 
-  const modele = useMemo(
-    () => modeles.find((m) => m.id === modeleId) ?? null,
-    [modeles, modeleId],
-  );
-
   return {
     libre,
     dossier,
@@ -1038,6 +1152,10 @@ export function useAtelier(libre = false): Atelier {
     annonce,
     choisirModele,
     garderModele,
+    couleur,
+    couleurOrigine,
+    choisirCouleur,
+    garderCouleur,
     miseEnAvant,
     allerALaLettre,
     allerAFinaliser,

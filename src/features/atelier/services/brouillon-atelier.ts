@@ -57,6 +57,9 @@ export interface BrouillonAtelier {
   dossierId: string;
   cv: Cv;
   modeleId: string | null;
+  /** La couleur principale choisie (`#RRGGBB`) ; `null` ou absente : celle du
+   *  modèle. Facultative : un brouillon écrit avant la couleur se relit. */
+  couleur?: string | null;
   /** Le dernier élément touché, pour le remettre en lumière. */
   dernierChemin: string | null;
   /** ISO 8601 : quand ce brouillon a été écrit. */

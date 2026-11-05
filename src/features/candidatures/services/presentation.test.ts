@@ -20,6 +20,7 @@ const maintenant = new Date("2026-11-06T15:00:00");
 function carte(partiel: Partial<CarteDossier>): CarteDossier {
   return {
     id: "d1",
+    couleur: null,
     offre: {
       id: "o1",
       titre: "Vendeuse",

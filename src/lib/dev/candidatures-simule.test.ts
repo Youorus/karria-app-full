@@ -396,6 +396,52 @@ describe("Le faux serveur des dossiers", () => {
       200,
     );
   });
+  it("pose la couleur principale du dossier, qui survit au modèle ; `null` la retire ; refuse un faux code", async () => {
+    const liste = await appeler("GET", "/applications?applied=false");
+    const pret = liste.corps.items.find((c: { status: string }) => c.status === "pret");
+    const avant = (await appeler("GET", `/applications/${pret.id}`)).corps;
+    expect(avant.primary_color).toBeNull();
+
+    const posee = await appeler(
+      "PUT",
+      `/applications/${pret.id}/color`,
+      { primary_color: "7b1e2b" },
+      T0 + 60_000,
+    );
+    expect(posee.statut).toBe(200);
+    expect(posee.corps.primary_color).toBe("#7B1E2B");
+    expect(posee.corps.cv).toEqual(avant.cv);
+    expect(posee.corps.updated_at > avant.updated_at).toBe(true);
+
+    const encore = await appeler(
+      "PUT",
+      `/applications/${pret.id}/color`,
+      { primary_color: "#7B1E2B" },
+      T0 + 120_000,
+    );
+    expect(encore.corps.updated_at).toBe(posee.corps.updated_at);
+
+    const modele = await appeler("PUT", `/applications/${pret.id}/template`, {
+      template_id: "9b2e7c41-3f6d-4a8b-b1c2-5e7f9a0d1b02",
+    });
+    expect(modele.corps.primary_color).toBe("#7B1E2B");
+    const cartes = await appeler("GET", "/applications?applied=false");
+    expect(
+      cartes.corps.items.find((c: { id: string }) => c.id === pret.id).primary_color,
+    ).toBe("#7B1E2B");
+
+    const faux = await appeler("PUT", `/applications/${pret.id}/color`, {
+      primary_color: "bleu",
+    });
+    expect(faux.statut).toBe(422);
+    expect((await appeler("PUT", `/applications/${pret.id}/color`, {})).statut).toBe(422);
+
+    const nul = await appeler("PUT", `/applications/${pret.id}/color`, {
+      primary_color: null,
+    });
+    expect(nul.corps.primary_color).toBeNull();
+  });
+
   it("change le modèle du dossier à tout moment, sans toucher au reste ; refuse un Premium non possédé", async () => {
     const liste = await appeler("GET", "/applications?applied=false");
     const pret = liste.corps.items.find((c: { status: string }) => c.status === "pret");

@@ -17,6 +17,8 @@
  * 300 ms perçus ; le voile apparaît en fondu. On la ferme d'un toucher sur
  * le voile, du retour Android, ou d'un glissement vers le bas (seuil ou
  * vitesse : un petit coup sec suffit). Mouvement réduit : fondu seul.
+ * Elle remonte avec le clavier (iOS) : un champ en bas de feuille — le code
+ * couleur — reste visible pendant la saisie.
  */
 
 import type { ReactNode } from "react";
@@ -206,43 +208,47 @@ function DemiFeuille({
               accessibilityRole="button"
               accessibilityLabel="Fermer"
             />
-            <GestureDetector gesture={glisser}>
-              <Animated.View
-                entering={
-                  reduit
-                    ? FadeIn.duration(200)
-                    : SlideInDown.duration(320).easing(COURBE_FEUILLE)
-                }
-                style={style}
-              >
-                <Box className="max-h-[72vh] rounded-t-lg bg-background">
-                  <Box className="items-center pt-2.5">
-                    <Box className="h-1 w-9 rounded-full bg-border-champ" />
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+            >
+              <GestureDetector gesture={glisser}>
+                <Animated.View
+                  entering={
+                    reduit
+                      ? FadeIn.duration(200)
+                      : SlideInDown.duration(320).easing(COURBE_FEUILLE)
+                  }
+                  style={style}
+                >
+                  <Box className="max-h-[72vh] rounded-t-lg bg-background">
+                    <Box className="items-center pt-2.5">
+                      <Box className="h-1 w-9 rounded-full bg-border-champ" />
+                    </Box>
+                    <EnTete
+                      titre={titre}
+                      sousTitre={sousTitre}
+                      onFermer={onFermer}
+                      action={action}
+                      fermerParCroix={false}
+                    />
+                    <ScrollView
+                      contentContainerClassName="gap-4 px-5 pb-4"
+                      showsVerticalScrollIndicator={false}
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      {children}
+                    </ScrollView>
+                    <SafeAreaView edges={["bottom"]}>
+                      {pied ? (
+                        <Box className="px-5 pb-2 pt-2">{pied}</Box>
+                      ) : (
+                        <Box className="h-2" />
+                      )}
+                    </SafeAreaView>
                   </Box>
-                  <EnTete
-                    titre={titre}
-                    sousTitre={sousTitre}
-                    onFermer={onFermer}
-                    action={action}
-                    fermerParCroix={false}
-                  />
-                  <ScrollView
-                    contentContainerClassName="gap-4 px-5 pb-4"
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
-                  >
-                    {children}
-                  </ScrollView>
-                  <SafeAreaView edges={["bottom"]}>
-                    {pied ? (
-                      <Box className="px-5 pb-2 pt-2">{pied}</Box>
-                    ) : (
-                      <Box className="h-2" />
-                    )}
-                  </SafeAreaView>
-                </Box>
-              </Animated.View>
-            </GestureDetector>
+                </Animated.View>
+              </GestureDetector>
+            </KeyboardAvoidingView>
           </Box>
         </Animated.View>
       </GestureHandlerRootView>

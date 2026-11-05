@@ -8,8 +8,9 @@
  * - la note discrète de Karria, si elle a déjà appliqué quelque chose ;
  * - la feuille, pleine largeur, pincer pour zoomer, défiler les pages ;
  *   dessus, en haut à gauche, la **pastille du modèle** (« Meridian ·
- *   Changer ») qui rouvre « Avec quel modèle ? » à tout moment, et à droite
- *   le nombre de pages ;
+ *   Changer ») qui rouvre « Avec quel modèle ? » à tout moment, la **pastille
+ *   de la couleur** (un rond de la couleur, « Couleur ») qui ouvre « Quelle
+ *   couleur ? », et à droite le nombre de pages ;
  * - la barre basse en capsule : Modifier · Karria · Mise en avant ·
  *   Intitulé · Finaliser.
  *
@@ -38,6 +39,7 @@ import { useCouleurs } from "@/theme/use-couleurs";
 
 import { AttenteAdaptation } from "../components/attente-adaptation";
 import { BarreAtelier } from "../components/barre-atelier";
+import { FeuilleCouleur } from "../components/feuille-couleur";
 import { FeuilleCv } from "../components/feuille-cv";
 import { FeuilleIntitule } from "../components/feuille-intitule";
 import { FeuilleKarria } from "../components/feuille-karria";
@@ -45,6 +47,7 @@ import { FeuilleMiseEnAvant } from "../components/feuille-mise-en-avant";
 import { FeuilleModele } from "../components/feuille-modele";
 import { FeuilleModifier } from "../components/feuille-modifier";
 import { NoteKarria } from "../components/note-karria";
+import { PastilleCouleur } from "../components/pastille-couleur";
 import { PastilleModele } from "../components/pastille-modele";
 import { useAtelier } from "../hooks/use-atelier";
 import { useChoixModele } from "../hooks/use-choix-modele";
@@ -92,6 +95,7 @@ export function EcranAtelier({ libre = false }: { libre?: boolean }) {
     a.possedes,
     a.modeleId,
     a.choisirModele,
+    a.couleur,
   );
 
   const attente =
@@ -224,10 +228,17 @@ export function EcranAtelier({ libre = false }: { libre?: boolean }) {
                 className="absolute left-4 right-4 top-2 items-center justify-between"
                 pointerEvents="box-none"
               >
-                <PastilleModele
-                  libelle={a.modele?.libelle ?? null}
-                  onPress={() => a.ouvrir({ type: "modele" })}
-                />
+                <HStack className="shrink items-center gap-2">
+                  <PastilleModele
+                    libelle={a.modele?.libelle ?? null}
+                    onPress={() => a.ouvrir({ type: "modele" })}
+                  />
+                  <PastilleCouleur
+                    couleur={a.couleur ?? a.couleurOrigine}
+                    posee={a.couleur !== null}
+                    onPress={() => a.ouvrir({ type: "couleur" })}
+                  />
+                </HStack>
                 {a.pages > 1 ? (
                   <Box className="rounded-full bg-scrim-fort px-2.5 py-1">
                     <Texte className="text-caption text-on-scrim">{a.pages} pages</Texte>
@@ -297,6 +308,13 @@ export function EcranAtelier({ libre = false }: { libre?: boolean }) {
         choix={choix}
         modeleId={a.modeleId}
         onFermer={a.garderModele}
+      />
+      <FeuilleCouleur
+        visible={a.feuille?.type === "couleur"}
+        couleur={a.couleur}
+        origine={a.couleurOrigine}
+        onChoisir={a.choisirCouleur}
+        onFermer={a.garderCouleur}
       />
     </Box>
   );

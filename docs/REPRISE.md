@@ -5,6 +5,75 @@
 
 **Dernière mise à jour : 2026-11-05**
 
+## Session du 2026-11-05 (soir) — la couleur principale du CV se choisit dans l'atelier (Fable)
+
+**Demande de Marc** : « lors de l'édition, donner la possibilité de changer la couleur primaire
+— une palette prédéfinie, un code couleur, ou un sélecteur avec des variantes — et revenir à la
+couleur initiale ; toujours dans le design immersif de Karria. » Côté API (même session,
+`karria_api_v2/docs/REPRISE.md`) : `primary_color` au rendu et aux exports, retenue sur le choix
+par défaut, le dossier (`PUT /applications/{id}/color`) et l'export ; ADR-0034, migration 20,
+**en production**.
+
+### Ce qui est livré (`npm run check` vert, 614 tests)
+
+- **La pastille « Couleur »** (`atelier/components/pastille-couleur.tsx`, `testID="pastille-couleur"`) :
+  un rond de la couleur réelle du CV et le mot « Couleur », juste à droite de la pastille du modèle
+  sur la feuille, dans l'atelier d'un dossier comme dans l'atelier libre ; la même sous la carte
+  « Mon CV » de Finaliser (→ l'atelier, `?cible=couleur`).
+- **La feuille « Quelle couleur ? »** (`feuille-couleur.tsx`, demi-feuille, le CV derrière se
+  redessine en direct par la même file de rendu) : une rangée de pastilles 44 pt — la couleur
+  **d'origine du modèle** en premier (« D'origine »), puis dix teintes sobres nommées (Marine,
+  Bleu roi, Pétrole, Forêt, Olive, Bordeaux, Terre, Cuivre, Ardoise, Encre) ; un **curseur de
+  nuance** (plus clair ↔ plus sombre, même teinte, Reanimated + geste Pan, rendu au repos pendant
+  le glissement et tout de suite au lever du doigt ; `adjustable` pour VoiceOver) ; un champ
+  **« Code couleur »** (`#1a2b3c`, `1a2b3c`, `#abc`, validation douce : pas de message tant que le
+  code peut encore devenir juste) ; « Revenir à la couleur d'origine » quand une couleur est
+  posée ; « Garder cette couleur » ferme (glisser la feuille vaut pareil). La coche sur une
+  pastille prend le noir ou le blanc selon la luminance (`surCouleur`), pas le ton de l'écran.
+  La demi-feuille remonte désormais avec le clavier sur iOS (`feuille-basse.tsx`,
+  `KeyboardAvoidingView`) pour que le champ reste visible.
+- **Le hook** (`use-atelier.ts` : `couleur`, `couleurOrigine`, `choisirCouleur`, `garderCouleur`,
+  feuille `{ type: "couleur" }`, `?couleur=` dans l'adresse) : la couleur d'origine est
+  `modele.couleur` (galerie) ; la couleur d'origine choisie se retient comme **`null`** — changer
+  de modèle garde une couleur choisie et suit l'origine du nouveau sinon ; chaque choix redemande
+  seulement le rendu (`rendreCv(…, couleur)`), le CV, l'historique et la sauvegarde ne bougent pas ;
+  le brouillon la porte (`BrouillonAtelier.couleur`, facultatif) ; au « Garder », si elle a changé,
+  elle part **une fois** au serveur : dossier → `PUT /applications/{id}/color`
+  (`candidatures.api.ts › changerCouleurDuDossier`), libre → `PUT /user-templates/me/selected`
+  avec le modèle courant (`documents.api.ts › choisirModele(modeleId, couleur)` ; le `PUT`
+  remplace le choix entier, `use-choix-modele` renvoie donc la couleur courante avec le modèle).
+  Reprise : `?couleur=` → le dossier (survit au changement d'appareil) → le brouillon → le choix.
+- **Finaliser** exporte avec la couleur (dossier : `lu.couleur`, CV **et** lettre ; libre : le
+  brouillon repris sinon le choix) ; `Export.couleur` ; la lettre (`use-lettre.ts`) se rend dans
+  la couleur du dossier. **Mes CV** : un rond de la couleur devant le nom du modèle quand l'export
+  en porte une ; « Voir avec un autre modèle » repart avec elle (`?couleur=`,
+  `use-atelier-avec-modele.ts`).
+- **Services purs testés** (`services/couleur.ts`, 10 cas) : `normaliserCode`, `erreurDeCode`,
+  hex ↔ HSL, `nuance`/`positionDeNuance`/`pisteDeNuance` (clarté bornée 0,12–0,72), `memeTeinte`,
+  `surCouleur`, `nomDeTeinte`, `couleurAEnvoyer`. Hook : 3 cas de plus dans `use-atelier.test.tsx`
+  (libre : pose, rendu, brouillon, « Garder » une fois, survit au modèle, origine = `null` ;
+  dossier : `PUT /color` et `null` ; `?couleur=`).
+- **Faux serveurs** : `atelier-simule.ts` (`primary_color` au rendu — l'accent du HTML change —,
+  sur le choix avec `default_primary_color`, sur l'export, `422` sur un faux code),
+  `candidatures-simule.ts` (`primary_color` sur le dossier et la carte, `PUT /applications/{id}/color`
+  idempotent, `422`) ; tests dans les deux `*-simule.test.ts`.
+- Contrats : `docs/contrat-api-documents.md`, `contrat-api-candidatures.md` (copies de l'API),
+  `contrat-api-modeles.md` (`Selection.primary_color`, `default_primary_color`).
+
+### Non vérifié / à savoir
+
+- **Rien vu sur un appareil ni sur le simulateur** dans cette session : le glissement du curseur
+  (Pan `minDistance(0)` à l'intérieur d'une demi-feuille qui se ferme aussi d'un glissement vers le
+  bas — le Pan de la feuille n'arme qu'à 12 pt vers le bas, celui du curseur suit `e.x` ; à
+  vérifier qu'ils ne se disputent pas), la remontée de la feuille avec le clavier, le contraste
+  des pastilles en mode sombre, la largeur de la rangée « Modèle · Couleur » sur un petit écran.
+- Les **pictogrammes de contact** des modèles (PNG rastérisés par l'API) gardent leur couleur
+  d'origine : limite connue, notée dans l'ADR-0034 et `PLUS-TARD.md` de l'API.
+- **Marc a commité en parallèle** pendant la session (lecteur de documents, Finaliser et l'accord
+  IA) ; mes textes ajoutés à `services/presentation.ts` (clés `couleur*`, la clé
+  `accordIaPourLeScore` intacte) sont partis dans un de ses commits. `npm run check` est vert
+  (typecheck, lint, prettier, 614 tests) sur l'arbre entier au moment du commit.
+
 ## Session du 2026-11-05 (après-midi) — l'achat « en attente » se revérifie tout seul, et le merci arrive (Fable)
 
 **Contexte** : le matin, un vrai café de 2,99 € payé pendant que l'API répondait 500 ; l'app a dit

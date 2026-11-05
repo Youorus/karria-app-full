@@ -164,8 +164,13 @@ export function useLettre(): EcranLettre {
 
   const [file] = useState(() =>
     creerFileDeRendu<EntreeDeRendu, Awaited<ReturnType<typeof rendreLettre>>>({
+      // La lettre suit la couleur principale du dossier (ADR-0034).
       rendre: (e) =>
-        rendreLettre(e.modeleId, documentDeLettre(e.dossier, e.lettre, e.dossier.cv)),
+        rendreLettre(
+          e.modeleId,
+          documentDeLettre(e.dossier, e.lettre, e.dossier.cv),
+          e.dossier.couleur,
+        ),
       surResultat: (rendu) => {
         setHtml(rendu.html);
         setAvertissements(rendu.avertissements);

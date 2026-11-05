@@ -29,6 +29,13 @@
  * Deux CV libres sont semés (Meridian, Minimalist) pour que « Mes CV » ait
  * une liste à montrer — et son annonce après la deuxième carte.
  *
+ * ═══ La couleur principale (ADR-0034) ═══
+ *
+ * `primary_color` au rendu et à l'export remplace l'accent du modèle (titres,
+ * filets, bande latérale) — normalisé en `#RRGGBB`, `422` sinon, comme le
+ * vrai serveur. Le choix par défaut la retient (`primary_color`) et rend la
+ * couleur d'origine du modèle (`default_primary_color`) ; l'export la porte.
+ *
  * ═══ L'envoi ═══
  *
  * `202 Envoi` en file, `sent` à la relecture ; cinq envois par jour, deux
@@ -100,6 +107,7 @@ interface ExportSimule {
   kind: "cv" | "letter";
   template: { id: string; label: string; version: number };
   ats_safe: boolean;
+  primary_color: string | null;
   dossier_id: string | null;
   company_name: string | null;
   created_at: string;
@@ -157,6 +165,7 @@ const etat = {
   selection: null as {
     template_id: string;
     ats_safe: boolean;
+    primary_color: string | null;
     updated_at: string;
   } | null,
   exports: new Map<string, ExportSimule>(),
@@ -235,6 +244,19 @@ function erreur(
       details: { reason: raison, ...details },
     },
   });
+}
+
+const HEX = /^#?([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/;
+
+/** `#1a2b3c`, `1a2b3c`, `#abc` → `#1A2B3C` ; `null`/absent → `null` ; sinon `undefined` (422). */
+function couleurRecue(corps: unknown): string | null | undefined {
+  const v = champ(corps, "primary_color");
+  if (v === null || v === undefined) return null;
+  if (typeof v !== "string") return undefined;
+  const m = HEX.exec(v.trim());
+  if (m === null) return undefined;
+  const d = m[1].length === 3 ? [...m[1]].map((c) => c + c).join("") : m[1];
+  return `#${d.toUpperCase()}`;
 }
 
 function champ(corps: unknown, nom: string): unknown {
@@ -392,8 +414,10 @@ export function htmlDuCv(
   cv: CvRecu,
   templateId: string,
   atelier = true,
+  couleur: string | null = null,
 ): { html: string; pages: number; warnings: string[] } {
   const modele = MODELES[templateId] ?? MODELES["9b2e7c41-3f6d-4a8b-b1c2-5e7f9a0d1b02"];
+  const accent = couleur ?? modele.accent;
   const volume = JSON.stringify(cv).length;
   const pages = volume > 2_600 ? 2 : 1;
   const competences = (cv.skills ?? []).map((s) => s.name);
@@ -418,15 +442,17 @@ export function htmlDuCv(
     warnings.push("photo_missing");
   if (pages > 1) warnings.push("more_than_one_page");
 
-  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>fit</title><style>${styleDePage(modele.accent, modele.police, modele.colonnes, pages)}</style></head><body><div class="page">${corps}${atelier ? coupures : ""}</div>${scriptDeFit(pages)}</body></html>`;
+  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>fit</title><style>${styleDePage(accent, modele.police, modele.colonnes, pages)}</style></head><body><div class="page">${corps}${atelier ? coupures : ""}</div>${scriptDeFit(pages)}</body></html>`;
   return { html, pages, warnings };
 }
 
 export function htmlDeLettre(
   lettre: LettreRecue,
   templateId: string,
+  couleur: string | null = null,
 ): { html: string; pages: number; warnings: string[] } {
   const modele = MODELES[templateId] ?? MODELES["9b2e7c41-3f6d-4a8b-b1c2-5e7f9a0d1b02"];
+  const accent = couleur ?? modele.accent;
   const s = lettre.sender ?? {};
   const r = lettre.recipient ?? {};
   const nom = `${s.first_name ?? ""} ${s.last_name ?? ""}`.trim();
@@ -453,7 +479,7 @@ export function htmlDeLettre(
   const corpsTexte = paragraphes.reduce((n, p) => n + (p.text ?? "").length, 0);
   if (corpsTexte > 3_200) warnings.push("body_too_long");
 
-  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>fit</title><style>${styleDePage(modele.accent, modele.police, 1, 1)}
+  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>fit</title><style>${styleDePage(accent, modele.police, 1, 1)}
   .lettre { padding: 20mm 22mm; font-size: 11pt; line-height: 1.6; }
   .exp { margin-bottom: 8mm; } .exp span { display: block; font-size: 9.5pt; color: #444; } .exp .nom { font-weight: 700; font-size: 12pt; color: #1b1b1b; }
   .dest { text-align: right; margin-bottom: 8mm; } .dest span { display: block; }
@@ -622,6 +648,7 @@ function nouvelExport(
   ats: Record<string, unknown>,
   pages: number,
   maintenant: number,
+  couleur: string | null = null,
 ): ExportSimule {
   const modele = MODELES[templateId] ?? MODELES["9b2e7c41-3f6d-4a8b-b1c2-5e7f9a0d1b02"];
   const id = identifiant("exp");
@@ -630,6 +657,7 @@ function nouvelExport(
     kind,
     template: { id: templateId, label: modele.label, version: 1 },
     ats_safe: atsSafe,
+    primary_color: couleur,
     dossier_id: dossierId,
     company_name: companyName,
     created_at: new Date(maintenant).toISOString(),
@@ -661,6 +689,8 @@ export function repondreAtelier(
       },
       ats_safe: etat.selection.ats_safe,
       updated_at: etat.selection.updated_at,
+      primary_color: etat.selection.primary_color,
+      default_primary_color: modele?.accent ?? null,
     });
   }
 
@@ -674,15 +704,24 @@ export function repondreAtelier(
         template_id: templateId,
       });
     }
+    const couleur = couleurRecue(corps);
+    if (couleur === undefined) {
+      return erreur(422, "invalid_input", "Un code couleur s'écrit #rrggbb.", {
+        field: "primary_color",
+      });
+    }
     etat.selection = {
       template_id: templateId,
       ats_safe: champ(corps, "ats_safe") === true,
+      primary_color: couleur,
       updated_at: new Date(maintenant).toISOString(),
     };
     return json(200, {
       template: { id: templateId, label: MODELES[templateId].label, version: 1 },
       ats_safe: etat.selection.ats_safe,
       updated_at: etat.selection.updated_at,
+      primary_color: couleur,
+      default_primary_color: MODELES[templateId].accent,
     });
   }
 
@@ -700,12 +739,18 @@ export function repondreAtelier(
         template_id: templateId,
       });
     }
+    const couleur = couleurRecue(corps);
+    if (couleur === undefined) {
+      return erreur(422, "invalid_input", "Un code couleur s'écrit #rrggbb.", {
+        field: "primary_color",
+      });
+    }
     const letter = champ(corps, "letter");
     const cv = champ(corps, "cv");
     if (letter && typeof letter === "object")
-      return json(200, htmlDeLettre(letter as LettreRecue, templateId));
+      return json(200, htmlDeLettre(letter as LettreRecue, templateId, couleur));
     if (cv && typeof cv === "object")
-      return json(200, htmlDuCv(cv as CvRecu, templateId, true));
+      return json(200, htmlDuCv(cv as CvRecu, templateId, true, couleur));
     return erreur(422, "nothing_to_render", "Ni CV, ni lettre.");
   }
 
@@ -761,6 +806,12 @@ export function repondreAtelier(
       typeof champ(corps, "dossier_id") === "string"
         ? (champ(corps, "dossier_id") as string)
         : null;
+    const couleur = couleurRecue(corps);
+    if (couleur === undefined) {
+      return erreur(422, "invalid_input", "Un code couleur s'écrit #rrggbb.", {
+        field: "primary_color",
+      });
+    }
     const { pages } = htmlDuCv(cv as CvRecu, templateId, false);
     const exporte = nouvelExport(
       "cv",
@@ -771,6 +822,7 @@ export function repondreAtelier(
       scoreAts(cv as CvRecu, motsClesDe(dossierId)),
       pages,
       maintenant,
+      couleur ?? etat.selection?.primary_color ?? null,
     );
     etat.exports.set(exporte.id, exporte);
     return json(201, exporte);
