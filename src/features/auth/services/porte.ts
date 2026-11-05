@@ -22,7 +22,8 @@ export type RaisonConnexion =
   | "achat"
   | "modele"
   | "profil"
-  | "equipe";
+  | "equipe"
+  | "dossiers";
 
 export interface TextesPorte {
   titre: string;
@@ -75,6 +76,11 @@ const TEXTES: Record<RaisonConnexion, TextesPorte> = {
     titre: "Ton espace t'attend",
     phrase:
       "Ton CV, tes offres gardées, ta recherche : tout se retrouve ici, avec un compte.",
+  },
+  dossiers: {
+    titre: "Tes candidatures, au même endroit",
+    phrase:
+      "Chaque CV adapté et chaque lettre restent rangés avec leur offre, avec un compte.",
   },
 };
 

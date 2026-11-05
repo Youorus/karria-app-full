@@ -55,7 +55,9 @@ export type UsageIa =
   | "cv_creation"
   | "cv_import"
   | "photo_enhancement"
-  | "template_analysis";
+  | "template_analysis"
+  /** Adapter le CV et écrire la lettre pour une offre (module `applications`). */
+  | "application";
 
 /** `GET /auth/me/ai-consent` — `docs/contrat-api-consentement-ia.md`. */
 export interface ConsentementIaBrut {

@@ -127,6 +127,10 @@ export const TEXTES_IA: Record<UsageIa, TextesIa> = {
     envoi: "le score de ton CV, pour l'expliquer",
     outil: "Expliquer ton score",
   },
+  application: {
+    envoi: "ton CV et l'offre, pour les rapprocher",
+    outil: "Adapter ton CV et écrire ta lettre pour une offre",
+  },
 };
 
 /**
