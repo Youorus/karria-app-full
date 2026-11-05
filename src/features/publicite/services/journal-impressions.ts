@@ -36,7 +36,12 @@ export type Emplacement =
   | "candidatures"
   /** L'atelier : pendant que Karria adapte le CV, et pendant la génération des documents. */
   | "atelier_attente"
-  | "finaliser";
+  | "finaliser"
+  /** Finaliser, une fois les documents là : sous le score ATS, au-dessus des documents. */
+  | "finaliser_score"
+  /** « Mes CV » : une carte dans la liste après la deuxième, et une sous l'invitation de l'état vide. */
+  | "mes_cv"
+  | "mes_cv_vide";
 
 /** Par emplacement, par jour (`AAAA-MM-JJ`), un nombre. */
 export type Journal = Partial<Record<Emplacement, Record<string, number>>>;
