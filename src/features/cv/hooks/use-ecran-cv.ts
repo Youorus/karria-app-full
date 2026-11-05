@@ -45,6 +45,8 @@ export interface EcranCv {
   creer: () => void;
   importer: (source: SourceImport) => void;
   modifier: (section: CleChapitre) => void;
+  /** L'icône de l'en-tête : « Mes CV », les CV déjà mis en page (`/cv/mes-cv`). */
+  ouvrirMesCv: () => void;
   /** Après un import : les sections à relire, coordonnées d'abord. */
   aVerifier: readonly CleChapitre[];
   importRecent: boolean;
@@ -123,7 +125,11 @@ export function useEcranCv(): EcranCv {
       router.push({ pathname: "/cv/modifier/[section]", params: { section } }),
     [router],
   );
+  const ouvrirMesCv = useCallback(() => {
+    if (exiger("cv", { cle: "cv.mes-cv" })) router.push("/cv/mes-cv");
+  }, [exiger, router]);
   useReprise("cv.creer", () => router.push("/cv/creer"));
+  useReprise("cv.mes-cv", () => router.push("/cv/mes-cv"));
   useReprise("cv.importer", (charge) =>
     ouvrirImport(SOURCES.find((s) => s === charge) ?? "fichier"),
   );
@@ -137,6 +143,7 @@ export function useEcranCv(): EcranCv {
     creer,
     importer,
     modifier,
+    ouvrirMesCv,
     aVerifier: verification.aVerifier,
     importRecent: verification.importRecent,
     manquants: cv === null || cv.vide ? [] : manquantsDuCv(cv),

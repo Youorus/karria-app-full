@@ -5,21 +5,28 @@
  * a pas encore de CV (l'invitation à l'importer, ou à le créer), ou il y
  * en a un (l'écran CV, qui se modifie). Le sous-titre est celui de la V1
  * dans chaque cas.
+ *
+ * À droite de l'en-tête, dans tous les états : l'icône « Mes CV » — les CV
+ * déjà mis en page, et le bouton pour en créer un. Une icône, pas un badge
+ * ni un menu : c'est un endroit où l'on va, comme la cloche des offres.
  */
 
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Aura } from "@/components/aura";
 import { ChargeurKarria } from "@/components/chargeur-karria";
-import { EnTeteKarria } from "@/components/en-tete-karria";
+import { BoutonEnTeteRond, EnTeteKarria } from "@/components/en-tete-karria";
+import { Icone } from "@/components/icone";
 import { MessageErreur } from "@/components/message-erreur";
 import { Box } from "@/components/ui/box";
+import { useCouleurs } from "@/theme/use-couleurs";
 
 import { CvRempli } from "../components/cv-rempli";
 import { InvitationCv } from "../components/invitation-cv";
 import { useEcranCv } from "../hooks/use-ecran-cv";
 
 export function EcranCv() {
+  const couleurs = useCouleurs();
   const e = useEcranCv();
   const rempli = e.cv !== null && !e.cv.vide;
 
@@ -30,6 +37,11 @@ export function EcranCv() {
         <EnTeteKarria
           titre="Mon CV"
           sousTitre={rempli ? "Karria génère votre CV" : "Importez, améliorez, générez"}
+          droite={
+            <BoutonEnTeteRond onPress={e.ouvrirMesCv} libelle="Mes CV">
+              <Icone nom="pile" couleur={couleurs.texte} taille={18} graisse="medium" />
+            </BoutonEnTeteRond>
+          }
         />
         {e.chargement ? (
           <Box className="flex-1 items-center justify-center pb-24">

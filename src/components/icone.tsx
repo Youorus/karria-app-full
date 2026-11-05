@@ -32,6 +32,8 @@ export const ICONES = {
   dossiers: { ios: "doc.text", android: "description" },
   dossiersPlein: { ios: "doc.text.fill", android: "description" },
   cv: { ios: "doc", android: "draft" },
+  /** Plusieurs documents : « Mes CV », les CV déjà mis en page. */
+  pile: { ios: "doc.on.doc", android: "file_copy" },
   cvPlein: { ios: "doc.fill", android: "draft" },
   modeles: { ios: "square.stack.3d.up", android: "stacks" },
   modelesPlein: { ios: "square.stack.3d.up.fill", android: "stacks" },
