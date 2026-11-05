@@ -50,6 +50,7 @@
  */
 
 import type { ReactNode } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Box } from "@/components/ui/box";
 import { VStack } from "@/components/ui/vstack";
@@ -75,6 +76,12 @@ export function PiedAction({
    */
   flottant?: boolean;
 }) {
+  // En flottant, le pied est positionné en absolu : il **ignore** la marge
+  // basse que la `SafeAreaView` de l'écran pose en padding (un enfant
+  // absolu se place par rapport à la boîte de son parent, padding compris).
+  // Sans cette ligne, le bouton couvrait la barre de gestes d'Android et
+  // l'indicateur d'accueil d'iOS (vu sur l'émulateur Android le 2026-11-05).
+  const { bottom } = useSafeAreaInsets();
   return (
     <VStack
       space="sm"
@@ -83,9 +90,10 @@ export function PiedAction({
           ? // Transparent, et non `bg-background` : un bandeau opaque posé
             // sur le contenu n'est pas un bouton flottant, c'est la même
             // barre qu'avant à un autre endroit.
-            "absolute inset-x-0 bottom-0 px-5 pb-2 pt-3"
+            "absolute inset-x-0 px-5 pb-2 pt-3"
           : "bg-background px-5 pb-2 pt-3"
       }
+      style={flottant ? { bottom } : undefined}
       // Le conteneur transparent ne doit pas intercepter les touchers
       // destinés au contenu qui défile derrière lui ; ses enfants, si.
       pointerEvents={flottant ? "box-none" : "auto"}
