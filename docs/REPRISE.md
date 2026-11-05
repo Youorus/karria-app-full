@@ -10,8 +10,9 @@
 **Plan de Marc** : `karria_api_v2/docs/atelier-cv-feuille-de-route.md` (§ 1 à 5 et 7), contrats
 `contrat-api-documents.md` (recopié dans `docs/`) et `contrat-api-candidatures.md`. Commits `346807c`
 (socle), `e5e4237` (brouillons effacés à la déconnexion, revue sécurité), `4f9f5a7` (feuille, entrée,
-modèle, atelier), `2c04ce9` (lettre, Finaliser), `4940e07` (relais galerie → atelier, routes typées).
-`npm run check` vert (542 tests), `npx expo export --platform ios` produit un paquet. Paquets ajoutés
+modèle, atelier), `2c04ce9` (lettre, Finaliser), `4940e07` (relais galerie → atelier, routes typées),
+`aeebdd6` (finitions vues sur simulateur : Annuler dans la feuille pleine, En avant dans la barre, Finaliser
+passe par la lettre, modèle retenu, accord IA depuis la lettre). `npm run check` vert (543 tests), `npx expo export --platform ios` produit un paquet. Paquets ajoutés
 (SDK 57) : `react-native-webview`, `expo-file-system`, `expo-sharing`.
 
 ### Ce qui est livré — `src/features/atelier`, routes `app/(app)/atelier/[dossierId]/{index,lettre,finaliser}`
