@@ -16,6 +16,13 @@
  * éprouve ici, c'est le parcours de validation chapitre par chapitre,
  * pas l'extraction — qui est l'affaire de Gemini, côté serveur.
  *
+ * ═══ Un CV d'avance, si on le demande ═══
+ *
+ * `EXPO_PUBLIC_SIMULATION_CV=rempli` pose au démarrage le CV que l'import
+ * aurait lu : pour voir l'onglet CV rempli, l'atelier libre et « Mes CV »
+ * sans passer par un sélecteur de fichiers que Maestro ne pilote pas.
+ * Sans la variable, rien ne change : le CV reste à créer.
+ *
  * ═══ L'interprète n'est pas Karria ═══
  *
  * Il tire un premier jet de la réponse par quelques motifs simples
@@ -543,6 +550,34 @@ function parties(corps: unknown): { fieldName: string; uri?: string; type?: stri
   );
 }
 
+/** Le CV que la fausse lecture « trouve », posé comme CV de base. */
+function poserCvLu(): void {
+  const donnee = (c: Chapitre) => CV_LU[c]?.data as Record<string, unknown> | undefined;
+  const elements = (c: Chapitre) => CV_LU[c]?.items ?? [];
+  const skills = (donnee("skills")?.skills ?? []) as unknown[];
+  const languages = (donnee("skills")?.languages ?? []) as unknown[];
+  const interests = (donnee("interests")?.interests ?? []) as unknown[];
+  // La fausse lecture ne trouve pas de téléphone : c'est ce qui exerce
+  // « à vérifier » dans l'app.
+  const contact = { ...(donnee("contact") ?? {}), phone: null };
+  etat.cv = {
+    ...cvVide(),
+    ...(etat.cv ?? {}),
+    identity: donnee("identity") ?? null,
+    contact,
+    summary: (donnee("summary")?.summary as string | undefined) ?? null,
+    experiences: elements("experiences"),
+    educations: elements("educations"),
+    skills,
+    languages,
+    interests,
+    updated_at: new Date().toISOString(),
+  };
+  etat.brouillon = null;
+}
+
+if (process.env.EXPO_PUBLIC_SIMULATION_CV === "rempli") poserCvLu();
+
 function importerCv(corps: unknown): Response {
   const fichiers = parties(corps).filter((p) => p.fieldName === "file");
   if (fichiers.length === 0) {
@@ -569,28 +604,8 @@ function importerCv(corps: unknown): Response {
   }
   // Comme le vrai serveur : le CV lu remplace les sections, la photo reste,
   // le brouillon disparaît. Le compte rendu dit ce qui a été retenu.
-  const donnee = (c: Chapitre) => CV_LU[c]?.data as Record<string, unknown> | undefined;
-  const elements = (c: Chapitre) => CV_LU[c]?.items ?? [];
-  const skills = (donnee("skills")?.skills ?? []) as unknown[];
-  const languages = (donnee("skills")?.languages ?? []) as unknown[];
-  const interests = (donnee("interests")?.interests ?? []) as unknown[];
-  // La fausse lecture ne trouve pas de téléphone : c'est ce qui exerce
-  // « à vérifier » dans l'app.
-  const contact = { ...(donnee("contact") ?? {}), phone: null };
-  etat.cv = {
-    ...cvVide(),
-    ...(etat.cv ?? {}),
-    identity: donnee("identity") ?? null,
-    contact,
-    summary: (donnee("summary")?.summary as string | undefined) ?? null,
-    experiences: elements("experiences"),
-    educations: elements("educations"),
-    skills,
-    languages,
-    interests,
-    updated_at: new Date().toISOString(),
-  };
-  etat.brouillon = null;
+  poserCvLu();
+  const cv = etat.cv as Record<string, unknown[]>;
   return json(201, {
     cv: etat.cv,
     source: {
@@ -605,11 +620,11 @@ function importerCv(corps: unknown): Response {
       identity: 1,
       contact: 1,
       summary: 1,
-      experiences: elements("experiences").length,
-      educations: elements("educations").length,
-      skills: skills.length,
-      languages: languages.length,
-      interests: interests.length,
+      experiences: cv.experiences.length,
+      educations: cv.educations.length,
+      skills: cv.skills.length,
+      languages: cv.languages.length,
+      interests: cv.interests.length,
     },
     discarded: {},
     missing: ["contact.phone"],

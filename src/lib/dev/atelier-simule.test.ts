@@ -42,11 +42,89 @@ async function lire(r: Response) {
 describe("le faux serveur de l'atelier", () => {
   beforeEach(() => reinitialiserAtelier());
 
-  it("reconnaît ses routes, et laisse la lecture des exports aux dossiers", () => {
+  it("reconnaît ses routes, la liste et la suppression des exports comprises", () => {
     expect(estUneRouteAtelier("POST", `/documents/${MERIDIAN}/render`)).toBe(true);
     expect(estUneRouteAtelier("POST", "/cv/me/generated-cvs")).toBe(true);
-    expect(estUneRouteAtelier("GET", "/cv/me/generated-cvs?dossier_id=x")).toBe(false);
+    expect(estUneRouteAtelier("GET", "/cv/me/generated-cvs?dossier_id=x")).toBe(true);
+    expect(estUneRouteAtelier("DELETE", "/cv/me/generated-cvs/exp_1")).toBe(true);
     expect(estUneRouteAtelier("GET", "/user-templates/me/selected")).toBe(true);
+    expect(estUneRouteAtelier("GET", "/cv/me")).toBe(false);
+  });
+
+  it("liste les CV libres semés avec ceux des dossiers, du plus récent au plus ancien", async () => {
+    const tous = await lire(
+      repondreAtelier("GET", "/cv/me/generated-cvs?kind=cv", undefined),
+    );
+    expect(tous.statut).toBe(200);
+    const items = tous.corps?.items as {
+      dossier_id: string | null;
+      created_at: string;
+    }[];
+    const libres = items.filter((e) => e.dossier_id === null);
+    expect(libres).toHaveLength(2);
+    expect(items.some((e) => e.dossier_id !== null)).toBe(true);
+    for (let i = 1; i < items.length; i += 1) {
+      expect(items[i - 1].created_at >= items[i].created_at).toBe(true);
+    }
+    expect(
+      (await lire(repondreAtelier("GET", "/cv/me/generated-cvs?kind=lettre", undefined)))
+        .statut,
+    ).toBe(422);
+  });
+
+  it("supprime un export, et refuse celui qu'il ne connaît pas", async () => {
+    const avant = await lire(
+      repondreAtelier("GET", "/cv/me/generated-cvs?kind=cv", undefined),
+    );
+    const items = avant.corps?.items as { id: string; dossier_id: string | null }[];
+    const libre = items.find((e) => e.dossier_id === null)!;
+    expect(
+      (
+        await lire(
+          repondreAtelier("DELETE", `/cv/me/generated-cvs/${libre.id}`, undefined),
+        )
+      ).statut,
+    ).toBe(204);
+    expect(
+      (await lire(repondreAtelier("GET", `/cv/me/generated-cvs/${libre.id}`, undefined)))
+        .statut,
+    ).toBe(404);
+    expect(
+      (
+        await lire(
+          repondreAtelier("DELETE", "/cv/me/generated-cvs/exp_inconnu", undefined),
+        )
+      ).statut,
+    ).toBe(404);
+  });
+
+  it("exporte un CV libre (sans dossier) et l'envoie seul par e-mail", async () => {
+    const exporte = await lire(
+      repondreAtelier("POST", "/cv/me/generated-cvs", { cv, template_id: MERIDIAN }),
+    );
+    expect(exporte.statut).toBe(201);
+    expect(exporte.corps?.dossier_id).toBeNull();
+    const envoi = await lire(
+      repondreAtelier("POST", `/documents/exports/${exporte.corps?.id}/send`, {
+        to: null,
+      }),
+    );
+    expect(envoi.statut).toBe(202);
+    expect(envoi.corps?.generated_ids).toEqual([exporte.corps?.id]);
+    expect(
+      (await lire(repondreAtelier("POST", "/documents/exports/exp_inconnu/send", {})))
+        .statut,
+    ).toBe(404);
+  });
+
+  it("sans `cv` ni CV de base, l'export répond 409 cv_missing", async () => {
+    const r = await lire(
+      repondreAtelier("POST", "/cv/me/generated-cvs", { template_id: MERIDIAN }),
+    );
+    expect(r.statut).toBe(409);
+    expect((r.corps?.error as { details: { reason: string } }).details.reason).toBe(
+      "cv_missing",
+    );
   });
 
   it("rend un HTML ancré conforme au contrat", () => {

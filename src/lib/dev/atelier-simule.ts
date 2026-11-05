@@ -19,13 +19,27 @@
  * stockage (elles ne répondent pas : la simulation n'écrit rien) et un
  * score ATS **calculé par quelques règles** (contact, à-propos, missions,
  * mots-clés) — assez pour exercer le cadran et « Je corrige », jamais
- * pour juger un CV.
+ * pour juger un CV. Sans `cv` dans le corps, c'est le CV de base du faux
+ * serveur du CV (`cvSimule`) qui est exporté, comme le contrat le dit ;
+ * `409 cv_missing` s'il n'existe pas.
+ *
+ * `GET /cv/me/generated-cvs` est tenu ici, pour les deux sources : les
+ * exports faits ici (CV libres de « Mes CV », exports de Finaliser) et ceux
+ * des dossiers d'avance du faux serveur des dossiers (`exportsSimulesDesDossiers`).
+ * Deux CV libres sont semés (Meridian, Minimalist) pour que « Mes CV » ait
+ * une liste à montrer — et son annonce après la deuxième carte.
  *
  * ═══ L'envoi ═══
  *
  * `202 Envoi` en file, `sent` à la relecture ; cinq envois par jour, deux
  * par adresse tierce, comme le contrat — pour voir les refus à l'écran.
  */
+
+import {
+  exportsSimulesDesDossiers,
+  supprimerExportSimuleDeDossier,
+} from "./candidatures-simule";
+import { cvSimule } from "./cv-simule";
 
 const PAGE_HAUTEUR_MM = 297;
 
@@ -152,11 +166,36 @@ const etat = {
   possedes: new Set<string>(),
 };
 
-export function reinitialiserAtelier(): void {
+export function reinitialiserAtelier(maintenant: number = Date.now()): void {
   etat.selection = null;
   etat.exports.clear();
   etat.envois.clear();
   etat.possedes.clear();
+  semer(maintenant);
+}
+
+const MERIDIAN_ID = "6f1c2b0e-8d4a-4c1e-9a57-0b3f1e2d4c01";
+const MINIMALIST_ID = "c4d81a93-7e25-4f0b-8c6d-2a9e4b7f3c03";
+
+/** Deux CV libres d'avance, du plus ancien au plus récent : « Mes CV » n'est pas vide. */
+function semer(maintenant: number): void {
+  for (const [templateId, heures] of [
+    [MINIMALIST_ID, 9 * 24],
+    [MERIDIAN_ID, 2 * 24 + 3],
+  ] as const) {
+    const { pages } = htmlDuCv(CV_EXEMPLE, templateId, false);
+    const exporte = nouvelExport(
+      "cv",
+      templateId,
+      null,
+      null,
+      false,
+      scoreAts(CV_EXEMPLE, []),
+      pages,
+      maintenant - heures * 3_600_000,
+    );
+    etat.exports.set(exporte.id, exporte);
+  }
 }
 
 /** Le faux paiement remet un modèle : le rendu cesse de répondre 403. */
@@ -559,14 +598,14 @@ function scoreAts(cv: CvRecu, motsCles: string[]): Record<string, unknown> {
 // Le routage
 // ─────────────────────────────────────────────────────────────────────
 
-/** Les routes de ce faux serveur. `POST /cv/me/generated-cvs` est tenu
- *  ici (l'export) ; sa lecture (`GET`) reste au faux serveur des dossiers. */
-export function estUneRouteAtelier(methode: string, chemin: string): boolean {
+/** Les routes de ce faux serveur — les exports (`/cv/me/generated-cvs`,
+ *  liste, création, suppression) compris. */
+export function estUneRouteAtelier(_methode: string, chemin: string): boolean {
   const seul = chemin.split("?")[0];
   return (
     seul.startsWith("/documents/") ||
     seul === "/user-templates/me/selected" ||
-    (methode === "POST" && seul === "/cv/me/generated-cvs")
+    seul.startsWith("/cv/me/generated-cvs")
   );
 }
 
@@ -670,14 +709,42 @@ export function repondreAtelier(
     return erreur(422, "nothing_to_render", "Ni CV, ni lettre.");
   }
 
+  if (route === "GET /cv/me/generated-cvs") {
+    const dossierId = params.get("dossier_id");
+    const kind = params.get("kind");
+    if (kind !== null && kind !== "cv" && kind !== "letter") {
+      return erreur(422, "invalid_input", "Genre inconnu.", { field: "kind" });
+    }
+    const items = [...etat.exports.values(), ...exportsSimulesDesDossiers()]
+      .filter(
+        (e) =>
+          (dossierId === null || e.dossier_id === dossierId) &&
+          (kind === null || e.kind === kind),
+      )
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    return json(200, { items, total: items.length });
+  }
+
+  const unExport = /^\/cv\/me\/generated-cvs\/([^/]+)$/.exec(cheminSeul);
+  if (unExport !== null && methode === "DELETE") {
+    if (etat.exports.delete(unExport[1]) || supprimerExportSimuleDeDossier(unExport[1]))
+      return json(204, undefined);
+    return erreur(404, "generated_cv_not_found", "Export inconnu.");
+  }
+  if (unExport !== null && methode === "GET") {
+    const e =
+      etat.exports.get(unExport[1]) ??
+      exportsSimulesDesDossiers().find((x) => x.id === unExport[1]);
+    return e === undefined
+      ? erreur(404, "generated_cv_not_found", "Export inconnu.")
+      : json(200, e);
+  }
+
   if (route === "POST /cv/me/generated-cvs") {
-    const cv = champ(corps, "cv");
+    // Sans `cv` : le CV de base, comme le vrai serveur.
+    const cv = champ(corps, "cv") ?? cvSimule();
     if (!cv || typeof cv !== "object") {
-      return erreur(
-        409,
-        "cv_missing",
-        "Le faux serveur de l'atelier n'exporte que le CV d'un dossier : envoie `cv`.",
-      );
+      return erreur(409, "cv_missing", "Il te faut d'abord un CV.");
     }
     const templateId =
       typeof champ(corps, "template_id") === "string"
@@ -743,13 +810,20 @@ export function repondreAtelier(
     return json(201, exporte);
   }
 
-  if (route === "POST /documents/exports/send") {
-    const ids = champ(corps, "generated_ids");
+  const unEnvoi = /^\/documents\/exports\/([^/]+)\/send$/.exec(cheminSeul);
+  if (
+    route === "POST /documents/exports/send" ||
+    (unEnvoi !== null && methode === "POST")
+  ) {
+    const ids = unEnvoi !== null ? [unEnvoi[1]] : champ(corps, "generated_ids");
     if (!Array.isArray(ids) || ids.length === 0 || ids.length > 4) {
       return erreur(422, "documents_count_invalid", "Entre 1 et 4 documents.");
     }
     for (const id of ids) {
-      if (typeof id !== "string" || !etat.exports.has(id))
+      if (
+        typeof id !== "string" ||
+        (!etat.exports.has(id) && !exportsSimulesDesDossiers().some((e) => e.id === id))
+      )
         return erreur(404, "generated_cv_not_found", "Export inconnu.");
     }
     const to = champ(corps, "to");
@@ -868,3 +942,5 @@ const CV_EXEMPLE: CvRecu = {
   languages: [{ language: "Anglais" }, { language: "Espagnol" }],
   interests: [{ name: "Danse" }, { name: "Bénévolat" }],
 };
+
+semer(Date.now());

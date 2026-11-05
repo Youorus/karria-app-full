@@ -19,6 +19,7 @@ import {
   VERSION_SIMULEE,
 } from "./consentement-simule";
 import { reinitialiserOffres, repondreOffres } from "./offres-simule";
+import { repondreAtelier } from "./atelier-simule";
 
 const T0 = Date.parse("2026-11-06T10:00:00Z");
 const KAYSER = "0f1e2d3c-0000-4000-8000-000000000006";
@@ -39,10 +40,10 @@ describe("Le faux serveur des dossiers", () => {
     accepterConsentementIa(VERSION_SIMULEE);
   });
 
-  it("reconnaît ses routes, exports compris", () => {
+  it("reconnaît ses routes — les exports sont à l'atelier", () => {
     expect(estUneRouteCandidature("/applications?applied=true")).toBe(true);
     expect(estUneRouteCandidature("/applications/abc/letter")).toBe(true);
-    expect(estUneRouteCandidature("/cv/me/generated-cvs?dossier_id=x")).toBe(true);
+    expect(estUneRouteCandidature("/cv/me/generated-cvs?dossier_id=x")).toBe(false);
     expect(estUneRouteCandidature("/cv/me")).toBe(false);
   });
 
@@ -351,33 +352,32 @@ describe("Le faux serveur des dossiers", () => {
   });
 
   it("supprime un dossier, et ses exports restent chez documents", async () => {
+    // La liste des exports est servie par le faux serveur de l'atelier, qui
+    // lit ceux des dossiers (`exportsSimulesDesDossiers`).
+    const exporter = (chemin: string) =>
+      lire(repondreAtelier("GET", chemin, undefined, T0));
     const liste = await appeler("GET", "/applications");
     const candidate = liste.corps.items.find(
       (c: { status: string }) => c.status === "candidate",
     );
-    const exports = await appeler(
-      "GET",
-      `/cv/me/generated-cvs?dossier_id=${candidate.id}`,
-    );
+    const exports = await exporter(`/cv/me/generated-cvs?dossier_id=${candidate.id}`);
     expect(exports.corps.items).toHaveLength(2);
     expect(exports.corps.items.map((e: { kind: string }) => e.kind).sort()).toEqual([
       "cv",
       "letter",
     ]);
-    const lettres = await appeler(
-      "GET",
+    const lettres = await exporter(
       `/cv/me/generated-cvs?dossier_id=${candidate.id}&kind=letter`,
     );
     expect(lettres.corps.items).toHaveLength(1);
-    expect((await appeler("GET", "/cv/me/generated-cvs?kind=lm")).statut).toBe(422);
+    expect((await exporter("/cv/me/generated-cvs?kind=lm")).statut).toBe(422);
 
     const suppression = await appeler("DELETE", `/applications/${candidate.id}`);
     expect(suppression.statut).toBe(204);
     expect((await appeler("GET", `/applications/${candidate.id}`)).statut).toBe(404);
     expect((await appeler("GET", "/applications")).corps.items).toHaveLength(2);
     expect(
-      (await appeler("GET", `/cv/me/generated-cvs?dossier_id=${candidate.id}`)).corps
-        .items,
+      (await exporter(`/cv/me/generated-cvs?dossier_id=${candidate.id}`)).corps.items,
     ).toHaveLength(2);
   });
 

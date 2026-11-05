@@ -721,7 +721,20 @@ function champsDeLaLettre(lettre: unknown): { field: string; message: string }[]
 // ─────────────────────────────────────────────────────────────────────
 
 export function estUneRouteCandidature(chemin: string): boolean {
-  return chemin.startsWith("/applications") || chemin.startsWith("/cv/me/generated-cvs");
+  return chemin.startsWith("/applications");
+}
+
+/** Les exports des dossiers d'avance, pour le faux serveur de l'atelier qui
+ *  tient `GET /cv/me/generated-cvs` (une seule liste, dossiers et CV libres). */
+export function exportsSimulesDesDossiers(): readonly ExportSimule[] {
+  return etat.exports;
+}
+
+/** `DELETE /cv/me/generated-cvs/{id}` sur un export de dossier — vrai s'il existait. */
+export function supprimerExportSimuleDeDossier(id: string): boolean {
+  const avant = etat.exports.length;
+  etat.exports = etat.exports.filter((e) => e.id !== id);
+  return etat.exports.length < avant;
 }
 
 function porteIa(): Response {
@@ -742,21 +755,6 @@ export function repondreCandidatures(
   const [cheminSeul, requete = ""] = chemin.split("?");
   const route = `${methode} ${cheminSeul}`;
   const params = new URLSearchParams(requete);
-
-  // Les exports du module `documents`, filtrés par dossier.
-  if (route === "GET /cv/me/generated-cvs") {
-    const dossierId = params.get("dossier_id");
-    const kind = params.get("kind");
-    if (kind !== null && kind !== "cv" && kind !== "letter") {
-      return erreur(422, "invalid_input", "Genre inconnu.", { field: "kind" });
-    }
-    const items = etat.exports.filter(
-      (e) =>
-        (dossierId === null || e.dossier_id === dossierId) &&
-        (kind === null || e.kind === kind),
-    );
-    return json(200, { items, total: items.length });
-  }
 
   if (route === "POST /applications") {
     if (!consentementIaAccorde()) return porteIa();

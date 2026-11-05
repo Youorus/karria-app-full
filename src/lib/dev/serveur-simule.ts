@@ -200,12 +200,9 @@ export async function repondreEnSimulation(requete: RequeteSimulee): Promise<Res
   );
 
   // L'atelier (module `documents` : rendu ancré, exports, envoi, modèle
-  // choisi) — **avant** les dossiers : `POST /cv/me/generated-cvs` (l'export)
-  // est à lui, le `GET` (la liste) reste aux dossiers.
+  // choisi) — **avant** le CV : tout `/cv/me/generated-cvs` (la liste, un
+  // export, sa suppression) est à lui, dossiers compris.
   if (estUneRouteAtelier(methode, chemin)) return repondreAtelier(methode, chemin, corps);
-  // Les dossiers de candidature — **avant** le CV : les exports d'un
-  // dossier se lisent sous `/cv/me/generated-cvs`, que le faux serveur des
-  // dossiers tient (contrat `documents`, filtre `dossier_id`).
   if (estUneRouteCandidature(chemin)) return repondreCandidatures(methode, chemin, corps);
   if (estUneRouteCv(chemin)) return repondreCv(methode, chemin, corps);
   // La porte de mise à jour : « ok » sauf forçage par l'environnement.
