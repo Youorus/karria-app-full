@@ -34,6 +34,7 @@
 import { CIBLE_V2 } from "@/lib/config";
 
 import { estUneRouteAppareil, repondreAppareils } from "./appareils-simule";
+import { estUneRouteAtelier, repondreAtelier } from "./atelier-simule";
 import { estUneRouteCandidature, repondreCandidatures } from "./candidatures-simule";
 import {
   accepterConsentementIa,
@@ -194,6 +195,10 @@ export async function repondreEnSimulation(requete: RequeteSimulee): Promise<Res
       : LATENCE_MS,
   );
 
+  // L'atelier (module `documents` : rendu ancré, exports, envoi, modèle
+  // choisi) — **avant** les dossiers : `POST /cv/me/generated-cvs` (l'export)
+  // est à lui, le `GET` (la liste) reste aux dossiers.
+  if (estUneRouteAtelier(methode, chemin)) return repondreAtelier(methode, chemin, corps);
   // Les dossiers de candidature — **avant** le CV : les exports d'un
   // dossier se lisent sous `/cv/me/generated-cvs`, que le faux serveur des
   // dossiers tient (contrat `documents`, filtre `dossier_id`).

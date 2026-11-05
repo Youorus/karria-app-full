@@ -17,6 +17,7 @@
  * (`possederModele`), comme le ferait le vrai serveur par son webhook.
  */
 
+import { possederModeleAtelier } from "./atelier-simule";
 import { possederModele, trouverModele } from "./modeles-simule";
 
 const PRIX_SANS_PUB = 499;
@@ -126,6 +127,8 @@ function livrer(session: Session): void {
   }
   if (session.type === "template" && session.modeleId !== undefined) {
     possederModele(session.modeleId);
+    // Le rendu ancré et les exports de l'atelier savent alors le modèle à soi.
+    possederModeleAtelier(session.modeleId);
   }
 }
 

@@ -105,13 +105,17 @@
         {
           "userTrackingPermission": "Karria est gratuite grâce aux annonces. Si tu l'acceptes, elles correspondront mieux à tes centres d'intérêt. Sinon, tu en verras autant, mais moins ciblées."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "extra": {
       "router": {},
       "eas": {

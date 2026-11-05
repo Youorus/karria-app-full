@@ -1,0 +1,194 @@
+/**
+ * Le module `documents`, pour l'atelier — `docs/contrat-api-documents.md`.
+ *
+ * ═══ Les routes ═══
+ *
+ * - `POST /documents/{template_id}/render` : le HTML ancré d'un CV ou d'une
+ *   lettre dans un modèle ; `?sample=true` pour l'exemple du modèle.
+ * - `POST /cv/me/generated-cvs` : l'export d'un CV — ici **toujours** avec
+ *   `cv` (la copie adaptée du dossier) et `dossier_id`.
+ * - `POST /documents/letters/export` : l'export de la lettre d'un dossier.
+ * - `POST /documents/exports/send` : plusieurs exports dans un seul e-mail.
+ * - `GET /documents/sends/{id}` : où en est l'envoi.
+ * - `GET|PUT /user-templates/me/selected` : le modèle choisi par la personne.
+ *
+ * Le CV part dans la forme de `GET /cv/me` : on réutilise `versCvBrut` des
+ * dossiers — une seule traduction du CV dans l'application.
+ */
+
+import { versCvBrut } from "@/features/candidatures/api/candidatures.api";
+import type { Cv } from "@/features/cv/types/cv.types";
+import { http } from "@/lib/http";
+
+import type {
+  AtsBrut,
+  Envoi,
+  EnvoiBrut,
+  Export,
+  ExportBrut,
+  LettreDocumentBrute,
+  Rendu,
+  RenduBrut,
+  ScoreAts,
+  Selection,
+  SelectionBrute,
+} from "../types/atelier.types";
+
+// ─────────────────────────────────────────────────────────────────────
+// Brut → app
+// ─────────────────────────────────────────────────────────────────────
+
+const NIVEAUX = { good: "bon", fair: "moyen", poor: "faible" } as const;
+
+function versScoreAts(b: AtsBrut): ScoreAts | null {
+  if (b.score === undefined || b.level === undefined) return null;
+  return {
+    score: b.score,
+    niveau: NIVEAUX[b.level],
+    controles: (b.checks ?? []).map((c) => ({
+      cle: c.key,
+      libelle: c.label,
+      points: c.points,
+      maxPoints: c.max_points,
+      constat: c.finding,
+      conseil: c.tip,
+    })),
+    conseilAtsSafe: b.suggest_ats_safe === true,
+  };
+}
+
+export function versExport(b: ExportBrut): Export {
+  return {
+    id: b.id,
+    genre: b.kind === "letter" ? "lettre" : "cv",
+    modele: b.template === null ? null : { id: b.template.id, libelle: b.template.label },
+    creeLe: b.created_at,
+    pdf: b.pdf_url ?? null,
+    docx: b.docx_url ?? null,
+    ats: versScoreAts(b.ats),
+  };
+}
+
+const STATUTS = { queued: "en_file", sent: "envoye", failed: "echoue" } as const;
+
+export function versEnvoi(b: EnvoiBrut): Envoi {
+  return {
+    id: b.id,
+    statut: STATUTS[b.status],
+    a: b.to,
+    exports: b.generated_ids,
+    creeLe: b.created_at,
+    envoyeLe: b.sent_at,
+  };
+}
+
+function versRendu(b: RenduBrut): Rendu {
+  return { html: b.html, pages: b.pages, avertissements: b.warnings };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Les routes
+// ─────────────────────────────────────────────────────────────────────
+
+/** Le CV, ancré, dans ce modèle. `403 template_not_owned`, `429 render_rate_limited`. */
+export async function rendreCv(
+  modeleId: string,
+  cv: Cv,
+  atsSafe = false,
+): Promise<Rendu> {
+  return versRendu(
+    await http.post<RenduBrut>(`/documents/${modeleId}/render`, {
+      cv: versCvBrut(cv),
+      letter: null,
+      ats_safe: atsSafe,
+    }),
+  );
+}
+
+/** La lettre, ancrée, dans le modèle du dossier. */
+export async function rendreLettre(
+  modeleId: string,
+  lettre: LettreDocumentBrute,
+): Promise<Rendu> {
+  return versRendu(
+    await http.post<RenduBrut>(`/documents/${modeleId}/render`, { letter: lettre }),
+  );
+}
+
+/** L'exemple du modèle, sans ancres — permis même sur un Premium non possédé. */
+export async function rendreExemple(modeleId: string): Promise<Rendu> {
+  return versRendu(
+    await http.post<RenduBrut>(`/documents/${modeleId}/render?sample=true`),
+  );
+}
+
+/**
+ * Exporte le CV **adapté** d'un dossier (PDF et DOCX, score ATS sur ce
+ * CV-là). `409 cv_missing`, `403 template_locked`, `503 rendering_unavailable`.
+ */
+export async function exporterCvDuDossier(options: {
+  cv: Cv;
+  modeleId: string;
+  dossierId: string;
+  atsSafe?: boolean;
+}): Promise<Export> {
+  return versExport(
+    await http.post<ExportBrut>("/cv/me/generated-cvs", {
+      template_id: options.modeleId,
+      formats: ["pdf", "docx"],
+      ats_safe: options.atsSafe ?? false,
+      dossier_id: options.dossierId,
+      cv: versCvBrut(options.cv),
+    }),
+  );
+}
+
+/** Exporte la lettre d'un dossier — un document à part, `kind: "letter"`. */
+export async function exporterLettre(options: {
+  lettre: LettreDocumentBrute;
+  modeleId: string;
+  dossierId: string;
+}): Promise<Export> {
+  return versExport(
+    await http.post<ExportBrut>("/documents/letters/export", {
+      template_id: options.modeleId,
+      letter: options.lettre,
+      formats: ["pdf", "docx"],
+      dossier_id: options.dossierId,
+    }),
+  );
+}
+
+/**
+ * Un seul e-mail avec ces exports en pièces jointes. `a` à `null` : l'adresse
+ * du compte. `429 send_quota_exceeded` (`details.scope`, `retry_after`),
+ * `422 recipient_invalid`, `409 document_file_missing`.
+ */
+export async function envoyerExports(ids: string[], a: string | null): Promise<Envoi> {
+  return versEnvoi(
+    await http.post<EnvoiBrut>("/documents/exports/send", { generated_ids: ids, to: a }),
+  );
+}
+
+export async function lireEnvoi(id: string): Promise<Envoi> {
+  return versEnvoi(await http.get<EnvoiBrut>(`/documents/sends/${id}`));
+}
+
+/** Le modèle choisi par la personne, ou `null` (`204`). */
+export async function lireModeleChoisi(): Promise<Selection | null> {
+  const brut = await http.get<SelectionBrute | undefined>("/user-templates/me/selected");
+  if (brut === undefined) return null;
+  return {
+    modeleId: brut.template.id,
+    libelle: brut.template.label,
+    atsSafe: brut.ats_safe,
+  };
+}
+
+/** Retient ce modèle comme modèle par défaut. `403 template_locked`. */
+export async function choisirModele(modeleId: string): Promise<void> {
+  await http.put("/user-templates/me/selected", {
+    template_id: modeleId,
+    ats_safe: false,
+  });
+}
