@@ -5,6 +5,52 @@
 
 **Dernière mise à jour : 2026-11-05**
 
+## Session du 2026-11-05 (soir) — Le consentement IA « en continuant », et la pub de la fiche d'offre au-dessus du pli (Fable)
+
+**Demande de Marc** : (1) faire accepter l'IA à l'inscription, naturellement, plutôt que par la
+feuille au moment du geste qui fait renoncer ; (2) « ai-je la garantie qu'une pub native est
+comptée à chaque ouverture d'une offre ? » API en face : `karria_api_v2` ADR-0025 § 2026-11-05,
+`GET /auth/ai-disclosure` + `ai_disclosure_version` **en production**.
+
+### Chantier 1 — `src/features/auth`
+
+- **La phrase** de `feuille-connexion.tsx` : « En continuant, tu acceptes nos Conditions
+  Générales, notre Politique de Confidentialité, et que *Karria s'appuie sur des modèles d'IA*
+  pour t'aider » — le troisième lien ouvre **`feuille-information-ia.tsx`** (titre « Karria et
+  l'IA » : ce qui part, chez qui, pourquoi, les deux promesses, lien politique, « Compris »,
+  aucun bouton d'accord). Un `Modal` **imbriqué** dans celui de la connexion (sur iOS un second
+  `Modal` frère n'est pas fiable) — **à vérifier sur l'iPhone de Marc**, non vu sur simulateur.
+- **`hooks/use-information-ia.ts`** : charge `GET /auth/ai-disclosure` (public, sans jeton) dès
+  que la feuille de connexion s'ouvre ; store `disclosureIa` / `poserDisclosureIa` /
+  `versionDisclosureAffichee` dans `services/consentement-ia.ts` (tenu à jour aussi par
+  `/auth/me` ; survit à la déconnexion).
+- **`api/auth.api.ts`** joint `ai_disclosure_version` = la version chargée aux trois requêtes
+  de connexion, ou rien si elle n'est pas encore là (le serveur ne consigne alors rien, la
+  feuille demandera : le filet). `use-action-ia.ts` et la feuille connectée sont inchangés ;
+  Paramètres → « Karria et l'IA » garde consultation et retrait.
+- **Risque Apple 5.1.2 (i)** noté en tête de `feuille-connexion.tsx` : retour arrière = ne plus
+  envoyer `ai_disclosure_version`, le chemin explicite est intact.
+- Faux serveur : `GET /auth/ai-disclosure`, version portée par le parcours puis consignée à
+  `verify`, jamais après un retrait (`consentement-simule.ts`, `serveur-simule.ts`). Contrat
+  `docs/contrat-api-consentement-ia.md` à jour.
+
+### Chantier 2 — `src/features/publicite`, `offres/screens/ecran-detail-offre.tsx`
+
+- La `CarteAnnonce` de la fiche passe **entre les étiquettes et la description** (jamais
+  au-dessus de « Adapter mon CV », qui est dans le pied flottant) ; elle arrive en fondu et la
+  description glisse (`LinearTransition`).
+- `calme-tactile.ts` : `delaiAvantCalme(maintenant, calmeMs)` ; **`noterFinDeToucher`** (la
+  racine `app/_layout.tsx` note `onTouchEnd`/`onTouchCancel`) : un doigt posé n'est jamais
+  calme, garde-fou `DOIGT_OUBLIE_MS` 10 s. `use-annonce-emplacement.ts` :
+  `CALME_PAR_EMPLACEMENT = { detail_offre: 700 }`, et en tête **la réponse à la question de
+  Marc** (pas de garantie ; ce qui conditionne vraiment une impression).
+- Journal : une impression par objet, l'objet détruit à la fermeture (inchangé, vérifié).
+
+**Vérifié** : jest sur `auth`, `publicite`, `lib/dev/serveur-simule` (84 tests), `tsc` et
+`expo lint` propres sur mes fichiers, `npx expo export --platform ios` produit un paquet.
+**Pas vérifié** : `npm run check` entier (l'arbre de travail portait le chantier atelier d'un
+autre agent, `cv-simule.ts` / `atelier-simule.test.ts` en cours), le rendu sur appareil.
+
 ## Session du 2026-11-05 (nuit) — L'atelier CV : feuille temps réel, Karria qui propose, lettre, Finaliser (Fable)
 
 **Plan de Marc** : `karria_api_v2/docs/atelier-cv-feuille-de-route.md` (§ 1 à 5 et 7), contrats

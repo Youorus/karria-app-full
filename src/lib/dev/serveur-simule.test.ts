@@ -18,6 +18,8 @@ interface Corps {
   session: { access_token: string };
   user: Record<string, string>;
   error: { details: { reason: string } };
+  version: string;
+  required: boolean;
 }
 
 async function appeler(methode: string, chemin: string, corps?: unknown) {
@@ -47,6 +49,36 @@ describe("La connexion par e-mail simulée", () => {
     });
     expect(fin.statut).toBe(400);
     expect(fin.corps.error.details.reason).toBe("auth_code_invalid");
+  });
+});
+
+describe("L'accord IA donné en continuant (simulé)", () => {
+  it("sert l'information sans session, et la version affichée vaut accord à la connexion", async () => {
+    const information = await appeler("GET", "/auth/ai-disclosure");
+    expect(information.statut).toBe(200);
+    expect(information.corps.version).toEqual(expect.any(String));
+
+    const depart = await appeler("POST", "/auth/email/start", {
+      email: "a@b.fr",
+      ai_disclosure_version: information.corps.version,
+    });
+    const fin = await appeler("POST", "/auth/email/verify", {
+      challenge_id: depart.corps.challenge_id,
+      code: CODE_SIMULATION,
+    });
+    expect(fin.statut).toBe(200);
+
+    const etat = await appeler("GET", "/auth/me/ai-consent");
+    expect(etat.corps.required).toBe(false);
+
+    // Le retrait explicite prime sur une reconnexion « en continuant ».
+    await appeler("DELETE", "/auth/me/ai-consent");
+    const encore = await appeler("POST", "/auth/social/google", {
+      id_token: "x",
+      ai_disclosure_version: information.corps.version,
+    });
+    expect(encore.statut).toBe(200);
+    expect((await appeler("GET", "/auth/me/ai-consent")).corps.required).toBe(true);
   });
 });
 

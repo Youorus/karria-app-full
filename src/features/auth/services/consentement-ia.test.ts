@@ -2,7 +2,7 @@
  * Le consentement à l'IA : l'état partagé, la reprise après accord, les textes.
  */
 
-import { afterEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import { ErreurApi } from "@/lib/http";
 
@@ -12,13 +12,16 @@ import {
   consentementIa,
   dateLisible,
   demanderConsentementIa,
+  disclosureIa,
   estConsentementIaRequis,
   fermerFeuilleIa,
   feuilleIa,
   fournisseursLisibles,
   ouvrirConsultationIa,
   poserConsentementIa,
+  poserDisclosureIa,
   reprendreApresAccord,
+  versionDisclosureAffichee,
 } from "./consentement-ia";
 
 describe("l'état partagé", () => {
@@ -81,6 +84,55 @@ describe("l'état partagé", () => {
     );
     expect(estConsentementIaRequis(new ErreurApi("x", 403, "forbidden"))).toBe(false);
     expect(estConsentementIaRequis(new Error("x"))).toBe(false);
+  });
+});
+
+describe("l'information avant la connexion", () => {
+  // Elle survit volontairement aux autres tests : on repart de rien ici.
+  beforeEach(() => {
+    poserDisclosureIa(null);
+    poserConsentementIa(null);
+  });
+  afterEach(() => {
+    poserDisclosureIa(null);
+    poserConsentementIa(null);
+  });
+
+  it("n'envoie aucune version tant que rien n'a été montré", () => {
+    expect(disclosureIa()).toBeNull();
+    expect(versionDisclosureAffichee()).toBeNull();
+  });
+
+  it("renvoie la version de l'information chargée par la feuille de connexion", () => {
+    const rappel = jest.fn();
+    const desabonner = abonnerConsentementIa(rappel);
+    poserDisclosureIa({
+      version: "2026-10.abc",
+      fournisseurs: [{ id: "gemini", nom: "Google Gemini" }],
+      usages: ["assistant"],
+    });
+
+    expect(versionDisclosureAffichee()).toBe("2026-10.abc");
+    expect(rappel).toHaveBeenCalledTimes(1);
+    desabonner();
+  });
+
+  it("suit ce que /auth/me dit une fois connecté, et survit à la déconnexion", () => {
+    poserConsentementIa({
+      requis: false,
+      version: "2026-10.def",
+      fournisseurs: [{ id: "gemini", nom: "Google Gemini" }],
+      usages: ["assistant"],
+      versionAcceptee: "2026-10.def",
+      accepteLe: "2026-11-05T10:00:00Z",
+      retireLe: null,
+    });
+    expect(versionDisclosureAffichee()).toBe("2026-10.def");
+
+    poserConsentementIa(null);
+
+    expect(consentementIa()).toBeNull();
+    expect(versionDisclosureAffichee()).toBe("2026-10.def");
   });
 });
 

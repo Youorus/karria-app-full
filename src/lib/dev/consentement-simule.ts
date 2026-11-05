@@ -6,6 +6,11 @@
  * compte (`/auth/me`, `/auth/me/ai-consent`) et ceux des routes d'IA (le
  * CV, Karria), qui refusent avec `ai_consent_required` tant que rien n'est
  * accepté — exactement comme la vraie API.
+ *
+ * Depuis le 2026-11-05 : `GET /auth/ai-disclosure` (public) et l'accord
+ * donné « en continuant » (`ai_disclosure_version` sur les requêtes de
+ * connexion), consigné en silence s'il vise la version courante, jamais si
+ * l'accord a été retiré — comme `AcceptAiConsent.at_sign_in` côté API.
  */
 
 export const VERSION_SIMULEE = "2026-10.simule01";
@@ -20,23 +25,28 @@ export function consentementIaAccorde(): boolean {
   return etat.accepteLe !== null && etat.retireLe === null;
 }
 
+/** `GET /auth/ai-disclosure` : l'information courante, sans session. */
+export function disclosureIaBrute() {
+  return {
+    version: VERSION,
+    providers: [{ id: "gemini", name: "Google Gemini" }],
+    purposes: [
+      "assistant",
+      "transcription",
+      "cv_creation",
+      "cv_import",
+      "photo_enhancement",
+      "template_analysis",
+      "application",
+    ],
+  };
+}
+
 export function consentementIaBrut() {
   const accorde = consentementIaAccorde();
   return {
     required: !accorde,
-    disclosure: {
-      version: VERSION,
-      providers: [{ id: "gemini", name: "Google Gemini" }],
-      purposes: [
-        "assistant",
-        "transcription",
-        "cv_creation",
-        "cv_import",
-        "photo_enhancement",
-        "template_analysis",
-        "application",
-      ],
-    },
+    disclosure: disclosureIaBrute(),
     accepted_version: etat.accepteLe === null ? null : VERSION,
     accepted_at: etat.accepteLe,
     revoked_at: etat.retireLe,
@@ -49,6 +59,17 @@ export function accepterConsentementIa(version: unknown): string | null {
   etat.accepteLe = new Date().toISOString();
   etat.retireLe = null;
   return null;
+}
+
+/**
+ * L'accord « en continuant » : rien si la version manque ou est périmée,
+ * rien si un accord a été retiré (le retrait explicite prime), rien si un
+ * accord court déjà (sa date d'origine reste).
+ */
+export function accepterConsentementIaALaConnexion(version: unknown): void {
+  if (version !== VERSION) return;
+  if (etat.retireLe !== null || etat.accepteLe !== null) return;
+  etat.accepteLe = new Date().toISOString();
 }
 
 export function retirerConsentementIa(): void {

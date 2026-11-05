@@ -11,10 +11,17 @@ import { poserSansPub } from "@/lib/sans-pub";
 
 import {
   CALME_MS,
+  noterFinDeToucher,
   noterToucher,
   oublierLesTouchersPourLesTests,
 } from "../services/calme-tactile";
-import { useAnnonceEmplacement } from "./use-annonce-emplacement";
+import { CALME_PAR_EMPLACEMENT, useAnnonceEmplacement } from "./use-annonce-emplacement";
+
+/** Un toucher bref : posé et levé. */
+function taper() {
+  noterToucher(Date.now());
+  noterFinDeToucher(Date.now());
+}
 
 interface FausseAnnonce {
   destroy: jest.Mock;
@@ -82,7 +89,7 @@ describe("L'annonce d'un emplacement", () => {
   it("attend deux secondes de calme après un toucher", async () => {
     const annonce = fausseAnnonce();
     mockCharger.mockResolvedValue(annonce);
-    noterToucher(Date.now());
+    taper();
     const { result } = renderHook(() => useAnnonceEmplacement("cv"));
     await laisserCharger();
     expect(result.current).toBeNull();
@@ -92,14 +99,42 @@ describe("L'annonce d'un emplacement", () => {
     expect(result.current).toBe(annonce);
   });
 
-  it("repousse encore si l'on touche pendant l'attente", async () => {
+  it("attend moins longtemps sur la fiche d'une offre, où l'arrivée est un toucher", async () => {
+    const annonce = fausseAnnonce();
+    mockCharger.mockResolvedValue(annonce);
+    taper();
+    const { result } = renderHook(() => useAnnonceEmplacement("detail_offre"));
+    await laisserCharger();
+    expect(result.current).toBeNull();
+    const calme = CALME_PAR_EMPLACEMENT.detail_offre ?? CALME_MS;
+    expect(calme).toBeLessThan(CALME_MS);
+    act(() => jest.advanceTimersByTime(calme - 1));
+    expect(result.current).toBeNull();
+    act(() => jest.advanceTimersByTime(1));
+    expect(result.current).toBe(annonce);
+  });
+
+  it("ne paraît pas sous un doigt posé, même passé le délai", async () => {
     const annonce = fausseAnnonce();
     mockCharger.mockResolvedValue(annonce);
     noterToucher(Date.now());
+    const { result } = renderHook(() => useAnnonceEmplacement("detail_offre"));
+    await laisserCharger();
+    act(() => jest.advanceTimersByTime(CALME_MS * 2));
+    expect(result.current).toBeNull();
+    noterFinDeToucher(Date.now());
+    act(() => jest.advanceTimersByTime(CALME_MS));
+    expect(result.current).toBe(annonce);
+  });
+
+  it("repousse encore si l'on touche pendant l'attente", async () => {
+    const annonce = fausseAnnonce();
+    mockCharger.mockResolvedValue(annonce);
+    taper();
     const { result } = renderHook(() => useAnnonceEmplacement("cv"));
     await laisserCharger();
     act(() => jest.advanceTimersByTime(CALME_MS / 2));
-    noterToucher(Date.now());
+    taper();
     act(() => jest.advanceTimersByTime(CALME_MS / 2));
     expect(result.current).toBeNull();
     act(() => jest.advanceTimersByTime(CALME_MS / 2));

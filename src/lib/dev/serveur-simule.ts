@@ -38,7 +38,9 @@ import { estUneRouteAtelier, repondreAtelier } from "./atelier-simule";
 import { estUneRouteCandidature, repondreCandidatures } from "./candidatures-simule";
 import {
   accepterConsentementIa,
+  accepterConsentementIaALaConnexion,
   consentementIaBrut,
+  disclosureIaBrute,
   retirerConsentementIa,
 } from "./consentement-simule";
 import { estUneRouteCv, repondreCv } from "./cv-simule";
@@ -120,7 +122,9 @@ const LATENCE_ASSISTANT_MS = 1_400;
 /** L'état du faux serveur. En mémoire : il repart à zéro à chaque
  *  rechargement de l'application, ce qui suffit à concevoir. */
 const etat = {
-  parcours: new Map<string, { email: string; essais: number }>(),
+  // `aiVersion` : la version de l'information sur l'IA affichée à l'ouverture,
+  // consignée à la validation du code — comme `identity_login_challenges`.
+  parcours: new Map<string, { email: string; essais: number; aiVersion: unknown }>(),
   sessions: new Map<string, { id: string; email: string }>(),
 };
 
@@ -168,9 +172,9 @@ function ouvrirSession(email: string, creee: boolean) {
   };
 }
 
-function parcoursOuvert(email: string) {
+function parcoursOuvert(email: string, aiVersion: unknown = null) {
   const id = identifiant("chl");
-  etat.parcours.set(id, { email, essais: 0 });
+  etat.parcours.set(id, { email, essais: 0, aiVersion });
   return {
     challenge_id: id,
     sent_to: email,
@@ -231,7 +235,7 @@ export async function repondreEnSimulation(requete: RequeteSimulee): Promise<Res
           field: "email",
         });
       }
-      return json(200, parcoursOuvert(email));
+      return json(200, parcoursOuvert(email, champ(corps, "ai_disclosure_version")));
     }
 
     case "POST /auth/email/resend": {
@@ -239,7 +243,7 @@ export async function repondreEnSimulation(requete: RequeteSimulee): Promise<Res
       if (parcours === undefined) {
         return erreur(410, "auth_login_challenge_expired", "Parcours expiré.");
       }
-      return json(200, parcoursOuvert(parcours.email));
+      return json(200, parcoursOuvert(parcours.email, parcours.aiVersion));
     }
 
     case "POST /auth/email/verify": {
@@ -255,13 +259,16 @@ export async function repondreEnSimulation(requete: RequeteSimulee): Promise<Res
           : erreur(400, "auth_code_invalid", "Code incorrect.", { field: "code" });
       }
       etat.parcours.delete(id);
+      accepterConsentementIaALaConnexion(parcours.aiVersion);
       return json(200, ouvrirSession(parcours.email, true));
     }
 
     case "POST /auth/social/google":
+      accepterConsentementIaALaConnexion(champ(corps, "ai_disclosure_version"));
       return json(200, ouvrirSession("toi@gmail.com", true));
 
     case "POST /auth/social/apple":
+      accepterConsentementIaALaConnexion(champ(corps, "ai_disclosure_version"));
       return json(200, ouvrirSession("toi@privaterelay.appleid.com", true));
 
     case "POST /auth/refresh":
@@ -285,6 +292,9 @@ export async function repondreEnSimulation(requete: RequeteSimulee): Promise<Res
     }
 
     // Le consentement à l'IA — `docs/contrat-api-consentement-ia.md`.
+    case "GET /auth/ai-disclosure":
+      return json(200, disclosureIaBrute());
+
     case "GET /auth/me/ai-consent":
       return json(200, consentementIaBrut());
 

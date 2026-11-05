@@ -59,26 +59,36 @@ export type UsageIa =
   /** Adapter le CV et écrire la lettre pour une offre (module `applications`). */
   | "application";
 
-/** `GET /auth/me/ai-consent` — `docs/contrat-api-consentement-ia.md`. */
+/**
+ * `GET /auth/ai-disclosure` (public) et `disclosure` de `GET /auth/me/ai-consent`
+ * — `docs/contrat-api-consentement-ia.md`.
+ */
+export interface DisclosureIaBrut {
+  version: string;
+  providers: { id: string; name: string }[];
+  purposes: UsageIa[];
+}
+
+/** `GET /auth/me/ai-consent`. */
 export interface ConsentementIaBrut {
   required: boolean;
-  disclosure: {
-    version: string;
-    providers: { id: string; name: string }[];
-    purposes: UsageIa[];
-  };
+  disclosure: DisclosureIaBrut;
   accepted_version: string | null;
   accepted_at: string | null;
   revoked_at: string | null;
 }
 
-export interface ConsentementIa {
-  /** Vrai : montrer la feuille avant tout outil d'IA. */
-  requis: boolean;
+/** L'information sur l'IA, telle qu'on la montre — avant ou après la connexion. */
+export interface DisclosureIa {
   /** La version à renvoyer à l'acceptation — celle qu'on a montrée. */
   version: string;
   fournisseurs: { id: string; nom: string }[];
   usages: UsageIa[];
+}
+
+export interface ConsentementIa extends DisclosureIa {
+  /** Vrai : montrer la feuille avant tout outil d'IA. */
+  requis: boolean;
   versionAcceptee: string | null;
   accepteLe: string | null;
   retireLe: string | null;

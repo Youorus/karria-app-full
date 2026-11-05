@@ -6,7 +6,9 @@ fournisseur de modèles tiers — et pour qu'elle puisse revenir dessus. Règle
 5.1.2 (i) de l'App Store ; côté API, ADR-0025. Préfixe `/api/v1`, session
 exigée, erreurs au format `{ error: { code, message, details } }`.
 
-État : **servi en production** depuis le 2026-10-30.
+État : **servi en production** depuis le 2026-10-30 ; accord « en continuant »
+à l'inscription et route publique depuis le 2026-11-05 (ADR-0025, section du
+2026-11-05).
 
 ## Le principe
 
@@ -31,6 +33,57 @@ fournisseurs **réellement routés** (`gemini` aujourd'hui ; `anthropic`,
 `openai` possibles) et des usages. Un fournisseur ou un usage de plus change
 la version : `required` repasse à vrai et l'app redemande. L'app ne décide
 jamais de la version : elle renvoie celle qu'elle a montrée.
+
+## L'accord donné à l'inscription (2026-11-05)
+
+La feuille au moment du geste faisait renoncer. L'écran de connexion dit
+désormais « En continuant, tu acceptes nos Conditions Générales, notre
+Politique de Confidentialité, et que Karria s'appuie sur des modèles d'IA
+pour t'aider », le dernier membre ouvrant l'information complète **avant**
+tout compte. Deux ajouts au contrat, rien de retiré :
+
+### `GET /auth/ai-disclosure` → `200 AiDisclosure` — **public**
+
+Sans session (un jeton périmé répond `401 session_expired` : ne pas en
+joindre). Compté par origine pour un anonyme : `429 anonymous_rate_limited`
+avec `details.retry_after` au-delà de 120 lectures / 10 min.
+
+```jsonc
+{
+  "version": "2026-10.3f9a1c2e", // à renvoyer dans `ai_disclosure_version`
+  "providers": [{ "id": "gemini", "name": "Google Gemini" }],
+  "purposes": ["assistant", "transcription", "cv_creation", "cv_import",
+               "photo_enhancement", "template_analysis", "application"]
+}
+```
+
+C'est l'objet `disclosure` de `GET /auth/me/ai-consent`, servi seul.
+
+### `ai_disclosure_version` sur les requêtes de connexion — facultatif
+
+`POST /auth/email/start`, `POST /auth/social/google`, `POST /auth/social/apple`
+acceptent, à côté de `terms_version` et `privacy_policy_version`, la
+`version` lue ci-dessus (1 à 64 caractères ; `""` → `422`). Pour le code
+par e-mail elle voyage sur le parcours et se consigne à `verify`.
+
+Ce que le serveur en fait, **sans jamais faire échouer la connexion** :
+
+| Situation à la connexion                          | Effet                                              |
+| ------------------------------------------------- | -------------------------------------------------- |
+| version = version courante, aucun accord          | accord consigné (même preuve que le `PUT`, horodaté) |
+| version = version courante, accord courant existant | rien : la date d'origine reste                   |
+| version ≠ version courante (fournisseur changé)   | rien : la feuille demandera                        |
+| champ absent (app ancienne, information non chargée) | rien : la feuille demandera                     |
+| accord **retiré** dans les paramètres             | rien : un retrait explicite ne se renverse pas ainsi |
+
+Après la connexion, rien ne change : `GET /auth/me` dit `required: false`
+si l'accord a été consigné, et la porte `403 ai_consent_required` reste le
+filet.
+
+**Risque App Store (5.1.2 i), assumé** : Apple demande une permission
+explicite avant l'envoi de données à une IA tierce ; « en continuant » est
+le choix de Marc. Retour arrière sans redéploiement de l'API : l'app cesse
+d'envoyer `ai_disclosure_version`.
 
 ## Les routes
 
@@ -87,7 +140,14 @@ tranche.
 
 ## Ce que l'app fait de son côté
 
-- `features/ia/` : un état partagé (`consentement-ia.ts`) recopié depuis
+- **Avant la connexion** (`features/auth`) : `FeuilleConnexion` charge
+  `GET /auth/ai-disclosure` en s'ouvrant (`hooks/use-information-ia.ts`,
+  store `disclosureIa` dans `services/consentement-ia.ts`) ; le lien de la
+  phrase ouvre `components/feuille-information-ia.tsx` (ce qui part, chez
+  qui, pourquoi, les deux promesses, « Compris » — aucun bouton d'accord) ;
+  `api/auth.api.ts` joint `ai_disclosure_version` = la version chargée, ou
+  rien si elle ne l'est pas encore.
+- `features/auth` : un état partagé (`consentement-ia.ts`) recopié depuis
   `GET /auth/me` à l'ouverture de session, puis tenu à jour par les routes
   ci-dessus ; `useActionIa()` enveloppe chaque première action d'IA
   (parler à Karria, dicter, créer ou importer un CV, améliorer une photo) :
@@ -102,6 +162,8 @@ tranche.
   traité pareil (`estConsentementIaRequis(cause)`), l'action est rejouée.
 - Paramètres → « Karria et l'IA » : la même feuille en consultation (date,
   fournisseurs) avec « Retirer mon consentement » (`DELETE`).
-- En simulation, le faux serveur (`lib/dev/serveur-simule.ts`) tient le même
-  état et refuse les routes d'IA avec `ai_consent_required` tant que rien
+- En simulation, le faux serveur (`lib/dev/serveur-simule.ts`,
+  `consentement-simule.ts`) tient le même état, sert `GET /auth/ai-disclosure`,
+  consigne l'accord « en continuant » aux mêmes conditions (jamais après un
+  retrait) et refuse les routes d'IA avec `ai_consent_required` tant que rien
   n'est accepté.

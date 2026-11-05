@@ -33,6 +33,7 @@ import {
   ceQuiPart,
   consentementIa,
   dateLisible,
+  disclosureIa,
   fermerFeuilleIa,
   feuilleIa,
   fournisseursLisibles,
@@ -65,6 +66,13 @@ export function useConsentementIa(): FeuilleConsentementIa {
     abonnerConsentementIa,
     consentementIa,
     consentementIa,
+  );
+  // L'information chargée avant la connexion (`GET /auth/ai-disclosure`) :
+  // de quoi nommer les fournisseurs pendant que `/auth/me/ai-consent` se relit.
+  const disclosure = useSyncExternalStore(
+    abonnerConsentementIa,
+    disclosureIa,
+    disclosureIa,
   );
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -143,7 +151,9 @@ export function useConsentementIa(): FeuilleConsentementIa {
     consentement,
     envois:
       consentement === null ? [] : ceQuiPart(consentement.usages, feuille?.usage ?? null),
-    fournisseurs: fournisseursLisibles(consentement?.fournisseurs ?? []),
+    fournisseurs: fournisseursLisibles(
+      consentement?.fournisseurs ?? disclosure?.fournisseurs ?? [],
+    ),
     accepteLe:
       consentement !== null && !consentement.requis
         ? dateLisible(consentement.accepteLe)

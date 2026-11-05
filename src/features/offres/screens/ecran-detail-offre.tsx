@@ -7,9 +7,14 @@
  * - le bloc d'identité : tuile 68 (rayon 20) et, à sa droite,
  *   l'entreprise en capitales puis le titre très gras ; dessous, les
  *   étiquettes lieu / contrat / salaire (vert) ;
+ * - **l'annonce native du détail, au-dessus du pli** (2026-11-05) : entre
+ *   les étiquettes et la description, quand il y en a une et que la
+ *   personne n'est pas sans pub — posée en bas, après la description, elle
+ *   n'était vue (donc comptée) que si l'on défilait jusqu'à elle. Jamais
+ *   au-dessus du bouton principal, qui vit dans le pied flottant. Elle
+ *   arrive en fondu et la description glisse sous elle (`LinearTransition`)
+ *   plutôt que de sauter ;
  * - « Description — L'annonce », avec son chargeur ;
- * - une annonce native propre au détail, quand il y en a une et que la
- *   personne n'est pas sans pub (aucune carte de remplacement sinon) ;
  * - dans le pied flottant : **« Adapter mon CV à cette offre »** (l'action
  *   principale, en bleu : elle ouvre le dossier et l'atelier,
  *   `features/atelier`) et « Voir l'annonce d'origine », en contour.
@@ -24,7 +29,11 @@
  */
 
 import { Pressable, ScrollView } from "react-native";
-import Animated, { FadeInDown, useReducedMotion } from "react-native-reanimated";
+import Animated, {
+  FadeInDown,
+  LinearTransition,
+  useReducedMotion,
+} from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Aura } from "@/components/aura";
@@ -190,15 +199,17 @@ export function EcranDetailOffre() {
               </VStack>
             </Animated.View>
 
-            <Animated.View entering={entree(2)}>
+            {/* L'annonce porte son propre fondu (`CarteAnnonce`) ; la clé fixe
+                garde la description sous elle entre deux rendus. */}
+            {annonce !== null ? <CarteAnnonce annonce={annonce} /> : null}
+
+            <Animated.View
+              key="description"
+              entering={entree(2)}
+              layout={reduit ? undefined : LinearTransition.duration(260)}
+            >
               <BlocAnalyse etat={etatDescription} texte={offre.description} />
             </Animated.View>
-
-            {annonce !== null ? (
-              <Animated.View entering={entree(3)}>
-                <CarteAnnonce annonce={annonce} />
-              </Animated.View>
-            ) : null}
           </ScrollView>
         )}
       </SafeAreaView>

@@ -17,8 +17,26 @@
  * bouton principal — le seul en bleu plein — parce que c'est le seul chemin
  * disponible partout.
  *
- * Le consentement aux conditions tient dans une phrase, avec les deux liens :
+ * Le consentement aux conditions tient dans une phrase, avec les liens :
  * continuer vaut acceptation (voir `services/consentements.ts`).
+ *
+ * ═══ L'IA dans la même phrase (2026-11-05) — et le risque assumé ═══
+ *
+ * La phrase dit aussi « et que Karria s'appuie sur des modèles d'IA pour
+ * t'aider », avec un troisième lien, « Karria et l'IA », qui ouvre
+ * l'information complète **avant** tout compte (`feuille-information-ia.tsx`,
+ * route publique `GET /auth/ai-disclosure`). La version affichée part avec
+ * la connexion (`ai_disclosure_version`) et vaut accord IA côté serveur :
+ * la feuille de consentement ne se montre plus au premier geste d'IA, sauf
+ * filet (version changée, accord retiré, information non chargée).
+ *
+ * ⚠️ Apple 5.1.2 (i) demande une information claire et une **permission
+ * explicite** avant d'envoyer des données personnelles à une IA tierce.
+ * « En continuant » est le choix de Marc (la feuille au moment du geste
+ * faisait renoncer) ; l'ADR-0025 de l'API (section du 2026-11-05) consigne
+ * le pari. Si la relecture App Store refuse, il suffit de ne plus envoyer
+ * `ai_disclosure_version` (`api/auth.api.ts`) : le chemin explicite — la
+ * feuille, ses routes, le retrait dans les paramètres — est resté intact.
  */
 
 import { Pressable, View } from "react-native";
@@ -37,8 +55,10 @@ import { useCouleurs } from "@/theme/use-couleurs";
 
 import type { Document } from "../services/documents";
 import { GAINS } from "../services/porte";
+import { FeuilleInformationIa } from "./feuille-information-ia";
 import { LogoApple, LogoGoogle } from "./logos-fournisseurs";
 import type { ConnexionSociale } from "../hooks/use-connexion-sociale";
+import { useInformationIa } from "../hooks/use-information-ia";
 
 interface Props extends ConnexionSociale {
   titre: string;
@@ -68,6 +88,8 @@ export function FeuilleConnexion({
   onPlusTard,
 }: Props) {
   const couleurs = useCouleurs();
+  // Chargée dès l'ouverture : c'est la version que la connexion renverra.
+  const informationIa = useInformationIa();
 
   return (
     <View className="rounded-t-[32px] border-t border-border-subtle bg-card p-6 pb-8">
@@ -174,8 +196,8 @@ export function FeuilleConnexion({
                 onPress={() => lire("conditions")}
               >
                 Conditions Générales
-              </Texte>{" "}
-              et notre{" "}
+              </Texte>
+              , notre{" "}
               <Texte
                 className="font-bold text-caption text-foreground underline"
                 accessibilityRole="link"
@@ -183,11 +205,20 @@ export function FeuilleConnexion({
               >
                 Politique de Confidentialité
               </Texte>
-              .
+              , et que{" "}
+              <Texte
+                className="font-bold text-caption text-foreground underline"
+                accessibilityRole="link"
+                onPress={informationIa.ouvrir}
+              >
+                Karria s&apos;appuie sur des modèles d&apos;IA
+              </Texte>{" "}
+              pour t&apos;aider.
             </Texte>
           </VStack>
         </VStack>
       </SafeAreaView>
+      <FeuilleInformationIa {...informationIa} />
     </View>
   );
 }

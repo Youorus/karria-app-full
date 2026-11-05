@@ -22,11 +22,21 @@
  * La feuille nomme d'abord ce que **ce** geste envoie — tes messages, ta
  * voix, ton CV, ta photo — puis le reste. La liste des fournisseurs vient
  * du serveur ; les textes, d'ici. Pur et testé.
+ *
+ * ═══ L'information avant tout compte (2026-11-05) ═══
+ *
+ * L'écran de connexion dit « en continuant, tu acceptes … et que Karria
+ * s'appuie sur des modèles d'IA », avec le lien « Karria et l'IA ». Il lit
+ * `GET /auth/ai-disclosure` (public) et garde ici la `disclosure` : c'est
+ * **sa version** que les requêtes de connexion renvoient
+ * (`versionDisclosureAffichee`), et le serveur consigne l'accord s'il la
+ * reconnaît. Après la connexion, `poserConsentementIa` la tient à jour
+ * depuis `/auth/me` — une seule vérité, deux moments.
  */
 
 import { ErreurApi } from "@/lib/http";
 
-import type { ConsentementIa, UsageIa } from "../types/auth.types";
+import type { ConsentementIa, DisclosureIa, UsageIa } from "../types/auth.types";
 
 // ─────────────────────────────────────────────────────────────────────
 // L'état partagé
@@ -34,6 +44,11 @@ import type { ConsentementIa, UsageIa } from "../types/auth.types";
 
 /** `null` tant que le serveur n'a rien dit (pas de session, ou pas encore lu). */
 let courant: ConsentementIa | null = null;
+/**
+ * L'information courante, lisible sans session. Survit à la déconnexion :
+ * la prochaine connexion la renvoie telle quelle.
+ */
+let disclosure: DisclosureIa | null = null;
 let actionEnAttente: { usage: UsageIa; action: () => void } | null = null;
 /**
  * La feuille ouverte, ou `null`. **Un seul objet par ouverture** : les
@@ -52,10 +67,35 @@ export function consentementIa(): ConsentementIa | null {
   return courant;
 }
 
-/** Recopie ce que le serveur a dit. */
+/** Recopie ce que le serveur a dit ; l'information affichable suit. */
 export function poserConsentementIa(valeur: ConsentementIa | null): void {
   courant = valeur;
+  if (valeur !== null) {
+    disclosure = {
+      version: valeur.version,
+      fournisseurs: valeur.fournisseurs,
+      usages: valeur.usages,
+    };
+  }
   publier();
+}
+
+export function disclosureIa(): DisclosureIa | null {
+  return disclosure;
+}
+
+/** Recopie l'information publique (`GET /auth/ai-disclosure`). */
+export function poserDisclosureIa(valeur: DisclosureIa | null): void {
+  disclosure = valeur;
+  publier();
+}
+
+/**
+ * La version à joindre aux requêtes de connexion, ou `null` si rien n'a
+ * encore été chargé : on n'envoie jamais une version qu'on n'a pas montrée.
+ */
+export function versionDisclosureAffichee(): string | null {
+  return disclosure?.version ?? null;
 }
 
 export function abonnerConsentementIa(rappel: () => void): () => void {

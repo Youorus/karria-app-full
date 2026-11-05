@@ -13,9 +13,16 @@
  * d'accueil dit « en continuant, tu acceptes les conditions » ; continuer
  * **est** l'acceptation. La preuve juridique tient alors dans les
  * versions envoyées ici, que le serveur horodate avec le compte.
+ *
+ * Depuis le 2026-11-05, la même phrase couvre l'IA : `ai_disclosure_version`
+ * part avec les mêmes requêtes, **seulement** si la feuille de connexion a
+ * eu le temps de charger l'information (`GET /auth/ai-disclosure`). Sinon le
+ * champ manque, le serveur ne consigne rien, et la feuille de consentement
+ * demandera au premier geste d'IA — jamais une version qu'on n'a pas montrée.
  */
 
 import { http } from "@/lib/http";
+import { versionDisclosureAffichee } from "../services/consentement-ia";
 import { VERSIONS } from "../services/consentements";
 import { versConsentementIa } from "./consentement-ia.api";
 import type {
@@ -29,10 +36,15 @@ import type {
   SuppressionCompteBrute,
 } from "../types/auth.types";
 
-const CONSENTEMENT = {
-  terms_version: VERSIONS.conditions,
-  privacy_policy_version: VERSIONS.confidentialite,
-};
+/** Les versions acceptées « en continuant », lues au moment de l'appel. */
+function consentement(): Record<string, string> {
+  const ia = versionDisclosureAffichee();
+  return {
+    terms_version: VERSIONS.conditions,
+    privacy_policy_version: VERSIONS.confidentialite,
+    ...(ia === null ? {} : { ai_disclosure_version: ia }),
+  };
+}
 
 function versParcours(brut: ParcoursBrut): Parcours {
   return {
@@ -60,7 +72,7 @@ export async function demanderCode(email: string): Promise<Parcours> {
   return versParcours(
     await http.post<ParcoursBrut>(
       "/auth/email/start",
-      { email, ...CONSENTEMENT },
+      { email, ...consentement() },
       { authentifie: false },
     ),
   );
@@ -100,8 +112,8 @@ export async function connecterAvec(
 ): Promise<Connexion> {
   const corps =
     fournisseur === "apple"
-      ? { identity_token: jeton, nonce: nonce ?? null, ...CONSENTEMENT }
-      : { id_token: jeton, nonce: nonce ?? null, ...CONSENTEMENT };
+      ? { identity_token: jeton, nonce: nonce ?? null, ...consentement() }
+      : { id_token: jeton, nonce: nonce ?? null, ...consentement() };
   return versConnexion(
     await http.post<ConnexionBrute>(`/auth/social/${fournisseur}`, corps, {
       authentifie: false,
