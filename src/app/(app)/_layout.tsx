@@ -116,6 +116,8 @@ export default function LayoutApp() {
           name="atelier/[dossierId]/index"
           options={{ animation: "fade_from_bottom", animationDuration: 280 }}
         />
+        <Stack.Screen name="atelier/[dossierId]/lettre" />
+        <Stack.Screen name="atelier/[dossierId]/finaliser" />
         {/* Les paramètres s'empilent comme un détail : on y va, on revient.
             La suppression monte en fondu depuis le bas, comme une feuille
             qu'on ouvre — et le geste de retour reste permis : on doit
