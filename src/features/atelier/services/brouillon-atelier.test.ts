@@ -53,8 +53,10 @@ import {
   brouillonPrime,
   ecrireBrouillonAtelier,
   lireBrouillonAtelier,
+  fichierDExport,
   oublierBrouillonAtelier,
   oublierTousLesBrouillonsAtelier,
+  supprimerExport,
 } from "./brouillon-atelier";
 
 const cv: Cv = {
@@ -108,6 +110,18 @@ describe("le brouillon d'atelier", () => {
     expect(lireBrouillonAtelier("a")).toBeNull();
     expect(lireBrouillonAtelier("b")).toBeNull();
     expect(() => oublierTousLesBrouillonsAtelier()).not.toThrow();
+  });
+
+  it("pose les exports sous le répertoire de l'atelier, et la purge les emporte", () => {
+    const f = fichierDExport("CV - Awa.pdf");
+    expect(f.uri).toBe("cache/atelier/exports/CV - Awa.pdf");
+    f.write("pdf");
+    expect(f.exists).toBe(true);
+    supprimerExport(f);
+    expect(f.exists).toBe(false);
+    fichierDExport("Lettre.pdf").write("pdf");
+    oublierTousLesBrouillonsAtelier();
+    expect(mockDisque.has("cache/atelier/exports/Lettre.pdf")).toBe(false);
   });
 
   it("ignore un fichier illisible", () => {

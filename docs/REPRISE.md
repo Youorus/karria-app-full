@@ -5,6 +5,107 @@
 
 **Dernière mise à jour : 2026-11-05**
 
+## Session du 2026-11-05 (nuit) — L'atelier CV : feuille temps réel, Karria qui propose, lettre, Finaliser (Fable)
+
+**Plan de Marc** : `karria_api_v2/docs/atelier-cv-feuille-de-route.md` (§ 1 à 5 et 7), contrats
+`contrat-api-documents.md` (recopié dans `docs/`) et `contrat-api-candidatures.md`. Commits `346807c`
+(socle), `e5e4237` (brouillons effacés à la déconnexion, revue sécurité), `4f9f5a7` (feuille, entrée,
+modèle, atelier), `2c04ce9` (lettre, Finaliser), `4940e07` (relais galerie → atelier, routes typées).
+`npm run check` vert (542 tests), `npx expo export --platform ios` produit un paquet. Paquets ajoutés
+(SDK 57) : `react-native-webview`, `expo-file-system`, `expo-sharing`.
+
+### Ce qui est livré — `src/features/atelier`, routes `app/(app)/atelier/[dossierId]/{index,lettre,finaliser}`
+
+- **La feuille temps réel** (`components/feuille-cv.tsx`) : une WebView **unique, jamais rechargée**.
+  Le premier HTML part en `source` ; chaque rendu suivant est injecté (`__karria.remplacer` : corps et
+  styles remplacés, scripts de la page rejoués pour `window.karriaFit`, défilement conservé, polices
+  déjà chargées). Choix fait **contre** la double WebView en fondu : une seule page en mémoire, rien à
+  synchroniser (`services/script-feuille.ts`, en-tête). Le `viewport` est déclaré à 826 px : la page
+  A4 tient dans la largeur, et **pincer-zoomer est celui du système** (×4). Fond du mode courant
+  autour, feuille blanche avec ombre, filet pointillé des coupures posé par la page. Toucher un
+  élément → `postMessage({ type: "toucher", chemin })`. La poignée (`patcher`, `choisir`) passe par la
+  prop `onPoignee`, pas par `ref` : le compilateur React (activé) traite tout ce qui passe par `ref`
+  comme une référence lue au rendu, et contaminait l'objet rendu par le hook.
+- **Le hook central** (`hooks/use-atelier.ts`) : trois horloges — patch local **immédiat**
+  (`services/chemins.ts › differences` : tous les textes du CV par `data-chemin`, virtuels compris,
+  avant/après → seuls les changés), **rendu au repos 400 ms** (`services/file-de-rendu.ts` : un vol à
+  la fois, la dernière demande gagne, un résultat périmé est jeté — testé avec minuteries factices),
+  **`PUT /applications/{id}/cv` à 1,5 s** (la couverture relue dans le dossier rendu ; le CV local
+  garde la main, un PUT ne l'écrase jamais). Annuler/rétablir (`services/historique.ts`, 50 états),
+  brouillon local (`services/brouillon-atelier.ts`, **`Paths.cache`**, un JSON par dossier, repris
+  seulement s'il est plus récent que `modifieLe` du serveur ; **effacé à la déconnexion et à la
+  suppression du compte** depuis `use-session.tsx`), relecture 2 s pendant `adaptation: en_cours`,
+  `echouee` → « Réessayer » (`POST /adapt`, consentement IA) ou « Continuer à la main ».
+- **Les cinq gestes** (`components/barre-atelier.tsx`, capsule de verre du pied flottant ; seul
+  « Finaliser » est bleu) : **Modifier** (toucher un élément → `FeuilleModifier` pleine avec **le
+  formulaire existant** de `cv/components/edition`, validations et suggestions comprises, recréée par
+  `key` à chaque cible ; sans élément touché : la liste des sections) ; **Karria** (`FeuilleKarria`,
+  demi-feuille : la page reste visible ; propositions avant/après/raison, accepter · refuser ·
+  revenir, « Tout accepter » ; couverture des mots-clés en pastilles présents/manquants) ; **Mise en
+  avant** (`FeuilleMiseEnAvant` : monter/descendre, masquer/montrer — **l'ordre des rubriques n'est
+  pas dans le contrat** (c'est le modèle), la feuille le dit ; masquer = retirer de la copie,
+  montrer = reprendre du **CV de base** à sa place, `services/mise-en-avant.ts`) ; **Intitulé**
+  (`FeuilleIntitule`, suggestions `kind=title`, aperçu à la frappe, enregistrement au bouton) ;
+  **Finaliser**. La **note discrète** « Karria a mis à jour ton à-propos — voir · revenir »
+  (`note-karria.tsx`) pour les propositions `acceptee` d'office (intitulé, à-propos), fermable pour la
+  session.
+- **L'entrée** : fiche d'offre (`offres/screens/ecran-detail-offre.tsx`) → **« Adapter mon CV à cette
+  offre »** devient l'action principale (l'annonce d'origine passe en contour). Hook
+  `atelier/hooks/use-entree-atelier.ts` composé dans `use-detail-offre` : porte « dossiers » + reprise,
+  consentement IA « application », `POST /applications` avec le modèle choisi de la personne (201 ou
+  200 si existant), `409 cv_missing` → alerte vers l'onglet CV. **Première étape dans l'atelier : le
+  modèle** (`FeuilleModele`, demi-feuille) — le modèle actuel, les miens, les autres (Premium, prix
+  serveur, pastille or) ; toucher un modèle possédé **redessine la page derrière** (c'est l'aperçu avec
+  ses données) ; un Premium ouvre Stripe (`ouvrirAchatModele` + `openAuthSessionAsync` + relecture
+  jusqu'à livré, `hooks/use-choix-modele.ts`) puis s'applique **sans quitter l'atelier**. Le modèle
+  appliqué est aussi retenu par `PUT /user-templates/me/selected`. Depuis la galerie, un modèle à soi
+  propose « Continuer dans l'atelier » si un dossier y est ouvert (`services/dossier-en-cours.ts`).
+- **La lettre** (`screens/ecran-lettre.tsx`, `hooks/use-lettre.ts`) : « Et ta lettre ? » → ébauche
+  (`POST /{id}/letter`), même feuille avec `{ letter }` (`services/lettre.ts › documentDeLettre` :
+  entreprise + logo s'il est sur `storage.karria.fr`, expéditeur du CV adapté), toucher un paragraphe
+  → `FeuilleParagraphe` : à la main (aperçu à la frappe) ou **« Karria réécrit »** avec consigne
+  (`regenerate`), puis garder l'ancien / le nouveau ; `PUT /letter` différé ; avertissements du rendu
+  → conseils (`presentation.ts › conseilsDe`), le premier sous le bouton « Continuer ».
+- **Finaliser** (`screens/ecran-finaliser.tsx`, `hooks/use-finaliser.ts`) : **deux exports distincts**
+  (`POST /cv/me/generated-cvs` avec `cv` du dossier + `template_id` + `dossier_id` ;
+  `POST /documents/letters/export`), attente immersive avec annonce (`emplacement finaliser`),
+  **cadran ATS** (`cadran-ats.tsx`, arc SVG) + phrase **sans chiffre** par niveau, points à améliorer
+  (trois, les plus payants) avec « Je corrige » → retour dans l'atelier sur l'élément (`?cible=`) ou
+  « Optimiser pour les logiciels de tri » (`ats_safe`) ; **Télécharger** PDF/Word (fichier dans le
+  `cache/atelier/exports/` sous un nom lisible, puis `Sharing.shareAsync`, **puis supprimé** ; le répertoire
+  est purgé avec la session) ; **Envoyer par e-mail** (`FeuilleEnvoi` : à
+  mon adresse pré-remplie via `lireMoi`, ou une autre validée ; `POST /documents/exports/send` avec les
+  deux ids ; `429 send_quota_exceeded` par `scope` en français) ; puis la **feuille « As-tu
+  candidaté ? »** du domaine Candidatures.
+- **Faux serveur** `lib/dev/atelier-simule.ts` (`EXPO_PUBLIC_API_MODE=simulation`) : HTML ancré
+  réaliste (deux mises en page selon le modèle, `data-chemin` virtuels, `karriaFit`, filets), `403
+template_not_owned` tant que le faux paiement n'a pas livré, exports avec score ATS par règles,
+  envoi avec quotas, modèle choisi. Routé **avant** les dossiers dans `serveur-simule.ts` (le `POST`
+  des exports est à lui, le `GET` reste aux dossiers — leurs exports ne se voient donc pas dans la
+  liste du faux serveur des dossiers : à fusionner un jour, sans importance en réel).
+- **Publicité** : emplacements `atelier_attente` (pendant l'adaptation) et `finaliser` (pendant la
+  génération) — jamais sur la feuille, jamais au-dessus d'un bouton principal.
+
+### Ce qu'il faut savoir du contrat (constaté en construisant)
+
+- `template_id` d'un dossier n'est posé qu'à la création (`POST /applications`) : **aucune route ne
+  le change ensuite**. Le modèle réellement employé suit une seule règle (`services/modele.ts`) :
+  dossier → brouillon local → modèle choisi de la personne → premier modèle gratuit. Une route
+  `PATCH /applications/{id}` (`template_id`) côté API rendrait la `DossierCard` juste.
+- L'ordre des **rubriques** n'existe pas dans le CV du contrat ; l'ordre des **éléments** si.
+- Le rendu charge polices et photo depuis `storage.karria.fr` : la WebView pose `baseUrl` sur cette
+  origine pour ne pas dépendre d'en-têtes CORS. **À vérifier contre la production.**
+
+### Non vérifié / reste
+
+- **La WebView réelle avec le HTML de production** (polices, photo signée, `karriaFit`, zoom, rejeu
+  des scripts à chaque remplacement) : seule la simulation a été exercée dans les tests ; voir la note
+  de fin de session pour ce qui a été vu sur le simulateur.
+- Le retour Stripe réel depuis l'atelier (comme pour le soutien), Android (zoom `setBuiltInZoomControls`,
+  feuilles), tablette/paysage (phase 7), les textes à relire par Marc.
+- Les exports `pdf_url` du faux serveur ne répondent pas : « Télécharger » échoue en simulation
+  (voulu : rien n'est écrit) — à essayer contre la production.
+
 ## Session du 2026-11-05 (soir) — Espace Candidatures : client API des dossiers, onglet, détail, feuille « As-tu candidaté ? » (Fable)
 
 **Demande de Marc** : l'onglet Candidatures (`(onglets)/dossiers.tsx`, jusqu'ici « à venir ») devient

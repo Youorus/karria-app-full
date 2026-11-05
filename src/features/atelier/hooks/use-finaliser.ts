@@ -12,10 +12,14 @@
  *
  * ═══ Télécharger ═══
  *
- * Le fichier est enregistré dans le cache (`expo-file-system`), sous son
- * nom lisible (« CV - Awa Diallo.pdf »), puis la feuille de partage du
- * système s'ouvre (`expo-sharing`) : Fichiers, AirDrop, Mail, WhatsApp —
- * c'est le téléphone qui décide où. Les URL signées valent une heure.
+ * Le fichier est enregistré dans `cache/atelier/exports/` (`expo-file-system`),
+ * sous son nom lisible (« CV - Awa Diallo.pdf »), puis la feuille de partage
+ * du système s'ouvre (`expo-sharing`) : Fichiers, AirDrop, Mail, WhatsApp —
+ * c'est le téléphone qui décide où. Dès qu'elle rend la main, le fichier
+ * est **supprimé** : le système a déjà sa copie là où la personne l'a mise,
+ * et un CV ne reste pas dans le cache d'un téléphone qu'on peut prêter. Le
+ * répertoire est de toute façon purgé avec la session. Les URL signées
+ * valent une heure.
  *
  * ═══ Envoyer par e-mail ═══
  *
@@ -31,7 +35,7 @@
  */
 
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { File, Paths } from "expo-file-system";
+import { File } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -55,7 +59,11 @@ import {
   exporterLettre,
   lireModeleChoisi,
 } from "../api/documents.api";
-import { lireBrouillonAtelier } from "../services/brouillon-atelier";
+import {
+  fichierDExport,
+  lireBrouillonAtelier,
+  supprimerExport,
+} from "../services/brouillon-atelier";
 import { documentDeLettre } from "../services/lettre";
 import { modeleDuDossier } from "../services/modele";
 import {
@@ -260,9 +268,9 @@ export function useFinaliser(): EcranFinaliser {
         format,
       );
       void (async () => {
+        let destination: File | null = null;
         try {
-          const destination = new File(Paths.cache, nom);
-          if (destination.exists) destination.delete();
+          destination = fichierDExport(nom);
           const fichier = await File.downloadFileAsync(url, destination);
           if (!vivant.current) return;
           if (await Sharing.isAvailableAsync()) {
@@ -278,6 +286,7 @@ export function useFinaliser(): EcranFinaliser {
           if (vivant.current)
             setErreur("Le fichier n'a pas pu être enregistré. Réessaie dans un instant.");
         } finally {
+          if (destination !== null) supprimerExport(destination);
           if (vivant.current) setTelechargement(null);
         }
       })();

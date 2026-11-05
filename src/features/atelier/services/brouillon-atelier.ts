@@ -21,6 +21,13 @@
  * formulaires du CV s'oublient : le compte suivant sur ce téléphone ne
  * trouve rien.
  *
+ * ═══ Les exports téléchargés passent par ici aussi ═══
+ *
+ * Un PDF ou un Word téléchargé pour la feuille de partage est posé dans
+ * `atelier/exports/` (`fichierDExport`) — donc effacé par la même purge —
+ * et Finaliser le supprime dès que la feuille de partage rend la main : un
+ * document personnel ne traîne pas dans le cache.
+ *
  * ═══ Jamais d'exception ═══
  *
  * Un brouillon illisible vaut l'absence de brouillon : on repart du
@@ -98,7 +105,27 @@ export function oublierBrouillonAtelier(dossierId: string): void {
   }
 }
 
-/** À la déconnexion et à la suppression du compte : tout le répertoire. */
+/** Où poser un export téléchargé pour le partager : sous le répertoire de
+ *  l'atelier, créé au besoin, et donc effacé avec lui. */
+export function fichierDExport(nom: string): File {
+  const d = new Directory(repertoire(), "exports");
+  if (!d.exists) d.create({ intermediates: true, idempotent: true });
+  const f = new File(d, nom);
+  if (f.exists) f.delete();
+  return f;
+}
+
+/** Supprime un fichier d'export, sans lever : il est de toute façon dans le cache. */
+export function supprimerExport(f: File): void {
+  try {
+    if (f.exists) f.delete();
+  } catch (cause) {
+    console.warn("[karria] export téléchargé non supprimé", cause);
+  }
+}
+
+/** À la déconnexion et à la suppression du compte : tout le répertoire,
+ *  brouillons et exports téléchargés compris. */
 export function oublierTousLesBrouillonsAtelier(): void {
   try {
     const d = repertoire();
