@@ -6,11 +6,15 @@
  * en a un (l'écran CV, qui se modifie). Le sous-titre est celui de la V1
  * dans chaque cas.
  *
- * À droite de l'en-tête, dans tous les états : l'icône « Mes CV » — les CV
- * déjà mis en page, et le bouton pour en créer un. Une icône, pas un badge
- * ni un menu : c'est un endroit où l'on va, comme la cloche des offres.
+ * À droite de l'en-tête, dans tous les états, deux gestes (demande de Marc,
+ * 2026-11-05) : **« + »**, un disque en bleu d'action — le bouton « nouveau »
+ * que toute application a, et qu'on comprend sans le lire : avec un CV, il
+ * ouvre l'atelier libre (choisir un modèle, mettre en page, exporter) ;
+ * sans CV, il le crée d'abord. À sa gauche, en texte, **« Mes CV »** : les
+ * CV déjà mis en page. Pas de badge, pas de menu : un verbe et un endroit.
  */
 
+import { Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Aura } from "@/components/aura";
@@ -18,7 +22,9 @@ import { ChargeurKarria } from "@/components/chargeur-karria";
 import { BoutonEnTeteRond, EnTeteKarria } from "@/components/en-tete-karria";
 import { Icone } from "@/components/icone";
 import { MessageErreur } from "@/components/message-erreur";
+import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
+import { HStack } from "@/components/ui/hstack";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import { CvRempli } from "../components/cv-rempli";
@@ -38,9 +44,25 @@ export function EcranCv() {
           titre="Mon CV"
           sousTitre={rempli ? "Karria génère votre CV" : "Importez, améliorez, générez"}
           droite={
-            <BoutonEnTeteRond onPress={e.ouvrirMesCv} libelle="Mes CV">
-              <Icone nom="pile" couleur={couleurs.texte} taille={18} graisse="medium" />
-            </BoutonEnTeteRond>
+            <HStack space="sm" className="items-center">
+              <Pressable
+                onPress={e.ouvrirMesCv}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Mes CV, les CV déjà mis en page"
+                className="h-10 justify-center rounded-full px-3 active:opacity-70"
+              >
+                <Texte className="font-semibold text-footnote text-primary">Mes CV</Texte>
+              </Pressable>
+              <BoutonEnTeteRond onPress={e.nouveauCv} libelle="Nouveau CV" plein>
+                <Icone
+                  nom="ajouter"
+                  couleur={couleurs.surPrimaire}
+                  taille={20}
+                  graisse="semibold"
+                />
+              </BoutonEnTeteRond>
+            </HStack>
           }
         />
         {e.chargement ? (

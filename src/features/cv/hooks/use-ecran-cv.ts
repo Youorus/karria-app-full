@@ -45,8 +45,11 @@ export interface EcranCv {
   creer: () => void;
   importer: (source: SourceImport) => void;
   modifier: (section: CleChapitre) => void;
-  /** L'icône de l'en-tête : « Mes CV », les CV déjà mis en page (`/cv/mes-cv`). */
+  /** L'en-tête : « Mes CV », les CV déjà mis en page (`/cv/mes-cv`). */
   ouvrirMesCv: () => void;
+  /** Le « + » de l'en-tête : un nouveau CV. Avec un CV, l'atelier libre
+   *  (`/atelier/libre`) ; sans CV, le créer d'abord (`/cv/creer`). */
+  nouveauCv: () => void;
   /** Après un import : les sections à relire, coordonnées d'abord. */
   aVerifier: readonly CleChapitre[];
   importRecent: boolean;
@@ -128,8 +131,17 @@ export function useEcranCv(): EcranCv {
   const ouvrirMesCv = useCallback(() => {
     if (exiger("cv", { cle: "cv.mes-cv" })) router.push("/cv/mes-cv");
   }, [exiger, router]);
+  const rempli = cv !== null && !cv.vide;
+  const nouveauCv = useCallback(() => {
+    if (!rempli) {
+      creer();
+      return;
+    }
+    if (exiger("cv", { cle: "cv.nouveau" })) router.push("/atelier/libre");
+  }, [rempli, creer, exiger, router]);
   useReprise("cv.creer", () => router.push("/cv/creer"));
   useReprise("cv.mes-cv", () => router.push("/cv/mes-cv"));
+  useReprise("cv.nouveau", () => router.push("/atelier/libre"));
   useReprise("cv.importer", (charge) =>
     ouvrirImport(SOURCES.find((s) => s === charge) ?? "fichier"),
   );
@@ -144,6 +156,7 @@ export function useEcranCv(): EcranCv {
     importer,
     modifier,
     ouvrirMesCv,
+    nouveauCv,
     aVerifier: verification.aVerifier,
     importRecent: verification.importRecent,
     manquants: cv === null || cv.vide ? [] : manquantsDuCv(cv),

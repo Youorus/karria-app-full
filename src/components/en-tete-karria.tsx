@@ -95,17 +95,23 @@ export function BoutonEnTeteRond({
   libelle,
   children,
   point = false,
+  plein = false,
 }: {
   onPress: () => void;
   libelle: string;
   children: ReactNode;
   point?: boolean;
+  /** Le disque en bleu d'action, pour **le** geste de création de l'écran
+   *  (le « + » de l'onglet CV) : un seul par en-tête, jamais deux. */
+  plein?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
       hitSlop={4}
-      className="h-10 w-10 items-center justify-center rounded-full bg-remplissage active:opacity-80"
+      className={`h-10 w-10 items-center justify-center rounded-full active:opacity-80 ${
+        plein ? "bg-primary" : "bg-remplissage"
+      }`}
       accessibilityRole="button"
       accessibilityLabel={libelle}
     >
