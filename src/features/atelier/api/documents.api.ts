@@ -5,10 +5,16 @@
  *
  * - `POST /documents/{template_id}/render` : le HTML ancré d'un CV ou d'une
  *   lettre dans un modèle ; `?sample=true` pour l'exemple du modèle.
- * - `POST /cv/me/generated-cvs` : l'export d'un CV — ici **toujours** avec
- *   `cv` (la copie adaptée du dossier) et `dossier_id`.
+ * - `POST /cv/me/generated-cvs` : l'export d'un CV — **toujours** avec `cv`
+ *   (la copie adaptée d'un dossier, ou le brouillon de l'atelier libre) ;
+ *   `dossier_id` quand il y a un dossier, absent pour un CV libre.
+ * - `GET /cv/me/generated-cvs?kind=cv` : tous les exports de CV de la
+ *   personne — dossiers compris : « Mes CV » garde ceux **sans dossier**
+ *   (`services/mes-cv.ts`), le contrat n'a pas de filtre « sans dossier ».
+ * - `DELETE /cv/me/generated-cvs/{id}` : effacer un export.
  * - `POST /documents/letters/export` : l'export de la lettre d'un dossier.
- * - `POST /documents/exports/send` : plusieurs exports dans un seul e-mail.
+ * - `POST /documents/exports/send` : plusieurs exports dans un seul e-mail ;
+ *   `POST /documents/exports/{id}/send` : un seul.
  * - `GET /documents/sends/{id}` : où en est l'envoi.
  * - `GET|PUT /user-templates/me/selected` : le modèle choisi par la personne.
  *
@@ -40,8 +46,8 @@ import type {
 
 const NIVEAUX = { good: "bon", fair: "moyen", poor: "faible" } as const;
 
-function versScoreAts(b: AtsBrut): ScoreAts | null {
-  if (b.score === undefined || b.level === undefined) return null;
+function versScoreAts(b: AtsBrut | undefined): ScoreAts | null {
+  if (b === undefined || b.score === undefined || b.level === undefined) return null;
   return {
     score: b.score,
     niveau: NIVEAUX[b.level],
@@ -62,6 +68,7 @@ export function versExport(b: ExportBrut): Export {
     id: b.id,
     genre: b.kind === "letter" ? "lettre" : "cv",
     modele: b.template === null ? null : { id: b.template.id, libelle: b.template.label },
+    dossierId: b.dossier_id ?? null,
     creeLe: b.created_at,
     pdf: b.pdf_url ?? null,
     docx: b.docx_url ?? null,
@@ -143,6 +150,39 @@ export async function exporterCvDuDossier(options: {
   );
 }
 
+/**
+ * Exporte le CV de l'atelier **libre** : le brouillon local (le CV de base
+ * retouché), sans dossier. C'est lui qui apparaît dans « Mes CV ». Le CV de
+ * base, lui, n'est pas touché : il n'existe aucun `PUT /cv/me` ici.
+ */
+export async function exporterCvLibre(options: {
+  cv: Cv;
+  modeleId: string;
+  atsSafe?: boolean;
+}): Promise<Export> {
+  return versExport(
+    await http.post<ExportBrut>("/cv/me/generated-cvs", {
+      template_id: options.modeleId,
+      formats: ["pdf", "docx"],
+      ats_safe: options.atsSafe ?? false,
+      cv: versCvBrut(options.cv),
+    }),
+  );
+}
+
+/** Tous les exports de CV de la personne, dossiers compris, du serveur tels quels. */
+export async function lireMesExports(genre: "cv" | "lettre" = "cv"): Promise<Export[]> {
+  const brut = await http.get<{ items: ExportBrut[]; total: number }>(
+    `/cv/me/generated-cvs?kind=${genre === "cv" ? "cv" : "letter"}`,
+  );
+  return brut.items.map(versExport);
+}
+
+/** Efface un export (ses fichiers avec). `404 generated_cv_not_found`. */
+export async function effacerExport(id: string): Promise<void> {
+  await http.delete(`/cv/me/generated-cvs/${id}`);
+}
+
 /** Exporte la lettre d'un dossier — un document à part, `kind: "letter"`. */
 export async function exporterLettre(options: {
   lettre: LettreDocumentBrute;
@@ -167,6 +207,13 @@ export async function exporterLettre(options: {
 export async function envoyerExports(ids: string[], a: string | null): Promise<Envoi> {
   return versEnvoi(
     await http.post<EnvoiBrut>("/documents/exports/send", { generated_ids: ids, to: a }),
+  );
+}
+
+/** Un seul export par e-mail — mêmes quotas et mêmes refus que `envoyerExports`. */
+export async function envoyerExport(id: string, a: string | null): Promise<Envoi> {
+  return versEnvoi(
+    await http.post<EnvoiBrut>(`/documents/exports/${id}/send`, { to: a }),
   );
 }
 

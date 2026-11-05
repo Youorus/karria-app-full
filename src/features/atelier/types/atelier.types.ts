@@ -73,7 +73,8 @@ export interface ExportBrut {
   pdf_url?: string | null;
   docx_url?: string | null;
   fit?: { spacing: number; font_scale: number; pages: number } | null;
-  ats: AtsBrut;
+  /** Toujours là sur le vrai serveur ; toléré absent (un export de dossier d'avance). */
+  ats?: AtsBrut;
 }
 
 /** `POST /documents/exports/send` → `202 Envoi`. */
@@ -127,6 +128,8 @@ export interface Export {
   id: string;
   genre: "cv" | "lettre";
   modele: { id: string; libelle: string } | null;
+  /** Le dossier de candidature qui l'a produit ; `null` pour un CV libre (« Mes CV »). */
+  dossierId: string | null;
   creeLe: string;
   /** URL signée (1 h), ou `null` si le format n'a pas été demandé. */
   pdf: string | null;
