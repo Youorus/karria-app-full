@@ -48,6 +48,8 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { lireMoi } from "@/features/auth/api/auth.api";
+import { useActionIa } from "@/features/auth/hooks/use-action-ia";
+import type { UsageIa } from "@/features/auth/types/auth.types";
 import { lireDossier } from "@/features/candidatures/api/candidatures.api";
 import {
   dossierMemorise,
@@ -146,6 +148,11 @@ export function useFinaliser(libre = false): EcranFinaliser {
   const dossierId = libre ? CLE_BROUILLON_LIBRE : (params.dossierId ?? "");
   const router = useRouter();
   const { pousser, remplacer } = useNavigationUnique();
+  // L'export porte le score ATS, expliqué par un modèle : le serveur exige
+  // l'accord sur l'IA (`403 ai_consent_required`). Sans lui, la feuille
+  // s'ouvre et la génération repart après « J'accepte et je continue ».
+  const { rejouerSiConsentementRequis } = useActionIa();
+  const usageIa: UsageIa = libre ? "cv_creation" : "application";
 
   const [dossier, setDossier] = useState<Dossier | null>(() =>
     dossierMemorise(dossierId),
@@ -271,14 +278,27 @@ export function useFinaliser(libre = false): EcranFinaliser {
 
   const generer = libre ? genererLibre : genererDossier;
 
+  const reessayer = useCallback(() => {
+    setGeneration(true);
+    setErreur(null);
+    setTentative((t) => t + 1);
+  }, []);
+
   // `generation` part à vrai, et « Réessayer » le remet avant de relancer :
   // l'effet ne pose aucun état lui-même.
   useEffect(() => {
     let actif = true;
     generer(false)
       .catch((cause: unknown) => {
+        if (!actif) return;
+        if (rejouerSiConsentementRequis(cause, usageIa, reessayer)) {
+          // La feuille est ouverte par-dessus ; « Pas maintenant » laisse
+          // ce mot et « Réessayer », qui la rouvre.
+          setErreur(TEXTES.accordIaPourLeScore);
+          return;
+        }
         console.warn("[karria] génération des documents en échec", cause);
-        if (actif) setErreur(messageDExport(cause));
+        setErreur(messageDExport(cause));
       })
       .finally(() => {
         if (actif) setGeneration(false);
@@ -286,20 +306,22 @@ export function useFinaliser(libre = false): EcranFinaliser {
     return () => {
       actif = false;
     };
-  }, [generer, tentative]);
+  }, [generer, tentative, rejouerSiConsentementRequis, usageIa, reessayer]);
 
   const optimiser = useCallback(() => {
     if (optimisation || generation) return;
     setOptimisation(true);
     generer(true)
       .catch((cause: unknown) => {
+        if (!vivant.current) return;
+        if (rejouerSiConsentementRequis(cause, usageIa, optimiser)) return;
         console.warn("[karria] export optimisé en échec", cause);
-        if (vivant.current) setErreur(messageDExport(cause));
+        setErreur(messageDExport(cause));
       })
       .finally(() => {
         if (vivant.current) setOptimisation(false);
       });
-  }, [optimisation, generation, generer]);
+  }, [optimisation, generation, generer, rejouerSiConsentementRequis, usageIa]);
 
   // ── Télécharger ────────────────────────────────────────────────────────
 
@@ -419,11 +441,7 @@ export function useFinaliser(libre = false): EcranFinaliser {
     envoyer,
     question,
     fermerQuestion: useCallback(() => setQuestion(false), []),
-    reessayer: useCallback(() => {
-      setGeneration(true);
-      setErreur(null);
-      setTentative((t) => t + 1);
-    }, []),
+    reessayer,
     retour: useCallback(() => {
       if (router.canGoBack()) router.back();
       else if (libre) pousser("/atelier/libre");

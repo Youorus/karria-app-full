@@ -138,6 +138,8 @@ export const TEXTES = {
   jeCorrige: "Je corrige",
   optimiser: "Optimiser pour les logiciels de tri",
   exportIntrouvable: "Les documents n'ont pas pu être générés. Réessaie dans un instant.",
+  accordIaPourLeScore:
+    "Le score ATS est expliqué par l'IA de Karria : dis-nous d'abord si tu es d'accord.",
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────
