@@ -6,7 +6,9 @@ import type { ScoreAts } from "../types/atelier.types";
 import {
   conseilsDe,
   correctionDe,
+  LIEN_APP,
   messageDEnvoi,
+  messageDePartageDocument,
   nomDeFichier,
   phraseAts,
   pointsAAmeliorer,
@@ -106,5 +108,21 @@ describe("les conseils et les refus", () => {
     expect(nomDeFichier("lettre", "x", "Acme / Inc: Lyon", "docx")).toBe(
       "Lettre de motivation - Acme Inc Lyon.docx",
     );
+  });
+});
+
+describe("le partage porte Karria", () => {
+  it("accompagne un CV partagé d'une phrase à la première personne et du lien de l'app", () => {
+    const message = messageDePartageDocument("cv");
+    expect(message).toMatch(/^Mon CV, préparé avec Karria/);
+    expect(message).toContain(LIEN_APP);
+    expect(LIEN_APP).toBe("https://karria.fr/app");
+  });
+
+  it("distingue la lettre, sur une seule ligne", () => {
+    const message = messageDePartageDocument("lettre");
+    expect(message).toMatch(/^Ma lettre de motivation, préparée avec Karria/);
+    expect(message).toContain(LIEN_APP);
+    expect(message).not.toContain("\n");
   });
 });

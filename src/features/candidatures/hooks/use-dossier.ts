@@ -34,6 +34,7 @@ import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 
+import { useOuvrirLecteur } from "@/features/atelier/hooks/use-ouvrir-lecteur";
 import { lireOffre } from "@/features/offres/api/offres.api";
 import { ErreurApi } from "@/lib/http";
 import { useNavigationUnique, type Chemin } from "@/lib/navigation";
@@ -235,6 +236,27 @@ export function useDossier(): EcranDossier {
     ]);
   }, [id, retour]);
 
+  // Un export s'ouvre dans le lecteur de Karria (en-tête « CV · Prénom Nom »,
+  // « Lettre · Entreprise »), pas dans le navigateur avec l'adresse du stockage.
+  const ouvrirLecteur = useOuvrirLecteur();
+  const ouvrirExport = useCallback(
+    (exporte: ExportDossier) => {
+      const lien = exporte.pdf ?? exporte.docx;
+      if (lien === null || dossier === null) return;
+      const nom =
+        `${dossier.cv.identite?.prenom ?? ""} ${dossier.cv.identite?.nom ?? ""}`.trim();
+      ouvrirLecteur({
+        url: lien,
+        genre: exporte.genre,
+        complement:
+          exporte.genre === "cv" ? (nom === "" ? null : nom) : dossier.offre.entreprise,
+        modele: exporte.modele,
+        retour: TEXTES.retourDossier,
+      });
+    },
+    [dossier, ouvrirLecteur],
+  );
+
   const ouvrirOffre = useCallback(() => {
     if (dossier === null) return;
     if (offreDansLIndex !== false) {
@@ -287,13 +309,7 @@ export function useDossier(): EcranDossier {
         pousser({ pathname: "/candidatures/[id]/lecture", params: { id, document } }),
       [pousser, id],
     ),
-    ouvrirExport: useCallback((exporte: ExportDossier) => {
-      const lien = exporte.pdf ?? exporte.docx;
-      if (lien === null) return;
-      WebBrowser.openBrowserAsync(lien).catch((cause: unknown) =>
-        console.warn("[karria] export non ouvert", cause),
-      );
-    }, []),
+    ouvrirExport,
     // La route de l'atelier est créée par l'atelier lui-même : le chemin est
     // écrit, pas typé — expo-router ne le connaît pas encore.
     ouvrirAtelier: useCallback(() => pousser(`/atelier/${id}` as Chemin), [pousser, id]),

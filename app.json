@@ -19,7 +19,11 @@
         "dark": "./src/assets/branding/karria-icone-ios-sombre.png",
         "tinted": "./src/assets/branding/karria-icone-ios-teintee.png"
       },
-      "googleServicesFile": "./config/firebase/GoogleService-Info.plist"
+      "googleServicesFile": "./config/firebase/GoogleService-Info.plist",
+      "associatedDomains": [
+        "applinks:karria.fr",
+        "applinks:www.karria.fr"
+      ]
     },
     "android": {
       "adaptiveIcon": {
@@ -30,7 +34,29 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.karria.app",
-      "googleServicesFile": "./config/firebase/google-services.json"
+      "googleServicesFile": "./config/firebase/google-services.json",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "karria.fr",
+              "pathPrefix": "/offre"
+            },
+            {
+              "scheme": "https",
+              "host": "www.karria.fr",
+              "pathPrefix": "/offre"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "plugins": [
       "./plugins/sans-sandbox-de-script",

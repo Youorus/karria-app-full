@@ -16,9 +16,10 @@
  *
  * ═══ Les gestes ═══
  *
- * Ouvrir : le PDF dans le navigateur intégré (l'aperçu, celui que recevra
- * un recruteur). Télécharger : `services/telechargement.ts`, la feuille de
- * partage du système. Envoyer : `POST /documents/exports/{id}/send`, mêmes
+ * Ouvrir : le lecteur de Karria (`/lecture-document`, en-tête « CV · Prénom
+ * Nom » — jamais l'adresse du stockage, que le navigateur intégré
+ * affichait). Télécharger : `services/telechargement.ts`, la feuille de
+ * partage du système, avec la phrase Karria sur iOS. Envoyer : `POST /documents/exports/{id}/send`, mêmes
  * quotas que Finaliser, même feuille. Supprimer : une alerte système
  * (c'est une décision), la carte part aussitôt et revient si le serveur
  * refuse. Nouveau CV : l'atelier libre.
@@ -37,7 +38,6 @@
  */
 
 import { useFocusEffect, useRouter } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import { useCallback, useMemo, useState } from "react";
 import { Alert } from "react-native";
 
@@ -57,6 +57,7 @@ import { exportsLibres, sousTitreDesCv, TEXTES_MES_CV } from "../services/mes-cv
 import { messageDEnvoi, nomDeFichier } from "../services/presentation";
 import { telechargerEtPartager, type Format } from "../services/telechargement";
 import type { Export } from "../types/atelier.types";
+import { useOuvrirLecteur } from "./use-ouvrir-lecteur";
 
 export type ElementMesCv =
   | { type: "cv"; exporte: Export; modele: Modele | null; rang: number }
@@ -178,16 +179,24 @@ export function useMesCv(): EcranMesCv {
   }, [exiger, pousser]);
   useReprise(CLE_REPRISE, () => pousser("/atelier/libre"));
 
-  const ouvrir = useCallback((exporte: Export) => {
-    const lien = exporte.pdf ?? exporte.docx;
-    if (lien === null) {
-      Alert.alert(TEXTES_MES_CV.apercuIndisponible);
-      return;
-    }
-    WebBrowser.openBrowserAsync(lien).catch((cause: unknown) =>
-      console.warn("[karria] aperçu du CV non ouvert", cause),
-    );
-  }, []);
+  const ouvrirLecteur = useOuvrirLecteur();
+  const ouvrir = useCallback(
+    (exporte: Export) => {
+      const lien = exporte.pdf ?? exporte.docx;
+      if (lien === null) {
+        Alert.alert(TEXTES_MES_CV.apercuIndisponible);
+        return;
+      }
+      ouvrirLecteur({
+        url: lien,
+        genre: "cv",
+        complement: nom === "" ? null : nom,
+        modele: exporte.modele?.libelle ?? null,
+        retour: TEXTES_MES_CV.titre,
+      });
+    },
+    [ouvrirLecteur, nom],
+  );
 
   const telecharger = useCallback(
     (exporte: Export, format: Format) => {
@@ -196,7 +205,12 @@ export function useMesCv(): EcranMesCv {
       setTelechargement({ id: exporte.id, format });
       void (async () => {
         try {
-          await telechargerEtPartager(url, nomDeFichier("cv", nom, null, format), format);
+          await telechargerEtPartager(
+            url,
+            nomDeFichier("cv", nom, null, format),
+            format,
+            "cv",
+          );
         } catch (cause) {
           console.warn("[karria] téléchargement en échec", cause);
           Alert.alert(TEXTES_MES_CV.erreurTelechargement, TEXTES_MES_CV.reessayer);

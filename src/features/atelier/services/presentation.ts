@@ -83,6 +83,20 @@ export const TEXTES = {
   modeleAttente:
     "Paiement pas encore confirmé. Si tu as payé, le modèle arrivera dans quelques minutes.",
   modeleErreur: "Le paiement n'a pas pu s'ouvrir. Réessaie dans un instant.",
+  // La couleur principale (ADR-0034).
+  couleur: "Couleur",
+  couleurTitre: "Quelle couleur ?",
+  couleurSousTitre: "Les titres, les filets et les bandes du modèle.",
+  couleurOrigine: "D'origine",
+  couleurNuance: "Plus clair ou plus sombre",
+  couleurPlusClair: "Plus clair",
+  couleurPlusSombre: "Plus sombre",
+  couleurCode: "Code couleur",
+  couleurCodeAide: "Six caractères, comme #1A5276.",
+  couleurRevenir: "Revenir à la couleur d'origine",
+  couleurGarder: "Garder cette couleur",
+  couleurNonRetenue:
+    "La couleur est appliquée ici, mais elle n'a pas pu être retenue. Elle sera réessayée.",
   // Mise en avant.
   miseEnAvantTitre: "Ce que tu mets en avant",
   miseEnAvantPhrase:
@@ -278,6 +292,25 @@ export function messageDeRendu(cause: unknown): string {
 export function compteurPropositions(n: number): string | null {
   if (n <= 0) return null;
   return n === 1 ? "1 proposition" : `${n} propositions`;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Le partage porte Karria
+// ─────────────────────────────────────────────────────────────────────
+
+/** Le lien intelligent du site : App Store, Google Play ou la page selon l'appareil. */
+export const LIEN_APP = "https://karria.fr/app";
+
+/**
+ * Le message qui accompagne un fichier partagé (iOS : `Share.share` avec
+ * le fichier **et** ce texte). Court, à la première personne — c'est la
+ * personne qui parle, pas Karria —, et le lien en clair : le destinataire
+ * sait d'où vient le document et où trouver l'app.
+ */
+export function messageDePartageDocument(genre: "cv" | "lettre"): string {
+  return genre === "cv"
+    ? `Mon CV, préparé avec Karria — l'app qui adapte ton CV à chaque offre : ${LIEN_APP}`
+    : `Ma lettre de motivation, préparée avec Karria — l'app qui adapte ton CV et ta lettre à chaque offre : ${LIEN_APP}`;
 }
 
 export function nomDeFichier(

@@ -211,8 +211,24 @@ export function qualite(
   return null;
 }
 
-/** Le texte partagé, repris de la V1. */
+/** Le lien public d'une offre, que le site (`karria.fr/offre/<id>`) et
+ *  l'app (lien universel → `/offre/<id>`) savent ouvrir. */
+export function lienPublicOffre(id: string): string {
+  return `https://karria.fr/offre/${encodeURIComponent(id)}`;
+}
+
+/** Le lien intelligent vers les magasins (`karria.fr/app`). */
+export const LIEN_APP = "https://karria.fr/app";
+
+/**
+ * Le texte partagé : les émojis sobres de la V1, puis le lien Karria en
+ * premier — celui qui ouvre l'app chez qui l'a, et la page publique chez
+ * les autres —, le lien de candidature ensuite, et une invitation à
+ * télécharger Karria pour finir. Le destinataire a tout : l'offre, où
+ * postuler, et d'où ça vient.
+ */
 export function messageDePartage(offre: {
+  id: string;
   titre: string;
   entreprise: string | null;
   ville: string | null;
@@ -222,6 +238,8 @@ export function messageDePartage(offre: {
     `💼 ${offre.titre}${offre.entreprise ? ` chez ${offre.entreprise}` : ""}`,
   ];
   if (offre.ville) lignes.push(`📍 ${offre.ville}`);
-  if (offre.lienCandidature) lignes.push("", offre.lienCandidature);
+  lignes.push("", `Vue sur Karria : ${lienPublicOffre(offre.id)}`);
+  if (offre.lienCandidature) lignes.push(`Postuler : ${offre.lienCandidature}`);
+  lignes.push("", `Télécharge Karria : ${LIEN_APP}`);
   return lignes.join("\n");
 }

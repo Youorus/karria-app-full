@@ -123,6 +123,12 @@ export default function LayoutApp() {
             détail ; l'atelier libre (« Nouveau CV ») monte comme celui d'un
             dossier, et son Finaliser par-dessus. */}
         <Stack.Screen name="cv/mes-cv" />
+        {/* Le lecteur d'un export (« Ouvrir » dans Mes CV ou dans un dossier) :
+            un détail, qui monte et se quitte comme les autres. */}
+        <Stack.Screen
+          name="lecture-document"
+          options={{ animation: "fade_from_bottom", animationDuration: 240 }}
+        />
         <Stack.Screen
           name="atelier/libre/index"
           options={{ animation: "fade_from_bottom", animationDuration: 280 }}

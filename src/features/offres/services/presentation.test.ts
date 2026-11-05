@@ -18,6 +18,7 @@ import {
   libelleSource,
   libelleTeletravail,
   nettoyerDescription,
+  lienPublicOffre,
   messageDePartage,
   qualite,
   salaireLisible,
@@ -99,15 +100,40 @@ describe("La qualité et le partage", () => {
     expect(qualite("excellent")).toBeNull();
   });
 
-  it("compose le message de partage", () => {
+  it("compose le message de partage : l'offre, le lien Karria d'abord, puis où postuler, puis l'app", () => {
     expect(
       messageDePartage({
+        id: "150279",
         titre: "Data Engineer",
         entreprise: "BNP Paribas",
         ville: "Paris",
-        lienCandidature: null,
+        lienCandidature: "https://emploi.example/postuler",
       }),
-    ).toBe("💼 Data Engineer chez BNP Paribas\n📍 Paris");
+    ).toBe(
+      [
+        "💼 Data Engineer chez BNP Paribas",
+        "📍 Paris",
+        "",
+        "Vue sur Karria : https://karria.fr/offre/150279",
+        "Postuler : https://emploi.example/postuler",
+        "",
+        "Télécharge Karria : https://karria.fr/app",
+      ].join("\n"),
+    );
+  });
+
+  it("partage sans ville ni lien de candidature, et encode l'identifiant", () => {
+    const message = messageDePartage({
+      id: "a b",
+      titre: "Cuisinier",
+      entreprise: null,
+      ville: null,
+      lienCandidature: null,
+    });
+    expect(message).toBe(
+      "💼 Cuisinier\n\nVue sur Karria : https://karria.fr/offre/a%20b\n\nTélécharge Karria : https://karria.fr/app",
+    );
+    expect(lienPublicOffre("150279")).toBe("https://karria.fr/offre/150279");
   });
 });
 

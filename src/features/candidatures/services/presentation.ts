@@ -175,6 +175,8 @@ export function apercuDeLaLettre(dossier: Pick<Dossier, "lettre">): string[] {
 /** Les textes de l'espace, en un seul endroit. */
 export const TEXTES = {
   titre: "Candidatures",
+  /** « ‹ Dossier » : d'où l'on vient en lisant un export. */
+  retourDossier: "Dossier",
   videTitre: "Rien ici pour l'instant",
   videPhrase: "Depuis une offre, touche « Adapter mon CV » : ton dossier arrivera ici.",
   videCandidatees: "Aucune candidature marquée pour l'instant.",

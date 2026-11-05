@@ -27,3 +27,13 @@ export function ouvrirFluxSimule(): Promise<never> {
     new Error("[karria] le flux simulé a été ouvert dans un paquet de production"),
   );
 }
+
+export function estUnFichierSimule(): boolean {
+  return false;
+}
+
+export function ecrireFichierSimule(): never {
+  throw new Error(
+    "[karria] le stockage simulé a été appelé dans un paquet de production",
+  );
+}
