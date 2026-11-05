@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "125109223481",
+    "project_id": "karria-notifications-push",
+    "storage_bucket": "karria-notifications-push.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:125109223481:android:cef4db37616e1e3d784de8",
+        "android_client_info": {
+          "package_name": "com.karria.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "125109223481-7ptk46bsj7ok3kl67h19u8p0408206un.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.karria.app",
+            "certificate_hash": "8adcb5c87488fccba5bb8cda08d81a282f6e54d6"
+          }
+        },
+        {
+          "client_id": "125109223481-e040g7g7kdnjakl4n6f3g5m2a2mm45lh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCrqf8IZH1lMvKwb7VxsgngtF5WxKv4wr4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "125109223481-e040g7g7kdnjakl4n6f3g5m2a2mm45lh.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "125109223481-ij2fmcqknh1n3fr7gib1qra0mbqtrasd.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.karria.app"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

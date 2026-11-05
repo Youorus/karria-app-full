@@ -18,7 +18,8 @@
         "light": "./src/assets/branding/karria-icone-ios-clair.png",
         "dark": "./src/assets/branding/karria-icone-ios-sombre.png",
         "tinted": "./src/assets/branding/karria-icone-ios-teintee.png"
-      }
+      },
+      "googleServicesFile": "./config/firebase/GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
@@ -28,7 +29,8 @@
         "monochromeImage": "./src/assets/branding/karria-android-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.karria.app"
+      "package": "com.karria.app",
+      "googleServicesFile": "./config/firebase/google-services.json"
     },
     "plugins": [
       "./plugins/sans-sandbox-de-script",

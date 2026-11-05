@@ -58,12 +58,23 @@ const CLIENT_IOS = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? "";
  */
 const CLIENT_WEB = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "";
 
+/**
+ * Sur Android, le client web doit appartenir au **même projet Google** que
+ * le client Android OAuth — celui qui porte l'empreinte SHA-1 du keystore.
+ * Chez Karria, ce projet est celui de Firebase (`karria-notifications-push`,
+ * `config/firebase/google-services.json`), pas celui du client iOS : la V1
+ * l'avait appris en recevant `DEVELOPER_ERROR` sur Android. Les deux
+ * audiences sont acceptées par l'API (`SOCIAL__GOOGLE_*`).
+ */
+const CLIENT_WEB_ANDROID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_WEB_CLIENT_ID ?? "";
+
 let googleConfigure = false;
 
 function preparerGoogle(): void {
   if (googleConfigure) return;
   GoogleSignin.configure({
-    webClientId: CLIENT_WEB,
+    webClientId:
+      Platform.OS === "android" && CLIENT_WEB_ANDROID ? CLIENT_WEB_ANDROID : CLIENT_WEB,
     iosClientId: CLIENT_IOS || undefined,
     // On ne demande que l'identité. Aucun accès aux contacts, à l'agenda
     // ou aux fichiers : chaque périmètre demandé est une raison de plus
