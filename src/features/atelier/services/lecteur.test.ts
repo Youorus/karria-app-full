@@ -1,12 +1,28 @@
-import { describe, expect, it } from "@jest/globals";
+import { beforeEach, describe, expect, it } from "@jest/globals";
 
 import {
+  documentMemorise,
+  estUnPdf,
   formatDuLien,
+  lienDeStockageSur,
+  memoriserDocument,
   modeDAffichage,
-  parametresDeLecture,
+  nomDeFichierSur,
+  oublierLesDocuments,
+  presentationDeLecture,
   sousTitreDeLecture,
   titreDeLecture,
+  type DocumentALire,
 } from "./lecteur";
+
+const DOCUMENT: DocumentALire = {
+  id: "exp-1",
+  url: "https://storage.karria.fr/x/a.pdf?X-Amz-Signature=1",
+  genre: "cv",
+  complement: "Awa Diallo",
+  modele: "Meridian",
+  retour: "Mes CV",
+};
 
 describe("Le titre du lecteur", () => {
   it("nomme le CV par la personne, la lettre par l'entreprise", () => {
@@ -42,19 +58,83 @@ describe("Le format et le mode d'affichage", () => {
   });
 });
 
-describe("les paramètres du lecteur", () => {
-  it("nomme un CV par la personne, et son fichier comme le serveur", () => {
+describe("Ce que le lecteur refuse", () => {
+  it("n'accepte que https vers l'hôte du stockage de Karria", () => {
     expect(
-      parametresDeLecture({
-        url: "https://storage.karria.fr/x/a.pdf?sig=1",
-        genre: "cv",
-        complement: "Awa Diallo",
-        modele: "Meridian",
-        retour: "Mes CV",
-      }),
-    ).toEqual({
-      url: "https://storage.karria.fr/x/a.pdf?sig=1",
-      genre: "cv",
+      lienDeStockageSur("https://storage.karria.fr/b/cv.pdf?X-Amz-Signature=1"),
+    ).toBe(true);
+    expect(lienDeStockageSur("https://STORAGE.karria.fr/simule/cv.pdf")).toBe(true);
+    expect(lienDeStockageSur("http://storage.karria.fr/b/cv.pdf")).toBe(false);
+    expect(lienDeStockageSur("https://storage.karria.fr.evil.example/cv.pdf")).toBe(
+      false,
+    );
+    expect(lienDeStockageSur("https://evil.example/storage.karria.fr/cv.pdf")).toBe(
+      false,
+    );
+    expect(lienDeStockageSur("https://user:pass@storage.karria.fr/cv.pdf")).toBe(false);
+    expect(lienDeStockageSur("https://storage.karria.fr:8443/cv.pdf")).toBe(false);
+    expect(lienDeStockageSur("file:///etc/passwd")).toBe(false);
+    expect(lienDeStockageSur("pas une url")).toBe(false);
+  });
+
+  it("refuse les noms de fichier qui sortent du répertoire des exports", () => {
+    expect(nomDeFichierSur("CV - Awa Diallo.pdf", "pdf")).toBe(true);
+    expect(nomDeFichierSur("../../brouillons/x.pdf", "pdf")).toBe(false);
+    expect(nomDeFichierSur("..", "pdf")).toBe(false);
+    expect(nomDeFichierSur("a/b.pdf", "pdf")).toBe(false);
+    expect(nomDeFichierSur("a\\b.pdf", "pdf")).toBe(false);
+    expect(nomDeFichierSur(".cache.pdf", "pdf")).toBe(false);
+    expect(nomDeFichierSur("x\u0000.pdf", "pdf")).toBe(false);
+    expect(nomDeFichierSur("", "pdf")).toBe(false);
+    expect(nomDeFichierSur(`${"a".repeat(200)}.pdf`, "pdf")).toBe(false);
+  });
+
+  it("exige l'extension du format", () => {
+    expect(nomDeFichierSur("CV.pdf", "docx")).toBe(false);
+    expect(nomDeFichierSur("CV.docx", "docx")).toBe(true);
+    expect(nomDeFichierSur("CV.pdf.html", "pdf")).toBe(false);
+  });
+
+  it("reconnaît un PDF à ses premiers octets", () => {
+    expect(estUnPdf(new TextEncoder().encode("%PDF-1.4\n"))).toBe(true);
+    expect(estUnPdf(new TextEncoder().encode("<html>"))).toBe(false);
+    expect(estUnPdf(new Uint8Array([0x25, 0x50]))).toBe(false);
+  });
+});
+
+describe("Les documents mémorisés", () => {
+  beforeEach(() => oublierLesDocuments());
+
+  it("retient un document sûr et le rend par son identifiant", () => {
+    expect(memoriserDocument(DOCUMENT)).toBe("exp-1");
+    expect(documentMemorise("exp-1")).toEqual(DOCUMENT);
+  });
+
+  it("ne retient rien d'un lien hors stockage, ni d'un identifiant vide", () => {
+    expect(
+      memoriserDocument({ ...DOCUMENT, url: "https://evil.example/cv.pdf" }),
+    ).toBeNull();
+    expect(memoriserDocument({ ...DOCUMENT, id: "" })).toBeNull();
+    expect(documentMemorise("exp-1")).toBeNull();
+  });
+
+  it("ignore un identifiant inconnu ou d'un autre type — un lien externe forgé n'ouvre rien", () => {
+    expect(documentMemorise("inconnu")).toBeNull();
+    expect(documentMemorise(["exp-1"])).toBeNull();
+    expect(documentMemorise(undefined)).toBeNull();
+  });
+
+  it("oublie tout à la déconnexion", () => {
+    memoriserDocument(DOCUMENT);
+    oublierLesDocuments();
+    expect(documentMemorise("exp-1")).toBeNull();
+  });
+});
+
+describe("La présentation d'un document", () => {
+  it("nomme un CV par la personne, et son fichier comme le serveur", () => {
+    expect(presentationDeLecture(DOCUMENT)).toEqual({
+      format: "pdf",
       titre: "CV · Awa Diallo",
       sousTitre: "PDF · Meridian",
       fichier: "CV - Awa Diallo.pdf",
@@ -63,7 +143,8 @@ describe("les paramètres du lecteur", () => {
   });
 
   it("nomme une lettre par l'entreprise, en Word si c'est le seul lien", () => {
-    const p = parametresDeLecture({
+    const p = presentationDeLecture({
+      ...DOCUMENT,
       url: "https://storage.karria.fr/x/l.docx",
       genre: "lettre",
       complement: "Maison Kayser",
@@ -75,15 +156,10 @@ describe("les paramètres du lecteur", () => {
     expect(p.fichier).toBe("Lettre de motivation - Maison Kayser.docx");
   });
 
-  it("reste neutre sans nom", () => {
-    const p = parametresDeLecture({
-      url: "https://storage.karria.fr/x/a.pdf",
-      genre: "cv",
-      complement: null,
-      modele: null,
-      retour: "Mes CV",
-    });
-    expect(p.titre).toBe("Mon CV");
-    expect(p.fichier).toBe("CV - Karria.pdf");
+  it("reste neutre sans nom, et le nom de fichier ne vient jamais de l'extérieur", () => {
+    const p = presentationDeLecture({ ...DOCUMENT, complement: "../../x", modele: null });
+    expect(p.titre).toBe("CV · ../../x");
+    expect(p.fichier).toBe("CV - .. .. x.pdf");
+    expect(presentationDeLecture({ ...DOCUMENT, complement: null }).titre).toBe("Mon CV");
   });
 });

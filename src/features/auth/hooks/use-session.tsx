@@ -37,6 +37,7 @@ import {
 import { desinscrireAppareil } from "@/features/notifications/api/appareils.api";
 import { poserConsentementIa } from "../services/consentement-ia";
 import { oublierTousLesBrouillonsAtelier } from "@/features/atelier/services/brouillon-atelier";
+import { oublierLesDocuments } from "@/features/atelier/services/lecteur";
 import { poserDossierEnCours } from "@/features/atelier/services/dossier-en-cours";
 import { oublierTousLesBrouillons } from "@/features/cv/services/brouillons-edition";
 import { effacerVerification } from "@/features/cv/services/verification";
@@ -121,6 +122,8 @@ export function FournisseurDeSession({ children }: { children: ReactNode }) {
     // Les brouillons de l'atelier (un CV adapté par dossier) et le dossier
     // en cours sont ceux d'un compte, eux aussi.
     oublierTousLesBrouillonsAtelier();
+    // Les exports retenus pour le lecteur (liens signés) sont ceux d'un compte.
+    oublierLesDocuments();
     poserDossierEnCours(null);
     poserConsentementIa(null);
     // L'achat laissé en attente et son merci sont ceux d'un compte, eux aussi.

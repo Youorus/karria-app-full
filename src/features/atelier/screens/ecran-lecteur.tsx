@@ -70,8 +70,13 @@ function SansApercu({ m }: { m: Modele }) {
   );
 }
 
-/** iOS : la WebView rend le PDF local. Les liens du document (e-mail,
- *  LinkedIn) ne naviguent pas — ce n'est pas un navigateur. */
+/**
+ * iOS : la WebView rend le PDF local — et rien d'autre. Pas de JavaScript,
+ * seule l'origine `file://` est admise, seule l'URI du fichier peut se
+ * charger (les liens du document — e-mail, LinkedIn — ne naviguent pas :
+ * ce n'est pas un navigateur), et la lecture est bornée au répertoire fixe
+ * des exports.
+ */
 function Apercu({
   uri,
   repertoire,
@@ -85,10 +90,11 @@ function Apercu({
     <WebView
       testID="lecteur-document"
       source={{ uri }}
-      originWhitelist={["*"]}
+      originWhitelist={["file://*"]}
+      javaScriptEnabled={false}
       allowFileAccess
       allowingReadAccessToURL={repertoire}
-      onShouldStartLoadWithRequest={(r) => r.url === uri || r.url.startsWith("file:")}
+      onShouldStartLoadWithRequest={(r) => r.url === uri}
       style={{ flex: 1, backgroundColor: fond }}
       contentInset={{ bottom: Platform.OS === "ios" ? 112 : 0 }}
     />
@@ -131,11 +137,7 @@ export function EcranLecteur() {
             />
           </Box>
         ) : m.mode === "apercu" ? (
-          <Apercu
-            uri={m.lecture.uri}
-            repertoire={m.lecture.repertoire}
-            fond={FOND[mode]}
-          />
+          <Apercu uri={m.lecture.uri} repertoire={m.repertoire} fond={FOND[mode]} />
         ) : (
           <SansApercu m={m} />
         )}

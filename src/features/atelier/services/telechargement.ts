@@ -32,7 +32,7 @@
  * et le reste du chemin — feuille, lecteur, suppression — est le vrai.
  */
 
-import { File } from "expo-file-system";
+import { Directory, File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { Platform, Share } from "react-native";
 
@@ -40,6 +40,7 @@ import { SIMULATION } from "@/lib/config";
 import { ecrireFichierSimule, estUnFichierSimule } from "@/lib/dev/stockage-simule";
 
 import { fichierDExport, supprimerExport } from "./brouillon-atelier";
+import { nomDeFichierSur } from "./lecteur";
 import { messageDePartageDocument } from "./presentation";
 
 export type Format = "pdf" | "docx";
@@ -60,10 +61,31 @@ export function genreDuNomDeFichier(nom: string): Genre {
   return /^lettre/i.test(nom.trim()) ? "lettre" : "cv";
 }
 
-/** Télécharge `url` dans le cache sous `nom` ; en simulation, écrit un
- *  document factice. Le fichier est à supprimer par l'appelant. */
-export async function telechargerFichier(url: string, nom: string): Promise<File> {
+/** Le répertoire des exports téléchargés — fixe, sous le cache de l'app. */
+export function repertoireDesExports(): Directory {
+  return new Directory(Paths.cache, "atelier", "exports");
+}
+
+/**
+ * Télécharge `url` dans le cache sous `nom` ; en simulation, écrit un
+ * document factice. Le nom doit être un nom de fichier simple portant
+ * l'extension du format (`nomDeFichierSur`), et le fichier résolu doit
+ * rester sous le répertoire des exports — sinon rien n'est écrit. Le
+ * fichier est à supprimer par l'appelant.
+ */
+export async function telechargerFichier(
+  url: string,
+  nom: string,
+  format: Format,
+): Promise<File> {
+  if (!nomDeFichierSur(nom, format)) throw new Error("[karria] nom de fichier refusé");
   const destination = fichierDExport(nom);
+  const racine = repertoireDesExports().uri.replace(/\/+$/, "");
+  if (
+    !destination.uri.startsWith(`${racine}/`) ||
+    destination.uri.slice(racine.length + 1).includes("/")
+  )
+    throw new Error("[karria] fichier hors du répertoire des exports");
   if (SIMULATION && estUnFichierSimule(url)) return ecrireFichierSimule(destination, url);
   return File.downloadFileAsync(url, destination);
 }
@@ -112,7 +134,7 @@ export async function telechargerEtPartager(
 ): Promise<boolean> {
   let fichier: File | null = null;
   try {
-    fichier = await telechargerFichier(url, nom);
+    fichier = await telechargerFichier(url, nom, format);
     return await partagerFichier(fichier, nom, format, genre);
   } finally {
     if (fichier !== null) supprimerExport(fichier);

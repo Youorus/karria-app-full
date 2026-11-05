@@ -246,6 +246,7 @@ export function useDossier(): EcranDossier {
       const nom =
         `${dossier.cv.identite?.prenom ?? ""} ${dossier.cv.identite?.nom ?? ""}`.trim();
       ouvrirLecteur({
+        id: exporte.id,
         url: lien,
         genre: exporte.genre,
         complement:

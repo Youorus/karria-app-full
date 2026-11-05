@@ -188,6 +188,7 @@ export function useMesCv(): EcranMesCv {
         return;
       }
       ouvrirLecteur({
+        id: exporte.id,
         url: lien,
         genre: "cv",
         complement: nom === "" ? null : nom,

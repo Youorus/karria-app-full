@@ -3,13 +3,22 @@
  * (iOS) ou le confie au lecteur du téléphone (Android), et propose
  * Télécharger / Partager sur le fichier déjà là — sans le retélécharger.
  *
+ * ═══ Un identifiant, et rien d'autre ═══
+ *
+ * La route ne porte que `id` : le document est relu dans la mémoire de
+ * l'app (`documentMemorise`, posé par `useOuvrirLecteur`). Inconnu — lien
+ * externe, redémarrage — : l'écran dit que le lien a expiré et ne
+ * télécharge rien. Le titre, le sous-titre, le nom de fichier et le
+ * retour sont dérivés du document mémorisé, jamais des paramètres.
+ *
  * ═══ Pourquoi un fichier local et pas le lien signé ═══
  *
  * Une WebView sur le lien signé montrerait le PDF, mais chaque geste
  * suivant (partager, enregistrer) repartirait sur le réseau, et le faux
  * serveur n'a rien à servir. Le fichier est téléchargé **une fois**, à
- * l'ouverture ; il vit le temps de l'écran et il est effacé en le
- * quittant (`supprimerExport`) — un CV ne reste pas dans le cache.
+ * l'ouverture ; ses premiers octets sont vérifiés (`%PDF-`) avant tout
+ * affichage ; il vit le temps de l'écran et il est effacé en le quittant
+ * (`supprimerExport`) — un CV ne reste pas dans le cache.
  *
  * ═══ Android ═══
  *
@@ -23,30 +32,33 @@ import type { File } from "expo-file-system";
 import { getContentUriAsync } from "expo-file-system/legacy";
 import * as IntentLauncher from "expo-intent-launcher";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Platform } from "react-native";
 
 import { ErreurApi } from "@/lib/http";
 
 import { supprimerExport } from "../services/brouillon-atelier";
 import {
-  formatDuLien,
+  documentMemorise,
+  estUnPdf,
+  lienDeStockageSur,
   modeDAffichage,
+  presentationDeLecture,
   TEXTES_LECTEUR,
   type FormatDocument,
   type GenreDocument,
-  type ParametresLecture,
 } from "../services/lecteur";
 import {
   enregistrerFichier,
   MIME,
   partagerFichier,
+  repertoireDesExports,
   telechargerFichier,
 } from "../services/telechargement";
 
 export type EtatLecture =
   | { etat: "chargement" }
-  | { etat: "pret"; uri: string; repertoire: string }
+  | { etat: "pret"; uri: string }
   | { etat: "erreur"; message: string };
 
 export interface EcranLecteur {
@@ -57,6 +69,8 @@ export interface EcranLecteur {
   genre: GenreDocument;
   mode: "apercu" | "lecteur-systeme" | "sans-apercu";
   lecture: EtatLecture;
+  /** Le répertoire fixe des exports : la seule lecture permise à la WebView. */
+  repertoire: string;
   /** Android : le lecteur du téléphone a pris le fichier, ou il n'y en a pas. */
   lecteurSysteme: "ouvert" | "absent" | null;
   /** Un geste de partage est en cours : les boutons attendent. */
@@ -78,21 +92,25 @@ function messageDe(cause: unknown): string {
 }
 
 export function useLecteurDocument(): EcranLecteur {
-  const p = useLocalSearchParams<Partial<ParametresLecture>>();
+  const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
-  const url = p.url ?? "";
-  const genre: GenreDocument = p.genre === "lettre" ? "lettre" : "cv";
-  const format = formatDuLien(url);
-  const fichierNom =
-    p.fichier ?? (genre === "cv" ? `CV - Karria.${format}` : `Lettre - Karria.${format}`);
+  // Le document, relu une fois : la mémoire peut être vidée pendant l'écran.
+  const document = useMemo(() => documentMemorise(id), [id]);
+  const presentation = useMemo(
+    () => (document === null ? null : presentationDeLecture(document)),
+    [document],
+  );
+  const genre: GenreDocument = document?.genre ?? "cv";
+  const format: FormatDocument = presentation?.format ?? "pdf";
   const mode = modeDAffichage(Platform.OS, format);
+  const connu =
+    document !== null && presentation !== null && lienDeStockageSur(document.url);
 
-  // Sans lien, rien à télécharger : l'état d'erreur est posé d'emblée,
-  // pas dans l'effet.
+  // Sans document connu, rien à télécharger : l'erreur est posée d'emblée.
   const [lecture, setLecture] = useState<EtatLecture>(() =>
-    url === ""
-      ? { etat: "erreur", message: TEXTES_LECTEUR.erreurLien }
-      : { etat: "chargement" },
+    connu
+      ? { etat: "chargement" }
+      : { etat: "erreur", message: TEXTES_LECTEUR.erreurLien },
   );
   const [lecteurSysteme, setLecteurSysteme] =
     useState<EcranLecteur["lecteurSysteme"]>(null);
@@ -117,33 +135,32 @@ export function useLecteurDocument(): EcranLecteur {
   }, []);
 
   useEffect(() => {
-    if (url === "") return undefined;
+    if (!connu) return undefined;
     let vivant = true;
-    telechargerFichier(url, fichierNom).then(
-      (f) => {
-        if (!vivant) {
-          supprimerExport(f);
-          return;
-        }
-        fichier.current = f;
-        setLecture({
-          etat: "pret",
-          uri: f.uri,
-          repertoire: f.uri.slice(0, f.uri.lastIndexOf("/") + 1),
-        });
-        if (mode === "lecteur-systeme") void ouvrirAilleurs(f);
-      },
-      (cause: unknown) => {
-        console.warn("[karria] document illisible", cause);
-        if (vivant) setLecture({ etat: "erreur", message: messageDe(cause) });
-      },
-    );
+    (async () => {
+      const f = await telechargerFichier(document.url, presentation.fichier, format);
+      if (!vivant) {
+        supprimerExport(f);
+        return;
+      }
+      if (format === "pdf" && !estUnPdf((await f.bytes()).subarray(0, 5))) {
+        supprimerExport(f);
+        if (vivant) setLecture({ etat: "erreur", message: TEXTES_LECTEUR.erreurContenu });
+        return;
+      }
+      fichier.current = f;
+      setLecture({ etat: "pret", uri: f.uri });
+      if (mode === "lecteur-systeme") void ouvrirAilleurs(f);
+    })().catch((cause: unknown) => {
+      console.warn("[karria] document illisible", cause);
+      if (vivant) setLecture({ etat: "erreur", message: messageDe(cause) });
+    });
     return () => {
       vivant = false;
       if (fichier.current !== null) supprimerExport(fichier.current);
       fichier.current = null;
     };
-  }, [url, fichierNom, mode, ouvrirAilleurs, tentative]);
+  }, [connu, document, presentation, format, mode, ouvrirAilleurs, tentative]);
 
   const geste = useCallback(
     (action: (f: File) => Promise<boolean>) => {
@@ -163,32 +180,37 @@ export function useLecteurDocument(): EcranLecteur {
     [occupe],
   );
 
+  const nomDuFichier = presentation?.fichier ?? `CV - Karria.${format}`;
+
   return {
-    titre: p.titre ?? (genre === "cv" ? TEXTES_LECTEUR.monCv : TEXTES_LECTEUR.maLettre),
-    sousTitre:
-      p.sousTitre ?? (format === "pdf" ? TEXTES_LECTEUR.pdf : TEXTES_LECTEUR.word),
-    retour: p.retour ?? TEXTES_LECTEUR.monCv,
+    titre:
+      presentation?.titre ??
+      (genre === "cv" ? TEXTES_LECTEUR.monCv : TEXTES_LECTEUR.maLettre),
+    sousTitre: presentation?.sousTitre ?? TEXTES_LECTEUR.pdf,
+    retour: presentation?.retour ?? TEXTES_LECTEUR.monCv,
     format,
     genre,
     mode,
     lecture,
+    repertoire: repertoireDesExports().uri,
     lecteurSysteme,
     occupe,
     telecharger: useCallback(
-      () => geste((f) => enregistrerFichier(f, fichierNom, format)),
-      [geste, fichierNom, format],
+      () => geste((f) => enregistrerFichier(f, nomDuFichier, format)),
+      [geste, nomDuFichier, format],
     ),
     partager: useCallback(
-      () => geste((f) => partagerFichier(f, fichierNom, format, genre)),
-      [geste, fichierNom, format, genre],
+      () => geste((f) => partagerFichier(f, nomDuFichier, format, genre)),
+      [geste, nomDuFichier, format, genre],
     ),
     ouvrirAilleurs: useCallback(() => {
       if (fichier.current !== null) void ouvrirAilleurs(fichier.current);
     }, [ouvrirAilleurs]),
     reessayer: useCallback(() => {
+      if (!connu) return;
       setLecture({ etat: "chargement" });
       setTentative((t) => t + 1);
-    }, []),
+    }, [connu]),
     revenir: useCallback(() => {
       if (router.canGoBack()) router.back();
       else router.replace("/cv");
