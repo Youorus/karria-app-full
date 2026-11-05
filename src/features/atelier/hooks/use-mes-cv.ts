@@ -199,7 +199,7 @@ export function useMesCv(): EcranMesCv {
           await telechargerEtPartager(url, nomDeFichier("cv", nom, null, format), format);
         } catch (cause) {
           console.warn("[karria] téléchargement en échec", cause);
-          Alert.alert(TEXTES_MES_CV.erreurTelechargement);
+          Alert.alert(TEXTES_MES_CV.erreurTelechargement, TEXTES_MES_CV.reessayer);
         } finally {
           setTelechargement(null);
         }
@@ -220,7 +220,7 @@ export function useMesCv(): EcranMesCv {
             console.warn("[karria] export non supprimé", cause);
             if (!(cause instanceof ErreurApi && cause.statut === 404)) {
               setExports((liste) => exportsLibres([...liste, exporte]));
-              Alert.alert(TEXTES_MES_CV.erreurSuppression);
+              Alert.alert(TEXTES_MES_CV.erreurSuppression, TEXTES_MES_CV.reessayer);
             }
           });
         },

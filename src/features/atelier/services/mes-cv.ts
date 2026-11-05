@@ -39,9 +39,12 @@ export const TEXTES_MES_CV = {
   envoye: "Envoyé",
   erreurLecture: "Tes CV n'ont pas pu être chargés.",
   erreurReseau: "Pas de connexion. Tes CV reviennent dès que le réseau est là.",
-  erreurSuppression: "Ce CV n'a pas pu être supprimé. Réessaie dans un instant.",
-  erreurTelechargement:
-    "Le fichier n'a pas pu être enregistré. Réessaie dans un instant.",
+  // Un titre court et une phrase, comme les autres alertes de l'application :
+  // Android coupe un titre d'alerte à deux lignes (« Réessaie dans un ins… »,
+  // vu sur l'émulateur le 2026-11-05), iOS le laissait filer.
+  erreurSuppression: "Ce CV n'a pas pu être supprimé",
+  erreurTelechargement: "Le fichier n'a pas pu être enregistré",
+  reessayer: "Réessaie dans un instant.",
   apercuIndisponible: "L'aperçu n'est pas disponible pour ce CV.",
 } as const;
 
