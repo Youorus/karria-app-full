@@ -104,6 +104,11 @@ export function configurerLaReception(): void {
 export async function preparerLesFamilles(): Promise<void> {
   try {
     await preparerLeCanalAndroid();
+    // Les catégories sont une affaire d'iOS : elles ne servent qu'à
+    // recevoir `customDismissAction`. Android **refuse** une catégorie sans
+    // action (« Must provide at least one action », vu sur l'émulateur le
+    // 2026-11-05) et n'en a pas besoin : ses familles sont les canaux.
+    if (Platform.OS !== "ios") return;
     for (const famille of Object.keys(CANAUX) as CanalNotification[]) {
       await Notifications.setNotificationCategoryAsync(famille, [], {
         customDismissAction: true,
