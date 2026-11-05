@@ -474,6 +474,19 @@ function etatDe(id: string): EtatOffre {
   return e;
 }
 
+/** Une offre du corpus, dans la forme de `job_offer` (détail compris), ou
+ *  `null` — pour le faux serveur des dossiers, qui fige l'offre à
+ *  l'ouverture d'un dossier. */
+export function offreSimulee(id: string): ReturnType<typeof versOffre> | null {
+  const o = OFFRES.find((x) => x.id === id);
+  return o === undefined ? null : versOffre(o, true);
+}
+
+/** « J'ai candidaté » remonte au fil : l'offre passe `applied`. */
+export function marquerPostuleeSimulee(id: string, postulee: boolean): void {
+  if (OFFRES.some((o) => o.id === id)) etatDe(id).applied = postulee;
+}
+
 /** Repart de zéro : pour les tests, et pour « oublier la recherche ». */
 export function reinitialiserOffres(): void {
   etat.criteres = null;

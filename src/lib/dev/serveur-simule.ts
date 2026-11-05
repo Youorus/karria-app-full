@@ -34,6 +34,7 @@
 import { CIBLE_V2 } from "@/lib/config";
 
 import { estUneRouteAppareil, repondreAppareils } from "./appareils-simule";
+import { estUneRouteCandidature, repondreCandidatures } from "./candidatures-simule";
 import {
   accepterConsentementIa,
   consentementIaBrut,
@@ -68,6 +69,9 @@ const SERVI_PAR_LA_V2 = [
   "/user-templates/",
   "/payments/",
   "/support/",
+  // Les dossiers de candidature (`/applications`), en production depuis
+  // le 2026-11-05 (module `applications`, ADR-0033).
+  "/applications",
   // La porte de mise à jour (`/app/release`), en cours de livraison côté
   // serveur (2026-11-05) : tant qu'elle répond 404, l'application ne fait
   // rien — c'est le comportement voulu, pas une panne à simuler.
@@ -190,6 +194,10 @@ export async function repondreEnSimulation(requete: RequeteSimulee): Promise<Res
       : LATENCE_MS,
   );
 
+  // Les dossiers de candidature — **avant** le CV : les exports d'un
+  // dossier se lisent sous `/cv/me/generated-cvs`, que le faux serveur des
+  // dossiers tient (contrat `documents`, filtre `dossier_id`).
+  if (estUneRouteCandidature(chemin)) return repondreCandidatures(methode, chemin, corps);
   if (estUneRouteCv(chemin)) return repondreCv(methode, chemin, corps);
   // La porte de mise à jour : « ok » sauf forçage par l'environnement.
   if (estUneRouteVersion(chemin)) return repondreVersion(methode, chemin);

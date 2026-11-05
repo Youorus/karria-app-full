@@ -34,6 +34,7 @@ export function consentementIaBrut() {
         "cv_import",
         "photo_enhancement",
         "template_analysis",
+        "application",
       ],
     },
     accepted_version: etat.accepteLe === null ? null : VERSION,

@@ -64,6 +64,16 @@ interface Etat {
 
 const etat: Etat = { brouillon: null, cv: null };
 
+/** Le CV de base tel qu'il est, ou `null` s'il n'a jamais été créé — lu
+ *  par le faux serveur des dossiers, qui le **copie** sans y toucher. */
+export function cvSimule(): Record<string, unknown> | null {
+  // Une copie par JSON, pas `structuredClone` : le CV est du JSON pur, et
+  // la disponibilité de `structuredClone` sous Hermes dépend du runtime.
+  return etat.cv === null
+    ? null
+    : (JSON.parse(JSON.stringify(etat.cv)) as Record<string, unknown>);
+}
+
 /** Les photos reçues, par identifiant : comme le vrai serveur, le
  *  brouillon ne retient que `image_id` et recalcule l'adresse. */
 const photos = new Map<string, string>();

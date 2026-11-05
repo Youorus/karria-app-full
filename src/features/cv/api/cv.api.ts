@@ -200,7 +200,15 @@ function versBrouillon(brut: BrouillonBrut): Brouillon {
   return { id: brut.id, chapitreCourant: brut.current_chapter, chapitres };
 }
 
-function versCv(b: CvBrut): Cv {
+/**
+ * Un CV brut → le CV de l'app. Exporté pour les dossiers de candidature :
+ * la copie adaptée d'un dossier a la même forme, sans `id` ni `image_url`
+ * (`docs/contrat-api-candidatures.md`), d'où le paramètre plus large —
+ * une seule traduction du CV dans l'application.
+ */
+export function versCv(
+  b: Omit<CvBrut, "id" | "image_url"> & { image_url?: string | null },
+): Cv {
   const cv: Omit<Cv, "vide" | "misAJour"> = {
     identite:
       b.identity === undefined || b.identity === null
@@ -220,7 +228,7 @@ function versCv(b: CvBrut): Cv {
             liens: b.contact.links.map((l) => ({ libelle: l.label, url: l.url })),
           },
     presentation: b.summary,
-    photo: b.image_url,
+    photo: b.image_url ?? null,
     experiences: b.experiences.map(versExperience),
     formations: b.educations.map(versFormation),
     competences: b.skills.map((s) => ({ nom: s.name, niveau: s.level })),
