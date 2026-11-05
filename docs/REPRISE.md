@@ -5,6 +5,132 @@
 
 **Dernière mise à jour : 2026-11-05**
 
+## Session du 2026-11-05 — Android, premier passage (Fable)
+
+**Question de Marc** : « tout ce que l'on construit est aussi bien adapté pour les apps Android comme il
+se doit ? » Karria n'avait **jamais** été lancée sur Android. Réponse courte : **oui pour l'essentiel,
+avec quatre défauts corrigés ici et quelques angles morts qu'un émulateur ne peut pas lever** (voir
+« Ce qui reste »). Le code partagé tient : edge-to-edge, thème, polices, WebView, navigation, retour
+système, Modal imbriqués, clavier — rien n'a planté, aucun écran rouge, aucun onglet vide.
+
+### Outillage posé (hors dépôt)
+
+- SDK Android dans `~/Library/Android/sdk` : image système `system-images;android-36;google_apis;arm64-v8a`
+  installée, AVD **`Pixel_8_API_36`** (Android 16, 1080×2400, `hw.keyboard=no`, 4 Go, GPU auto). Le
+  démarrer : `~/Library/Android/sdk/emulator/emulator -avd Pixel_8_API_36 -no-snapshot`. Il a **planté
+  une fois** (threads QEMU bloqués) après ~40 min, relancé sans séquelle.
+- `npx expo prebuild --platform android` (dossier `android/` git-ignoré, rien de natif commité), puis
+  `cd android && JAVA_HOME=/opt/homebrew/opt/openjdk ./gradlew :app:assembleDebug
+-PreactNativeArchitectures=arm64-v8a` (NDK 27.0 téléchargé par Gradle, ~25 min la première fois ;
+  les quatre architectures auraient pris quatre fois plus). APK dans
+  `android/app/build/outputs/apk/debug/app-debug.apk`, `adb install -r`, `adb reverse tcp:8081 tcp:8081`.
+- Metro : `EXPO_PUBLIC_API_MODE=simulation EXPO_PUBLIC_ADMOB_TEST_MODE=true
+EXPO_PUBLIC_SIMULATION_CV=rempli npx expo start --port 8081` (**sans `CI=1`** : en mode CI Metro
+  refuse les rechargements). Premier bundle Android ~20-60 s ; l'écran de chargement (le « K » sur fond
+  clair) dure autant — normal en debug.
+- Maestro marche sur l'émulateur (`maestro test flux/01-connexion.yaml`) mais **`inputText` reste muet**
+  avec `hw.keyboard=yes`, et `tapOn` par texte est lent (10-15 s par geste) : la plupart des captures
+  ont été prises avec `adb shell input tap/swipe/text` + `adb exec-out screencap`. Les flux
+  `/private/tmp/claude-501/-Users-marc--PycharmProjects-karria-api/b728036c-016d-4c13-965e-0db7af7cdbe1/scratchpad/android/flux/*.yaml` restent utiles comme trame.
+
+### Ce qui a été vu et qui marche (captures dans `/private/tmp/claude-501/-Users-marc--PycharmProjects-karria-api/b728036c-016d-4c13-965e-0db7af7cdbe1/scratchpad/android/`)
+
+- **Connexion** (`01-bienvenue`, `02-feuille-connexion`, `03-information-ia`, `05b-code`,
+  `06b-apres-code`) : l'accueil, la feuille avec la phrase « En continuant… » et le lien « Karria
+  s'appuie sur des modèles d'IA » qui ouvre bien le **Modal imbriqué** « Karria et l'IA » par-dessus la
+  feuille (le doute iOS n'existe pas sur Android : deux fenêtres de dialogue distinctes), « Compris »
+  referme ; e-mail → code `000000` → onglets. Le clavier Android **ne masque pas** le champ e-mail ni
+  les six cases du code (`windowSoftInputMode=adjustResize`, `KeyboardAvoidingView` sans `behavior`).
+- **Fil des offres** (`07c-fil`, `11-`, `12-fil-defile`, `68-fil-clair`) en sombre et en clair, aura,
+  barre d'onglets flottante au-dessus de la **barre de gestes** (edge-to-edge respecté), orbe Karria.
+- **Fiche d'offre** (`13-detail-offre`, `14-detail-offre-defile`) : carte en haut, pied flottant
+  « Adapter mon CV à cette offre » posé au-dessus de la barre de gestes, défilement ; **retour système**
+  → le fil (`15-retour-systeme-fil`), aucun geste prédictif (désactivé dans `app.json`, confirmé dans
+  le manifeste généré : `enableOnBackInvokedCallback="false"`).
+- **Onglet CV rempli** (`33-retour-mes-cv`), « Mes CV » avec ses deux cartes, PDF/Word/enveloppe/corbeille
+  et « Nouveau CV » en pied (`21-mes-cv`).
+- **Atelier libre** (`23-atelier-choix-modele`, `24-atelier-feuille`, `28-atelier-apres-annuler`) : la
+  demi-feuille « Avec quel modèle ? » par-dessus la page rendue, la WebView à 826 px tient la largeur
+  (feuille blanche, fond du thème autour), toucher « Awa DIALLO » → formulaire Identité, Annuler →
+  l'intitulé reste surligné, barre à quatre gestes. **Pincer-zoomer n'a pas pu être exercé** (l'émulateur
+  ne simule pas deux doigts par `adb` ; `maestro pinch` non essayé après le plantage).
+- **Finaliser** (`29b-finaliser`, `30-finaliser-defile`, `31-finaliser-envoi`, `32-finaliser-envoye`) :
+  cadran 83, les trois points, **le défilement fonctionne** (ce qui n'avait pas pu être vu sous Maestro
+  iOS), « Mon CV » PDF/Word, « Voir mes CV », feuille d'envoi (`pageSheet` plein écran sur Android),
+  « Envoyé à toi@exemple.fr ».
+- **Candidatures** (`40-candidatures`, `49-retour-dossiers`), **dossier** (`41b-dossier-corrige`,
+  `42-dossier-defile`), **atelier d'un dossier** (`44-atelier-dossier-feuille`, cinq gestes, pastille 2 sur
+  Karria), **propositions** (`45-atelier-karria`, accepter → `46-`), **lettre** (`47-lettre`,
+  `48-lettre-ecrite`, Karria écrit la lettre en simulation).
+- **Modèles** (`50-modeles`) : galerie, puces, pastilles « Premium » et « à toi ». Le **zoom Reanimated
+  Android** du détail (`use-ouverture-modele.ts`) est resté **non vu** : l'émulateur a planté sur le
+  toucher de la vignette (coïncidence QEMU, pas une trace JS) et je ne l'ai pas rejoué.
+- **Profil** (`60-profil`, `61-profil-defile`, `67-profil-clair`) : soutien (sans pub, cafés), « Parler à
+  l'équipe » (`62-equipe`, `63-equipe-clavier` : champ, envoi, icônes galerie/photo/micro), **Paramètres**
+  (`64-parametres`, `65-parametres-clair`), « Karria et l'IA » en consultation (`66-karria-ia-clair`).
+- **Thème** : Sombre ↔ Clair ↔ Système bascule tout, **barre d'état et barre de gestes suivent**
+  (`Uniwind.setTheme` → `Appearance.setColorScheme`, le style natif `values-night` fait le reste).
+- **Changement d'onglet répété** (8 bascules rapides, `69-`, `70-onglets-repetes-*`) : aucun onglet vide.
+  Une capture (`41b` première version) a montré le fil « 15 offres » sans aucune carte **pendant ~3 s
+  après un rechargement Metro** — c'est l'entrée en fondu des cartes après rechargement, pas le bug de
+  l'iPhone de Marc ; revu plein 5 s plus tard (`90-onglet-vide` → plein).
+- **Porte de version obsolète** (`EXPO_PUBLIC_SIMULATION_VERSION=requise`, `80-version-obsolete`) :
+  l'écran bloquant, « Mettre à jour » ouvre le **Play Store via Chrome** sur l'émulateur (pas de Play
+  Store dans une image `google_apis`), `81-mettre-a-jour`.
+- **expo-updates** : manifeste généré correct (`EXPO_UPDATE_URL`, `CODE_SIGNING_*`, `ALWAYS`,
+  `runtimeVersion` = `appVersion`). **Notifications** : icône monochrome et couleur `#1877F2` dans le
+  manifeste, canaux `offres/documents/compte/defaut` créés. **AdMob** : `APPLICATION_ID` Android et
+  `DELAY_APP_MEASUREMENT_INIT` dans le manifeste.
+
+### Ce qui a été corrigé (code partagé, branches `Platform.OS` minimales, tests)
+
+1. **`notifications.ts`** — Android refusait `setNotificationCategoryAsync(famille, [])` (« Must provide
+   at least one action ») : un avertissement à chaque démarrage. Les catégories ne servent qu'à iOS
+   (`customDismissAction`) ; sur Android les familles **sont** les canaux. `preparerLesFamilles` ne pose
+   les catégories que sur iOS. Test `notifications.test.ts` (Android : 4 canaux, 0 catégorie ; iOS : 3
+   catégories).
+2. **Feuilles `pageSheet` sous la barre d'état** — sur Android `presentationStyle="pageSheet"` n'existe
+   pas : le Modal prend tout l'écran, bord à bord, et « Annuler / Enregistrer » passait **sous l'heure**
+   (`26-atelier-formulaire` avant, `26b-atelier-formulaire-corrige` après). Nouveau
+   `src/lib/feuille-native.ts › BORDS_FEUILLE_NATIVE` (`["top","bottom"]` sur Android, `["bottom"]` sur
+   iOS, inchangé) posé sur les cinq feuilles : `feuille-basse` (pleine), `feuille-filtres`,
+   `feuille-sans-pub`, `selecteur-mois`, `formulaires-elements`. `feuille-envoi` et `visionneuse-pages`
+   géraient déjà le haut.
+3. **`PiedAction flottant` sur la barre de gestes** — positionné en absolu, il ignorait le padding bas de
+   la `SafeAreaView` de l'écran : « Continuer dans l'atelier » couvrait la barre de gestes Android (et
+   l'indicateur d'accueil iOS, mais Marc ne l'avait pas relevé) — `41-dossier` avant, `41b-dossier-corrige`
+   après. Le pied lit `useSafeAreaInsets().bottom` lui-même. Test `pied-action.test.tsx`.
+4. **Alertes « Mes CV »** — Android coupe un titre d'alerte à deux lignes (« Réessaie dans un ins… »,
+   `22-mes-cv-pdf`) ; les deux messages d'erreur sont désormais un titre court + une phrase
+   (`TEXTES_MES_CV.reessayer`), comme les autres alertes.
+
+### Ce qui reste (non vérifiable sur émulateur, ou à faire)
+
+- **AdMob / UMP** : sur l'émulateur, UMP répond « no form(s) configured for the input app ID
+  `ca-app-pub-…~4848202843` » (**le message de consentement n'est pas publié pour l'app Android dans
+  la console AdMob** — à faire avant toute build de prod Android, sinon `REFUS` hors test), puis les
+  annonces natives échouent en `internal-error` (ID de test Android absent de `.env`, `EMULATOR` comme
+  appareil de test). **Aucune annonce native n'a donc été vue sur Android** : fil, fiche, Mes CV, score.
+  À rejouer avec `EXPO_PUBLIC_ADMOB_NATIVE_ANDROID` de test et un appareil réel.
+- **Notifications push Android** : aucun `google-services.json` (`config/` est vide, `.gitignore` en
+  parle, `app.json` n'a pas `android.googleServicesFile`) → `getExpoPushTokenAsync` échouera sur un
+  vrai Android (« Default FirebaseApp is not initialized »). Le code le rattrape et avertit, mais
+  **aucun Android ne recevra de notification** tant que le fichier Firebase n'est pas posé.
+- **Google Sign-In Android** : `webClientId` seul suffit au code, mais il faut un client OAuth **Android**
+  (SHA-1 de la clé de signature EAS + `com.karria.app`) dans le projet Google Cloud — non vérifiable
+  en simulation.
+- **Stripe** : pas de SDK natif, le paiement passe par `openAuthSessionAsync` (Custom Tabs) et le retour
+  `karria://paiement/retour` (intent-filter présent dans le manifeste). Non exercé contre Stripe réel.
+- **Partage de fichier** (`expo-sharing`) : le téléchargement échoue en simulation (403 sur
+  `storage.karria.fr/simule/…`, comme sur iOS) — la feuille de partage Android n'a pas été vue.
+- **Pincer-zoomer de la WebView**, **zoom Reanimated du détail d'un modèle**, **dictée** (micro),
+  **sélecteur de fichiers** (import CV), **haptique** (aucune dans l'app : pas de `expo-haptics`) : à
+  faire au doigt sur un appareil.
+- **Maestro sur Android** : à refaire avec `hw.keyboard=no` (fait dans l'AVD) pour `inputText`.
+- Le ripple Android n'est pas utilisé (`active:opacity-70` partout) : cohérent iOS/Android, choix assumé.
+- Les deux fichiers d'un autre chantier parallèle (`candidatures.api.ts`, `candidatures-simule.test.ts`)
+  faisaient échouer `format:check` pendant cette session ; `tsc` et `expo lint` propres, Jest vert.
+
 ## Session du 2026-11-05 (nuit) — « Mes CV », l'atelier libre (« Nouveau CV »), la pub dans Mes CV et sous le score (Fable)
 
 **Demande de Marc** : dans l'onglet CV, pas de bouton pour **créer un CV** ; voir ses CV déjà
