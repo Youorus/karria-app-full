@@ -26,11 +26,18 @@
  *
  * Un abonnement change hors de l'app (portail, prélèvement, résiliation) :
  * on relit à chaque retour sur le profil.
+ *
+ * ═══ Pas confirmé à temps ═══
+ *
+ * La session est retenue (`services/achat-en-attente.ts`) et l'app la
+ * revérifie d'elle-même au retour au premier plan et au prochain lancement.
+ * Si la livraison arrive ainsi, la carte passe au merci (café) ou relit ses
+ * droits (sans pub), sans geste de la personne.
  */
 
 import { useFocusEffect } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
 
 import { SIMULATION } from "@/lib/config";
@@ -46,6 +53,11 @@ import {
   ouvrirPortail,
   RETOUR,
 } from "../api/soutien.api";
+import {
+  abonnerRemerciement,
+  oublierAchatEnAttente,
+  retenirAchatEnAttente,
+} from "../services/achat-en-attente";
 import { attendreLaLivraison } from "../services/attente";
 import { TEXTES } from "../services/presentation";
 import type {
@@ -164,6 +176,7 @@ export function useSoutien(actif = true): Soutien {
       setPhase("paiement");
       try {
         const session = await ouvrir();
+        await retenirAchatEnAttente(session);
         await ouvrirDansLeNavigateur(session);
         setPhase("confirmation");
         const issue = await attendreLaLivraison(async () => {
@@ -173,9 +186,14 @@ export function useSoutien(actif = true): Soutien {
           ]);
           return livre(statut, lue);
         });
-        if (issue === "livre") apres();
-        else if (issue === "en_attente") setErreur(TEXTES.nonConfirme);
-        else setErreur(TEXTES.nonConfirme);
+        if (issue === "livre") {
+          await oublierAchatEnAttente();
+          apres();
+        } else {
+          // `en_attente` comme `inconnu` : on ne sait pas, on ne dit pas
+          // « non payé » ; la session retenue sera revérifiée.
+          setErreur(TEXTES.nonConfirme);
+        }
       } catch (cause) {
         setErreur(
           message(cause, TEXTES.erreurOuverture, "ouverture du paiement échouée"),
@@ -193,6 +211,18 @@ export function useSoutien(actif = true): Soutien {
         setCafeEnCours(false);
       }
     },
+    [relireFacturation],
+  );
+
+  // L'achat laissé « en attente » a été confirmé pendant qu'on était ailleurs.
+  useEffect(
+    () =>
+      abonnerRemerciement((r) => {
+        if (r.type === "template") return;
+        setErreur(null);
+        if (r.type === "coffee") setMerci(true);
+        void relireFacturation();
+      }),
     [relireFacturation],
   );
 

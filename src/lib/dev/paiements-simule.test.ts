@@ -10,6 +10,7 @@ import {
   estUneRoutePaiement,
   reinitialiserPaiements,
   repondrePaiements,
+  retarderLaLivraison,
 } from "./paiements-simule";
 
 async function appeler(methode: string, chemin: string, corps?: unknown) {
@@ -22,6 +23,23 @@ describe("le faux serveur des paiements", () => {
   beforeEach(() => {
     reinitialiserPaiements();
     reinitialiserModeles();
+  });
+
+  it("livre plus tard quand on le lui demande — l'achat reste « en attente » puis arrive", async () => {
+    retarderLaLivraison(9);
+    const ouverture = await appeler("POST", "/payments/checkout-session", {
+      payment_type: "coffee",
+      coffee_count: 1,
+    });
+    const id = ouverture.corps.session_id as string;
+    for (let lecture = 1; lecture < 9; lecture += 1) {
+      const { corps } = await appeler("GET", `/payments/status/${id}`);
+      expect(corps.fulfilled).toBe(false);
+    }
+    const { corps } = await appeler("GET", `/payments/status/${id}`);
+    expect(corps.fulfilled).toBe(true);
+    const droits = await appeler("GET", "/payments/me");
+    expect(droits.corps.thanks.coffees).toBe(1);
   });
 
   it("reconnaît ses routes", () => {

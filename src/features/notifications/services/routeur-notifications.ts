@@ -44,6 +44,7 @@ const ID_PERMIS: ReadonlySet<TypeNotification> = new Set([
   "offer",
   "template",
   "cv_export",
+  "purchase",
 ]);
 
 const PILES: Record<TypeNotification, (id: string | null) => readonly string[]> = {
@@ -60,6 +61,9 @@ const PILES: Record<TypeNotification, (id: string | null) => readonly string[]> 
   account: () => ["/profil", "/parametres"],
   // L'équipe a répondu : l'échange, par-dessus le Profil d'où il s'ouvre.
   support: () => ["/profil", "/equipe"],
+  // Un paiement livré : le modèle acheté s'il y en a un, sinon le profil
+  // (la carte de soutien, où le café et le sans pub se lisent).
+  purchase: (id) => (id === null ? ["/profil"] : ["/modeles", `/modele/${id}`]),
 };
 
 const CANAUX: Record<TypeNotification, CanalNotification> = {
@@ -73,6 +77,7 @@ const CANAUX: Record<TypeNotification, CanalNotification> = {
   templates: "documents",
   account: "compte",
   support: "compte",
+  purchase: "compte",
 };
 
 export function canalDe(type: TypeNotification): CanalNotification {

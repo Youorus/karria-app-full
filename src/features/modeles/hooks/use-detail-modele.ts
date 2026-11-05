@@ -41,6 +41,11 @@
  * dans « les miens ». Le prix affiché est celui du serveur (`modele.prix`),
  * jamais un montant écrit ici. Si l'interrupteur des paiements est éteint
  * pour cette plateforme, le bouton le dit et ne fait rien.
+ *
+ * Si le serveur n'a pas confirmé à temps (« en attente »), la session est
+ * **retenue** (`features/soutien/services/achat-en-attente.ts`) : l'app la
+ * revérifie d'elle-même au retour au premier plan et au prochain lancement,
+ * et cet écran, s'il est encore ouvert, passe alors à « Ajouté ».
  */
 
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -56,6 +61,11 @@ import {
   ouvrirAchatModele,
   RETOUR,
 } from "@/features/soutien/api/soutien.api";
+import {
+  abonnerRemerciement,
+  oublierAchatEnAttente,
+  retenirAchatEnAttente,
+} from "@/features/soutien/services/achat-en-attente";
 import { attendreLaLivraison } from "@/features/soutien/services/attente";
 import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
 import { SIMULATION } from "@/lib/config";
@@ -184,6 +194,9 @@ export function useDetailModele(): DetailModele {
     void (async () => {
       try {
         const session = await ouvrirAchatModele(modele.id);
+        // Retenue avant même la page : si l'app est tuée pendant le paiement,
+        // le prochain lancement revérifie.
+        await retenirAchatEnAttente(session, modele.id);
         // Comme le soutien : une session du navigateur que la page de retour
         // de l'API referme ; en simulation, le faux serveur livre d'emblée.
         if (!SIMULATION) await WebBrowser.openAuthSessionAsync(session.adresse, RETOUR);
@@ -191,6 +204,7 @@ export function useDetailModele(): DetailModele {
           async () => (await lireStatut(session.id)).livre,
         );
         if (issue === "livre") {
+          await oublierAchatEnAttente();
           setAcquisition("ajoute");
           return;
         }
@@ -212,6 +226,18 @@ export function useDetailModele(): DetailModele {
   useReprise("modele.obtenir", (charge) => {
     if (charge === id) obtenir();
   });
+
+  // L'achat laissé « en attente » a été confirmé pendant qu'on était ailleurs.
+  useEffect(
+    () =>
+      abonnerRemerciement((r) => {
+        if (r.type !== "template" || r.modeleId !== id) return;
+        setAcquisition((etat) =>
+          etat === "en-attente" || etat === "libre" ? "ajoute" : etat,
+        );
+      }),
+    [id],
+  );
 
   const partager = useCallback(() => {
     if (modele === null) return;

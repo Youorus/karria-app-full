@@ -16,6 +16,13 @@
  * relit quand l'application revient au premier plan ; un échec de lecture ne
  * change rien : on garde la dernière réponse connue plutôt que de remettre
  * les annonces à quelqu'un qui a payé.
+ *
+ * ═══ L'achat en attente ═══
+ *
+ * Aux mêmes moments — au lancement, au retour au premier plan — la session
+ * Stripe qu'un écran d'achat a laissée « en attente » est revérifiée
+ * (`services/achat-en-attente.ts`) : si le serveur a livré entre-temps, le
+ * merci s'affiche, sans que la personne ait à retourner sur l'écran.
  */
 
 import { useEffect } from "react";
@@ -24,6 +31,7 @@ import { AppState, Platform } from "react-native";
 import { poserSansPub } from "@/lib/sans-pub";
 
 import { lireFacturation } from "../api/soutien.api";
+import { reverifierAchatEnAttente } from "../services/achat-en-attente";
 
 async function relire(): Promise<void> {
   try {
@@ -32,6 +40,7 @@ async function relire(): Promise<void> {
   } catch (cause) {
     console.warn("[karria] droits illisibles au démarrage", cause);
   }
+  await reverifierAchatEnAttente();
 }
 
 export function useDroitsConnectes(): void {

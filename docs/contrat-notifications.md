@@ -31,6 +31,7 @@ Toutes les valeurs sont des **chaînes** (ce qu'Android transmet intact).
 | `templates`      | interdit    | `documents`       | —        | galerie                                 | `karria://modeles`         |
 | `account`        | interdit    | `compte`          | —        | profil → paramètres                     | `karria://parametres`      |
 | `support`        | interdit    | `compte`          | —        | profil → « Parler à l'équipe »          | `karria://equipe`          |
+| `purchase`       | facultatif  | `compte`          | —        | sans `id` : profil (soutien) ; avec `id` (modèle acheté) : galerie → modèle | `karria://profil` ou `karria://modele/{id}` |
 
 Le message Expo porte en plus `channelId` et `categoryId` (même valeur que
 le canal) et `badge` quand la colonne le dit.

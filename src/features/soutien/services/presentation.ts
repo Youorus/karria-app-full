@@ -60,6 +60,13 @@ export const TEXTES = {
     "Ton café est bien arrivé. Il nous donne de l'élan pour rendre Karria encore meilleur. Bonne chance pour ta recherche.",
   encoreUn: "En offrir un autre",
 
+  // ── Le merci qui arrive plus tard (achat revérifié par l'app) ──
+  remerciementCafe: "Merci pour le café. Ton soutien est bien arrivé.",
+  remerciementModele: "Ton modèle de CV est à toi.",
+  remerciementSansPub: "Karria sans pub est actif. Merci.",
+  remerciementVoir: "Voir",
+  remerciementOuvrir: "Ouvrir",
+
   // ── Commun ──
   stripe: "Paiement sécurisé par Stripe, dans ton navigateur.",
   indisponible: "Le soutien n'est pas disponible dans cette version de l'app.",

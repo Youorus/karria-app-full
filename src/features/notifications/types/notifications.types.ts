@@ -28,6 +28,7 @@ export const TYPES_NOTIFICATION = [
   "templates",
   "account",
   "support",
+  "purchase",
 ] as const;
 
 export type TypeNotification = (typeof TYPES_NOTIFICATION)[number];
@@ -35,7 +36,7 @@ export type TypeNotification = (typeof TYPES_NOTIFICATION)[number];
 /** Une notification lue et validée, dans les termes de l'application. */
 export interface NotificationKarria {
   type: TypeNotification;
-  /** L'offre, le modèle ou l'export visé ; `null` quand le type n'en a pas. */
+  /** L'offre, le modèle (acheté ou non) ou l'export visé ; `null` quand le type n'en a pas. */
   id: string | null;
   /** Combien d'offres la notification annonce, si elle le dit. */
   nombre: number | null;

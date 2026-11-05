@@ -9,7 +9,10 @@
  * l'aperçu avec ses données, le vrai. Un modèle non possédé passe par
  * Stripe (`features/soutien/api`, le flux du détail d'un modèle) : session
  * du navigateur, puis **relecture du serveur** jusqu'à « livré », puis le
- * modèle s'applique de lui-même. On ne quitte pas l'atelier.
+ * modèle s'applique de lui-même. On ne quitte pas l'atelier. Si le serveur
+ * n'a pas confirmé à temps, la session est retenue et revérifiée plus tard
+ * par l'app (`features/soutien/services/achat-en-attente.ts`) : le modèle
+ * s'applique alors tout seul si la feuille est encore là.
  *
  * ═══ Le modèle choisi de la personne ═══
  *
@@ -32,6 +35,11 @@ import {
   ouvrirAchatModele,
   RETOUR,
 } from "@/features/soutien/api/soutien.api";
+import {
+  abonnerRemerciement,
+  oublierAchatEnAttente,
+  retenirAchatEnAttente,
+} from "@/features/soutien/services/achat-en-attente";
 import { attendreLaLivraison } from "@/features/soutien/services/attente";
 import { SIMULATION } from "@/lib/config";
 import { ErreurApi } from "@/lib/http";
@@ -99,11 +107,13 @@ export function useChoixModele(
       void (async () => {
         try {
           const session = await ouvrirAchatModele(modele.id);
+          await retenirAchatEnAttente(session, modele.id);
           if (!SIMULATION) await WebBrowser.openAuthSessionAsync(session.adresse, RETOUR);
           const issue = await attendreLaLivraison(
             async () => (await lireStatut(session.id)).livre,
           );
           if (issue === "livre") {
+            await oublierAchatEnAttente();
             setAchat(null);
             appliquer(modele.id);
             return;
@@ -124,6 +134,18 @@ export function useChoixModele(
     },
     [possedes, paiementsActifs, appliquer],
   );
+
+  // L'achat laissé « en attente » a été confirmé pendant qu'on était ailleurs.
+  // Réabonné à chaque changement d'`achat` : le rappel lit l'état courant.
+  useEffect(() => {
+    if (achat?.etat !== "en-attente") return undefined;
+    const { modeleId: enAttente } = achat;
+    return abonnerRemerciement((r) => {
+      if (r.type !== "template" || r.modeleId !== enAttente) return;
+      setAchat(null);
+      appliquer(enAttente);
+    });
+  }, [achat, appliquer]);
 
   const actuel = useMemo(
     () => modeles.find((m) => m.id === modeleId) ?? null,

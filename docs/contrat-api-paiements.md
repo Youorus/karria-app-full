@@ -136,4 +136,14 @@ session du navigateur, et renvoie au profil.
 - Un paiement n'est livré **qu'une fois**, même si Stripe réémet la notification.
 - La suppression du compte (`DELETE /auth/me`) supprime le client Stripe — donc
   résilie l'abonnement — et efface les droits ; les reçus restent chez Stripe.
-- Aucun courriel de Karria : les reçus sont ceux de Stripe.
+- Les reçus sont ceux de Stripe. Depuis le 2026-11-05 (ADR-0024 § 2026-11-05),
+  chaque livraison vaut en plus un **merci** de Karria : un courriel (café,
+  modèle, sans pub) et une notification push `type: purchase` (sans `id` →
+  profil ; `id` du modèle → ce modèle), envoyés **après** la livraison, une
+  seule fois, et jamais bloquants — `fulfilled` peut donc être vrai quelques
+  secondes avant que la notification arrive.
+- L'app ne doit pas se fier au seul `fulfilled` lu pendant les ~13 s d'attente :
+  un achat « en attente » (`en_attente` ou `inconnu`) est **revérifié par l'app**
+  au retour au premier plan et au prochain lancement (`GET /payments/status/{id}`
+  avec la session conservée, puis `/payments/me` ou `/user-templates/me`), et
+  le remerciement s'affiche alors.

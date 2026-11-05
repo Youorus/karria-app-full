@@ -37,6 +37,7 @@ import { FeuilleConsentementIa } from "@/features/auth/components/feuille-consen
 import { InvitationConnexion } from "@/features/auth/components/invitation-connexion";
 import { useSession } from "@/features/auth/hooks/use-session";
 import { useAppareilConnecte } from "@/features/notifications/hooks/use-appareil-connecte";
+import { BandeRemerciement } from "@/features/soutien/components/bande-remerciement";
 import { useDroitsConnectes } from "@/features/soutien/hooks/use-droits-connectes";
 import { FOND } from "@/theme";
 import { useTheme } from "@/theme/preference";
@@ -145,13 +146,17 @@ export default function LayoutApp() {
       </Stack>
       <InvitationConnexion />
       <FeuilleConsentementIa />
+      {/* Le merci d'un achat confirmé plus tard (`achat-en-attente.ts`) :
+          une bande en haut, par-dessus la navigation, comme celles du
+          démarrage. */}
+      <BandeRemerciement />
     </>
   );
 }
 
 /**
- * L'appareil s'enregistre et les droits (sans pub) se lisent, tant qu'une
- * session existe. Un composant sans rendu plutôt que des hooks appelés
+ * L'appareil s'enregistre et les droits (sans pub) se lisent — et l'achat
+ * laissé « en attente » se revérifie — tant qu'une session existe. Un composant sans rendu plutôt que des hooks appelés
  * dans la mise en page : ils ne doivent tourner **qu'une fois connecté**,
  * et un hook ne se monte pas sous condition.
  */

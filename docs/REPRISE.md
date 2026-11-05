@@ -5,6 +5,35 @@
 
 **Dernière mise à jour : 2026-11-05**
 
+## Session du 2026-11-05 (après-midi) — l'achat « en attente » se revérifie tout seul, et le merci arrive (Fable)
+
+**Contexte** : le matin, un vrai café de 2,99 € payé pendant que l'API répondait 500 ; l'app a dit
+« reviens plus tard » et **oubliait la session** — personne ne revérifiait. Côté API (même session,
+`karria_api_v2/docs/REPRISE.md`) : courriel + push `type: purchase` à chaque livraison, en prod.
+
+**Livré** (`npm run check` vert, 580 tests) :
+- `features/soutien/services/achat-en-attente.ts` : la session Stripe est **retenue** (magasin
+  local, survit à un redémarrage) dès l'ouverture du paiement par les trois flux (détail d'un
+  modèle, feuille de l'atelier, carte de soutien), oubliée quand « livré » ; sinon
+  `reverifierAchatEnAttente()` relit `GET /payments/status/{id}` **au lancement et à chaque
+  retour au premier plan** (`use-droits-connectes.ts`, déjà monté sur la session), une seule
+  relecture à la fois, session périmée après 24 h ou sur 404. « Livré » → merci posé une fois
+  (`useRemerciement` / `abonnerRemerciement`), sans pub coupé aussitôt.
+- `components/bande-remerciement.tsx` (montée dans `app/(app)/_layout.tsx`) : la bande des
+  démarrages réutilisée — « Merci pour le café. » / « Ton modèle de CV est à toi. » (Ouvrir →
+  le modèle) / « Karria sans pub est actif. » (Voir → profil), se retire seule en 8 s.
+  Les écrans concernés passent à leur état « livré » s'ils sont ouverts : détail du modèle →
+  « Ajouté », feuille de l'atelier → le modèle s'applique, carte de soutien → le cœur du café /
+  droits relus.
+- Push `purchase` (`notifications.types.ts`, `routeur-notifications.ts`) : sans `id` → `/profil`,
+  avec `id` → `["/modeles", "/modele/{id}"]`, canal `compte` ; `docs/contrat-notifications.md`.
+- Faux serveur : `retarderLaLivraison(n)` (`paiements-simule.ts`) pour voir l'attente puis le merci
+  au retour au premier plan ; `docs/contrat-api-paiements.md` § merci et revérification.
+
+**Non vérifié** : sur un vrai téléphone (le retour au premier plan avec une vraie session Stripe
+en attente ; le push `purchase` touché). Tests : service (9 cas), routeur, faux serveur.
+
+
 ## Session du 2026-11-05 (matin) — le modèle se change à tout moment, sans rien perdre (Fable)
 
 **Demande de Marc** : dans l'onglet CV, le choix du modèle n'était proposé qu'une fois ; il

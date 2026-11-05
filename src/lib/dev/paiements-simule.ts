@@ -9,9 +9,13 @@
  * les refus du contrat (`subscription_already_active`,
  * `template_already_owned`, `template_not_found`,
  * `coffee_count_out_of_bounds`). Il n'y a pas de page Stripe à ouvrir : la
- * session est **livrée dès son ouverture** (le hook de soutien le sait et
- * saute le navigateur en simulation), et `fulfilled` passe à vrai à la
- * seconde relecture, pour voir l'état « on attend la confirmation ».
+ * session est **livrée à la relecture** (le hook de soutien le sait et
+ * saute le navigateur en simulation) — `fulfilled` passe à vrai à la
+ * `LIVRAISON_APRES`-ième lecture (2 d'office), pour voir l'état « on attend
+ * la confirmation ». `retarderLaLivraison(n)` repousse ce seuil au-delà des
+ * sept lectures de `attente.ts` : on voit alors l'achat « en attente », puis
+ * le merci quand l'app revérifie d'elle-même au retour au premier plan
+ * (`services/achat-en-attente.ts`).
  *
  * Un modèle acheté rejoint « les miens » du faux serveur des modèles
  * (`possederModele`), comme le ferait le vrai serveur par son webhook.
@@ -21,6 +25,8 @@ import { possederModeleAtelier } from "./atelier-simule";
 import { possederModele, trouverModele } from "./modeles-simule";
 
 const PRIX_SANS_PUB = 499;
+/** La lecture du statut à laquelle le faux serveur livre. */
+const LIVRAISON_APRES = 2;
 const CAFES: Record<number, number> = { 1: 299, 2: 499, 3: 799, 5: 1299 };
 
 interface Session {
@@ -36,7 +42,13 @@ const etat = {
   cafes: 0,
   dernierCafe: null as string | null,
   resiliation: false,
+  livraisonApres: LIVRAISON_APRES,
 };
+
+/** Livrer plus tard : à la `lectures`-ième lecture du statut (tests, démonstration). */
+export function retarderLaLivraison(lectures: number): void {
+  etat.livraisonApres = Math.max(1, Math.floor(lectures));
+}
 
 export function estUneRoutePaiement(chemin: string): boolean {
   return chemin.split("?")[0].startsWith("/payments/");
@@ -193,9 +205,9 @@ export function repondrePaiements(
     const session = etat.sessions.get(statut[1]);
     if (session === undefined) return erreur(404, "not_found", "Paiement introuvable.");
     session.lectures += 1;
-    // La première relecture dit « pas encore » : on voit l'attente à l'écran.
-    const livre = session.lectures >= 2;
-    if (livre && session.lectures === 2) livrer(session);
+    // Les premières relectures disent « pas encore » : on voit l'attente à l'écran.
+    const livre = session.lectures >= etat.livraisonApres;
+    if (livre && session.lectures === etat.livraisonApres) livrer(session);
     return json(200, {
       session_id: statut[1],
       status: "paid",
@@ -215,4 +227,5 @@ export function reinitialiserPaiements(): void {
   etat.cafes = 0;
   etat.dernierCafe = null;
   etat.resiliation = false;
+  etat.livraisonApres = LIVRAISON_APRES;
 }

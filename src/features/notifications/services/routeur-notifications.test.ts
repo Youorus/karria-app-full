@@ -35,7 +35,18 @@ describe("Chaque type du contrat", () => {
     templates: { donnees: {}, pile: ["/modeles"] },
     account: { donnees: {}, pile: ["/profil", "/parametres"] },
     support: { donnees: {}, pile: ["/profil", "/equipe"] },
+    purchase: { donnees: {}, pile: ["/profil"] },
   };
+
+  it("un achat avec identifiant ouvre le modèle acheté, par-dessus la galerie", () => {
+    expect(destinationDe({ v: "1", type: "purchase", id: ID })).toEqual({
+      pile: ["/modeles", `/modele/${ID}`],
+      type: "purchase",
+      origine: "contrat",
+      campagne: null,
+    });
+    expect(canalDe("purchase")).toBe("compte");
+  });
 
   it.each(TYPES_NOTIFICATION)("%s mène à sa pile", (type) => {
     const { donnees, pile } = attendu[type];
