@@ -32,6 +32,8 @@ export const TEXTES = {
   modifier: "Modifier",
   karria: "Karria",
   miseEnAvant: "Mise en avant",
+  /** Le mot de la barre : « Mise en avant » ne tient pas sous l'icône. */
+  enAvant: "En avant",
   intitule: "Intitulé",
   finaliser: "Finaliser",
   // L'attente.

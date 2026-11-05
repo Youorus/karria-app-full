@@ -109,7 +109,7 @@ export function BarreAtelier({ enAttente, onGeste, desactivee = false }: Props) 
         />
         <Geste
           icone="filtres"
-          libelle={TEXTES.miseEnAvant}
+          libelle={TEXTES.enAvant}
           onPress={() => onGeste("mise-en-avant")}
           desactive={desactivee}
         />

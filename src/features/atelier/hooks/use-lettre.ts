@@ -27,6 +27,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 
 import { useActionIa } from "@/features/auth/hooks/use-action-ia";
+import { consentementIa } from "@/features/auth/services/consentement-ia";
 import {
   ebaucherLettre,
   lireDossier,
@@ -336,11 +337,17 @@ export function useLettre(): EcranLettre {
                 { chemin: `paragraphs.${c.index}.text`, texte: apres },
               ]);
               rendre(false);
+              // La feuille a pu être fermée pour laisser passer l'accord à l'IA :
+              // on la rouvre sur l'ancien et le nouveau.
+              setCible(c);
               setReecriture({ index: c.index, avant, apres });
             }
           } catch (cause) {
             if (!vivant.current) return;
-            if (rejouerSiConsentementRequis(cause, "application", geste)) return;
+            if (rejouerSiConsentementRequis(cause, "application", geste)) {
+              setCible(null);
+              return;
+            }
             console.warn("[karria] réécriture en échec", cause);
             Alert.alert("Karria n'a pas pu réécrire", messageDe(cause));
           } finally {
@@ -348,6 +355,12 @@ export function useLettre(): EcranLettre {
           }
         })();
       };
+      // L'accord à l'IA se demande dans une feuille globale, montée à la
+      // racine : sur iOS, elle ne peut pas monter par-dessus notre feuille
+      // native. Si l'accord manque (ou n'a jamais été lu), on ferme la
+      // nôtre d'abord ; le geste reprend après l'accord et la rouvre.
+      const connu = consentementIa();
+      if (connu === null || connu.requis) setCible(null);
       avecConsentement("application", geste);
     },
     [

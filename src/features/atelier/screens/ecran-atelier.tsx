@@ -219,7 +219,9 @@ export function EcranAtelier() {
         <BarreAtelier
           enAttente={a.enAttente}
           onGeste={(geste) => {
-            if (geste === "finaliser") a.allerAFinaliser();
+            // « Finaliser » passe d'abord par la lettre (« Et ta lettre ? »),
+            // qui mène à Finaliser ; on ne saute pas une étape du dossier.
+            if (geste === "finaliser") a.allerALaLettre();
             else if (geste === "modifier") a.ouvrir({ type: "modifier", cible: null });
             else a.ouvrir({ type: geste });
           }}
@@ -268,7 +270,7 @@ export function EcranAtelier() {
         visible={a.feuille?.type === "modele"}
         choix={choix}
         modeleId={a.modeleId}
-        onFermer={a.fermer}
+        onFermer={a.garderModele}
       />
     </Box>
   );

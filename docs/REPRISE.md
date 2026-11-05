@@ -96,11 +96,36 @@ template_not_owned` tant que le faux paiement n'a pas livré, exports avec score
 - Le rendu charge polices et photo depuis `storage.karria.fr` : la WebView pose `baseUrl` sur cette
   origine pour ne pas dépendre d'en-têtes CORS. **À vérifier contre la production.**
 
+### Vu sur le simulateur iPhone 17 (Maestro, `EXPO_PUBLIC_API_MODE=simulation`)
+
+Candidatures → dossier Alan → « Continuer dans l'atelier » → feuille « Avec quel modèle ? » par-dessus
+la page rendue (Meridian, deux colonnes) → « Garder ce modèle » → atelier : note « Karria a mis à jour
+ton intitulé et ton à-propos — voir · revenir », barre à cinq gestes. Toucher « Tenir la caisse » sur
+la feuille → « Expérience chez Zara » avec la proposition de Karria (avant/après/raison) **et** le
+formulaire existant ; « Vendeuse » + « senior » → Enregistrer → la feuille montre « Vendeuse senior
+chez Zara », l'élément touché est surligné, « Enregistré » en tête. Karria (deux propositions
+appliquées, « Revenir »), En avant (monter/descendre/masquer), Intitulé (aperçu à la frappe,
+« Annuler » / « Enregistrer »). Finaliser → lettre rendue (expéditeur, entreprise, date, objet,
+signature) → toucher un paragraphe → « Karria réécrit » → **feuille de consentement IA** (fermée
+d'abord : une feuille globale ne monte pas par-dessus une feuille native, corrigé) → « Karria a
+réécrit », avant/après, « Garder le nouveau » → Continuer → Finaliser : cadran 82/100 (ambre), phrase,
+« Ce qui ferait la différence », cartes CV/lettre avec PDF/Word → « Envoyer par e-mail » → « À mon
+adresse toi@exemple.fr » → « Envoyer à toi@exemple.fr » → **« As-tu candidaté à cette offre ? »** →
+« Pas encore ». Captures dans le rapport de session.
+
+Deux corrections faites en voyant : la feuille pleine a « Annuler » à gauche (la croix était cachée
+par « Enregistrer ») ; le mot de la barre est « En avant » (« Mise en avant » se tronquait).
+
 ### Non vérifié / reste
 
 - **La WebView réelle avec le HTML de production** (polices, photo signée, `karriaFit`, zoom, rejeu
-  des scripts à chaque remplacement) : seule la simulation a été exercée dans les tests ; voir la note
-  de fin de session pour ce qui a été vu sur le simulateur.
+  des scripts à chaque remplacement) : seule la simulation a été exercée.
+- L'entrée depuis la fiche d'offre (« Adapter mon CV à cette offre ») n'a pas été exercée à l'écran :
+  en simulation le CV de base n'existe pas sans import (`409 cv_missing` → alerte vers l'onglet CV,
+  voulu). Le code est le même que « Continuer dans l'atelier » une fois le dossier ouvert.
+- Metro en développement : le surveillant de fichiers n'a pas relevé les modifications pendant la
+  session (Fast Refresh muet, trois redémarrages avec `--clear`) — à garder en tête si « rien ne
+  change » à l'écran.
 - Le retour Stripe réel depuis l'atelier (comme pour le soutien), Android (zoom `setBuiltInZoomControls`,
   feuilles), tablette/paysage (phase 7), les textes à relire par Marc.
 - Les exports `pdf_url` du faux serveur ne répondent pas : « Télécharger » échoue en simulation

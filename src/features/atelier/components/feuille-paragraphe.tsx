@@ -103,21 +103,14 @@ function Contenu({
             </Texte>
           </VStack>
         </VStack>
-        <HStack className="gap-3 pt-2">
-          <Box className="flex-1">
-            <BoutonAction
-              libelle={TEXTES.lettreGarderAncien}
-              ton="secondaire"
-              onPress={onGarderAncien}
-            />
-          </Box>
-          <Box className="flex-1">
-            <BoutonAction
-              libelle={TEXTES.lettreGarderNouveau}
-              onPress={onGarderNouveau}
-            />
-          </Box>
-        </HStack>
+        <VStack className="gap-3 pt-2">
+          <BoutonAction libelle={TEXTES.lettreGarderNouveau} onPress={onGarderNouveau} />
+          <BoutonAction
+            libelle={TEXTES.lettreGarderAncien}
+            ton="secondaire"
+            onPress={onGarderAncien}
+          />
+        </VStack>
       </FeuilleBasse>
     );
   }

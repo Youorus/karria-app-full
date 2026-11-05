@@ -180,6 +180,8 @@ export interface Atelier {
   continuerSansKarria: () => void;
   annonce: NativeAd | null;
   choisirModele: (modeleId: string) => void;
+  /** « Garder ce modèle » : le choix est retenu, la feuille ne se rouvrira plus d'elle-même. */
+  garderModele: () => void;
   miseEnAvant: {
     deplacer: (rubrique: RubriqueEnListe, index: number, vers: number) => void;
     masquer: (rubrique: RubriqueEnListe, index: number) => void;
@@ -739,6 +741,12 @@ export function useAtelier(): Atelier {
     [rendre, retenir],
   );
 
+  const garderModele = useCallback(() => {
+    const courant = cvRef.current;
+    if (courant !== null) retenir(courant);
+    setFeuille(null);
+  }, [retenir]);
+
   const miseEnAvant = useMemo<Atelier["miseEnAvant"]>(
     () => ({
       deplacer: (rubrique, index, vers) => {
@@ -847,6 +855,7 @@ export function useAtelier(): Atelier {
     continuerSansKarria,
     annonce,
     choisirModele,
+    garderModele,
     miseEnAvant,
     allerALaLettre,
     allerAFinaliser,

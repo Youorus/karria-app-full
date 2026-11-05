@@ -47,12 +47,10 @@ import Animated, {
 import { scheduleOnRN } from "react-native-worklets";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Icone } from "@/components/icone";
 import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
-import { useCouleurs } from "@/theme/use-couleurs";
 
 const COURBE_FEUILLE = Easing.bezier(0.32, 0.72, 0, 1);
 const SEUIL_FERMETURE = 90;
@@ -81,7 +79,46 @@ function EnTete({
 }: Pick<Props, "titre" | "sousTitre" | "onFermer" | "action"> & {
   fermerParCroix: boolean;
 }) {
-  const couleurs = useCouleurs();
+  // La feuille pleine : « Annuler » à gauche, l'action à droite, comme les
+  // formulaires du CV — on doit toujours pouvoir sortir sans enregistrer.
+  if (fermerParCroix) {
+    return (
+      <VStack className="gap-1 px-5 pb-2 pt-3">
+        <HStack className="items-center justify-between">
+          <Pressable
+            onPress={onFermer}
+            className="min-h-touch justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="Annuler"
+          >
+            <Texte className="text-body text-muted-foreground">Annuler</Texte>
+          </Pressable>
+          {action ? (
+            <Pressable
+              onPress={action.onPress}
+              disabled={action.desactive}
+              className={`min-h-touch justify-center ${action.desactive ? "opacity-40" : ""}`}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: action.desactive }}
+            >
+              <Texte className="font-bold text-body text-primary">{action.libelle}</Texte>
+            </Pressable>
+          ) : null}
+        </HStack>
+        <Texte
+          accessibilityRole="header"
+          className="font-display text-title-sm tracking-tight text-foreground"
+        >
+          {titre}
+        </Texte>
+        {sousTitre ? (
+          <Texte className="text-footnote leading-5 text-muted-foreground">
+            {sousTitre}
+          </Texte>
+        ) : null}
+      </VStack>
+    );
+  }
   return (
     <HStack className="items-start justify-between gap-3 px-5 pb-2 pt-3">
       <VStack className="flex-1 gap-0.5">
@@ -106,16 +143,6 @@ function EnTete({
           accessibilityState={{ disabled: action.desactive }}
         >
           <Texte className="font-bold text-body text-primary">{action.libelle}</Texte>
-        </Pressable>
-      ) : fermerParCroix ? (
-        <Pressable
-          onPress={onFermer}
-          hitSlop={8}
-          className="h-9 w-9 items-center justify-center rounded-full bg-remplissage"
-          accessibilityRole="button"
-          accessibilityLabel="Fermer"
-        >
-          <Icone nom="fermer" couleur={couleurs.texte} taille={14} graisse="semibold" />
         </Pressable>
       ) : null}
     </HStack>
