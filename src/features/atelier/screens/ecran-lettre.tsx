@@ -3,9 +3,10 @@
  *
  * Sans lettre : l'orbe, la question, deux voies (Karria écrit · plus tard).
  * Avec : l'en-tête de l'atelier, la feuille au centre (même composant que
- * le CV), les conseils du rendu en une ligne discrète, et un seul bouton
- * bleu en pied : « Continuer » vers Finaliser. Toucher un paragraphe ouvre
- * la feuille basse : je modifie, ou Karria réécrit.
+ * le CV) avec la pastille du modèle à la même place que dans l'atelier,
+ * les conseils du rendu en une ligne discrète, et un seul bouton bleu en
+ * pied : « Continuer » vers Finaliser. Toucher un paragraphe ouvre la
+ * feuille basse : je modifie, ou Karria réécrit.
  */
 
 import { Pressable } from "react-native";
@@ -26,12 +27,22 @@ import { VStack } from "@/components/ui/vstack";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import { FeuilleCv } from "../components/feuille-cv";
+import { FeuilleModele } from "../components/feuille-modele";
 import { FeuilleParagraphe } from "../components/feuille-paragraphe";
+import { PastilleModele } from "../components/pastille-modele";
+import { useChoixModele } from "../hooks/use-choix-modele";
 import { TEXTES, useLettre } from "../hooks/use-lettre";
 
 export function EcranLettre() {
   const couleurs = useCouleurs();
   const l = useLettre();
+  const choix = useChoixModele(
+    l.feuilleModele,
+    l.modeles,
+    l.possedes,
+    l.modeleId,
+    l.choisirModele,
+  );
 
   return (
     <Box style={{ flex: 1 }} className="bg-background">
@@ -136,7 +147,14 @@ export function EcranLettre() {
                   {l.erreurRendu}
                 </Texte>
               </Box>
-            ) : null}
+            ) : (
+              <Box className="absolute left-4 top-2">
+                <PastilleModele
+                  libelle={l.modele?.libelle ?? null}
+                  onPress={l.ouvrirModele}
+                />
+              </Box>
+            )}
           </Box>
         )}
       </SafeAreaView>
@@ -164,6 +182,12 @@ export function EcranLettre() {
         onGarderNouveau={l.garderNouveau}
         onGarderAncien={l.garderAncien}
         onFermer={l.fermerCible}
+      />
+      <FeuilleModele
+        visible={l.feuilleModele}
+        choix={choix}
+        modeleId={l.modeleId}
+        onFermer={l.fermerModele}
       />
     </Box>
   );

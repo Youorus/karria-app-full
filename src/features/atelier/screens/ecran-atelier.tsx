@@ -7,6 +7,9 @@
  *   annuler / rétablir à droite ; l'état d'enregistrement en un mot ;
  * - la note discrète de Karria, si elle a déjà appliqué quelque chose ;
  * - la feuille, pleine largeur, pincer pour zoomer, défiler les pages ;
+ *   dessus, en haut à gauche, la **pastille du modèle** (« Meridian ·
+ *   Changer ») qui rouvre « Avec quel modèle ? » à tout moment, et à droite
+ *   le nombre de pages ;
  * - la barre basse en capsule : Modifier · Karria · Mise en avant ·
  *   Intitulé · Finaliser.
  *
@@ -42,6 +45,7 @@ import { FeuilleMiseEnAvant } from "../components/feuille-mise-en-avant";
 import { FeuilleModele } from "../components/feuille-modele";
 import { FeuilleModifier } from "../components/feuille-modifier";
 import { NoteKarria } from "../components/note-karria";
+import { PastilleModele } from "../components/pastille-modele";
 import { useAtelier } from "../hooks/use-atelier";
 import { useChoixModele } from "../hooks/use-choix-modele";
 import { cleDeCible } from "../hooks/use-edition-element";
@@ -119,9 +123,7 @@ export function EcranAtelier({ libre = false }: { libre?: boolean }) {
                 {a.dossier?.offre.entreprise ?? TEXTES.nouveauCv}
               </Texte>
               <Texte className="text-caption text-muted-foreground" numberOfLines={1}>
-                {a.dossier?.offre.titre ??
-                  a.modeles.find((m) => m.id === a.modeleId)?.libelle ??
-                  ""}
+                {a.dossier?.offre.titre ?? TEXTES.nouveauCvSousTitre}
               </Texte>
             </VStack>
           </Pressable>
@@ -217,11 +219,22 @@ export function EcranAtelier({ libre = false }: { libre?: boolean }) {
                   {a.erreurRendu}
                 </Texte>
               </Box>
-            ) : a.pages > 1 ? (
-              <Box className="absolute right-4 top-2 rounded-full bg-scrim-fort px-2.5 py-1">
-                <Texte className="text-caption text-on-scrim">{a.pages} pages</Texte>
-              </Box>
-            ) : null}
+            ) : (
+              <HStack
+                className="absolute left-4 right-4 top-2 items-center justify-between"
+                pointerEvents="box-none"
+              >
+                <PastilleModele
+                  libelle={a.modele?.libelle ?? null}
+                  onPress={() => a.ouvrir({ type: "modele" })}
+                />
+                {a.pages > 1 ? (
+                  <Box className="rounded-full bg-scrim-fort px-2.5 py-1">
+                    <Texte className="text-caption text-on-scrim">{a.pages} pages</Texte>
+                  </Box>
+                ) : null}
+              </HStack>
+            )}
           </Box>
         )}
       </SafeAreaView>

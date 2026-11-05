@@ -32,6 +32,7 @@ import { CarteAnnonce } from "@/features/publicite/components/carte-annonce";
 
 import { CarteExportCv } from "../components/carte-export-cv";
 import { FeuilleEnvoi } from "../components/feuille-envoi";
+import { useOuvrirAtelierAvecModele } from "../hooks/use-atelier-avec-modele";
 import { useMesCv } from "../hooks/use-mes-cv";
 import { TEXTES_MES_CV } from "../services/mes-cv";
 
@@ -75,6 +76,7 @@ function EtatVide({
 
 export function EcranMesCv() {
   const m = useMesCv();
+  const ouvrirAvecModele = useOuvrirAtelierAvecModele();
 
   return (
     <Box style={{ flex: 1 }} className="bg-background">
@@ -124,6 +126,14 @@ export function EcranMesCv() {
                   onTelecharger={(format) => m.telecharger(item.exporte, format)}
                   onEnvoyer={() => m.ouvrirEnvoi(item.exporte)}
                   onSupprimer={() => m.supprimer(item.exporte)}
+                  onAutreModele={() =>
+                    item.exporte.modele !== null &&
+                    ouvrirAvecModele({
+                      modeleId: item.exporte.modele.id,
+                      feuille: "modele",
+                      libre: true,
+                    })
+                  }
                 />
               ) : (
                 <CarteAnnonce annonce={item.annonce} />

@@ -24,10 +24,13 @@
  * « Obtenir ce modèle » passe par « Ajout en cours… » puis « Ajouté à ta
  * collection ! » une fois le serveur d'accord — jamais avant.
  *
- * ═══ Et l'atelier, s'il y en a un ═══
+ * ═══ Et l'atelier ═══
  *
- * Un dossier ouvert dans l'atelier (`features/atelier/services/dossier-en-cours.ts`)
- * change le bouton d'un modèle à soi : « Continuer dans l'atelier » y
+ * Un modèle à soi s'**utilise** : « Utiliser ce modèle » ouvre l'atelier
+ * avec les données de la personne (jamais l'échantillon de la galerie),
+ * dans ce modèle (`features/atelier/hooks/use-atelier-avec-modele.ts`). Un
+ * dossier ouvert dans l'atelier (`features/atelier/services/dossier-en-cours.ts`)
+ * change le libellé : « Continuer dans l'atelier » y
  * retourne, avec ce modèle à choisir. Sinon, « Voir tous les modèles ».
  *
  * ═══ Un modèle Premium s'achète chez Stripe ═══
@@ -45,6 +48,7 @@ import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform, Share } from "react-native";
 
+import { useOuvrirAtelierAvecModele } from "@/features/atelier/hooks/use-atelier-avec-modele";
 import { useDossierEnCours } from "@/features/atelier/services/dossier-en-cours";
 import {
   lireCatalogue,
@@ -89,10 +93,11 @@ export interface DetailModele {
   obtenir: () => void;
   partager: () => void;
   retour: () => void;
-  voirLaGalerie: () => void;
   /** Un dossier est ouvert dans l'atelier : on peut y continuer. */
   atelierEnCours: boolean;
-  continuerDansLAtelier: () => void;
+  /** « Utiliser ce modèle » : l'atelier, avec les données de la personne, dans
+   *  ce modèle — le dossier en cours s'il y en a un, sinon l'atelier libre. */
+  utiliser: () => void;
   recharger: () => void;
 }
 
@@ -220,16 +225,15 @@ export function useDetailModele(): DetailModele {
     else router.replace("/modeles");
   }, [router]);
 
-  const voirLaGalerie = useCallback(() => router.replace("/modeles"), [router]);
-
   const dossierEnCours = useDossierEnCours();
-  const continuerDansLAtelier = useCallback(() => {
-    if (dossierEnCours === null) return;
-    router.push({
-      pathname: "/atelier/[dossierId]",
-      params: { dossierId: dossierEnCours },
-    });
-  }, [router, dossierEnCours]);
+  const ouvrirAvecModele = useOuvrirAtelierAvecModele();
+  const utiliser = useCallback(() => {
+    if (!exiger("modele", { cle: "modele.utiliser", charge: id })) return;
+    ouvrirAvecModele({ modeleId: id });
+  }, [exiger, id, ouvrirAvecModele]);
+  useReprise("modele.utiliser", (charge) => {
+    if (charge === id) ouvrirAvecModele({ modeleId: id });
+  });
 
   const recharger = useCallback(() => {
     setChargement(true);
@@ -247,9 +251,8 @@ export function useDetailModele(): DetailModele {
     obtenir,
     partager,
     retour,
-    voirLaGalerie,
     atelierEnCours: dossierEnCours !== null,
-    continuerDansLAtelier,
+    utiliser,
     recharger,
   };
 }

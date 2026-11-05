@@ -16,6 +16,13 @@
  * rend le dossier avec le paragraphe réécrit : on montre l'ancien et le
  * nouveau ; « garder l'ancien » renvoie le texte d'avant par un `PUT`.
  *
+ * ═══ Le modèle, ici aussi ═══
+ *
+ * La pastille sur la feuille rouvre « Avec quel modèle ? » : la lettre se
+ * redessine dans le modèle choisi, et le dossier le retient
+ * (`PUT /{id}/template`) — l'atelier et Finaliser liront le même. Le texte
+ * de la lettre n'est pas touché : seul le rendu change.
+ *
  * ═══ Les avertissements du rendu ═══
  *
  * `too_few_paragraphs`, `subject_not_explicit`… deviennent des conseils
@@ -29,6 +36,7 @@ import { Alert } from "react-native";
 import { useActionIa } from "@/features/auth/hooks/use-action-ia";
 import { consentementIa } from "@/features/auth/services/consentement-ia";
 import {
+  changerModeleDuDossier,
   ebaucherLettre,
   lireDossier,
   modifierLettre,
@@ -86,6 +94,15 @@ export interface EcranLettre {
   garderNouveau: () => void;
   garderAncien: () => void;
   enregistrement: "repos" | "en-cours" | "fait" | "erreur";
+  /** Le modèle : le même geste que dans l'atelier, à la même place. */
+  modeleId: string | null;
+  modele: Modele | null;
+  modeles: Modele[];
+  possedes: Set<string>;
+  feuilleModele: boolean;
+  ouvrirModele: () => void;
+  fermerModele: () => void;
+  choisirModele: (modeleId: string) => void;
   ecrireAvecKarria: () => void;
   passer: () => void;
   continuer: () => void;
@@ -130,6 +147,10 @@ export function useLettre(): EcranLettre {
   const [reecriture, setReecriture] = useState<Reecriture | null>(null);
   const [enregistrement, setEnregistrement] =
     useState<EcranLettre["enregistrement"]>("repos");
+  const [modeleId, setModeleId] = useState<string | null>(null);
+  const [modeles, setModeles] = useState<Modele[]>([]);
+  const [possedes, setPossedes] = useState<Set<string>>(new Set());
+  const [feuilleModele, setFeuilleModele] = useState(false);
 
   const feuilleCv = useRef<FeuilleCvHandle | null>(null);
   const lettreRef = useRef<Lettre | null>(null);
@@ -205,6 +226,8 @@ export function useLettre(): EcranLettre {
         if (!actif) return;
         poserDossier(lu);
         poserLettre(lu.lettre);
+        setModeles(galerie);
+        setPossedes(miens);
         modeleRef.current = modeleDuDossier({
           dossier: lu,
           brouillonModeleId: lireBrouillonAtelier(dossierId)?.modeleId,
@@ -212,6 +235,7 @@ export function useLettre(): EcranLettre {
           galerie,
           possedes: miens,
         });
+        setModeleId(modeleRef.current);
         setErreur(null);
         if (lu.lettre !== null) rendre(true);
       })
@@ -394,6 +418,40 @@ export function useLettre(): EcranLettre {
     setCible(null);
   }, []);
 
+  // ── Le modèle ──────────────────────────────────────────────────────────
+
+  const choisirModele = useCallback(
+    (id: string) => {
+      const precedent = modeleRef.current;
+      if (precedent === id) return;
+      // Seul le rendu change : la lettre (`lettreRef`) n'est pas touchée.
+      modeleRef.current = id;
+      setModeleId(id);
+      setPossedes((p) => (p.has(id) ? p : new Set([...p, id])));
+      rendre(true);
+      changerModeleDuDossier(dossierId, id)
+        .then((lu) => {
+          if (vivant.current) poserDossier(lu);
+        })
+        .catch((cause: unknown) => {
+          console.warn("[karria] modèle du dossier non retenu (lettre)", cause);
+          if (!vivant.current) return;
+          if (cause instanceof ErreurApi && cause.raison === "template_locked") {
+            modeleRef.current = precedent;
+            setModeleId(precedent);
+            rendre(true);
+            Alert.alert(TEXTES.modeleVerrouille);
+            return;
+          }
+          Alert.alert(TEXTES.modeleNonRetenu);
+        });
+    },
+    [dossierId, poserDossier, rendre],
+  );
+
+  const ouvrirModele = useCallback(() => setFeuilleModele(true), []);
+  const fermerModele = useCallback(() => setFeuilleModele(false), []);
+
   // ── Les gestes ─────────────────────────────────────────────────────────
 
   const toucher = useCallback((chemin: string) => {
@@ -524,6 +582,14 @@ export function useLettre(): EcranLettre {
     garderNouveau,
     garderAncien,
     enregistrement,
+    modeleId,
+    modele: modeles.find((m) => m.id === modeleId) ?? null,
+    modeles,
+    possedes,
+    feuilleModele,
+    ouvrirModele,
+    fermerModele,
+    choisirModele,
     ecrireAvecKarria,
     passer: continuer,
     continuer,

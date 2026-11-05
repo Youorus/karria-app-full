@@ -24,11 +24,23 @@
  *
  * Le brouillon local (`services/brouillon-atelier.ts`) prime s'il est plus
  * récent que la dernière écriture serveur ; sinon, le serveur. Le modèle :
- * celui du dossier, sinon celui du brouillon, sinon le modèle choisi de la
- * personne (`/user-templates/me/selected`), sinon le premier modèle gratuit.
- * Sans modèle enregistré sur le dossier (le contrat ne le met pas à jour
- * après la création), la feuille « Avec quel modèle ? » s'ouvre d'elle-même
- * à la première visite, une fois l'adaptation finie.
+ * celui que l'adresse demande (`?modele=`, depuis la galerie ou « Mes CV »),
+ * sinon celui du dossier, sinon celui du brouillon, sinon le modèle choisi de
+ * la personne (`/user-templates/me/selected`), sinon le premier modèle
+ * gratuit. Sans modèle sur le dossier, la feuille « Avec quel modèle ? »
+ * s'ouvre d'elle-même à la première visite, une fois l'adaptation finie.
+ *
+ * ═══ Le modèle se change à tout moment, et ne perd rien ═══
+ *
+ * La pastille sur la feuille rouvre la feuille du modèle quand on veut.
+ * Choisir un modèle ne touche **que** le rendu : le CV courant (retouches,
+ * propositions acceptées, ordre, masqués), l'historique annuler/rétablir et
+ * la lettre restent exactement ce qu'ils étaient — on redemande seulement le
+ * HTML. Pour un dossier, le choix part aussitôt au serveur
+ * (`PUT /applications/{id}/template`) : le dossier devient la vérité, et la
+ * lettre comme Finaliser lisent le même modèle (`services/modele.ts`). Un
+ * refus `template_locked` remet l'ancien ; une panne réseau garde le choix
+ * local (le brouillon le porte), le prochain « Garder » le renvoie.
  *
  * ═══ Le mode libre : « Nouveau CV », sans dossier ═══
  *
@@ -63,6 +75,7 @@ import { Alert } from "react-native";
 
 import { useActionIa } from "@/features/auth/hooks/use-action-ia";
 import {
+  changerModeleDuDossier,
   deciderProposition,
   lireDossier,
   modifierCvDuDossier,
@@ -150,6 +163,8 @@ export interface Atelier {
   cv: Cv | null;
   cvDeBase: Cv | null;
   modeleId: string | null;
+  /** Le modèle courant dans la galerie, pour le nommer ; `null` tant qu'on ne le connaît pas. */
+  modele: Modele | null;
   modeles: Modele[];
   possedes: Set<string>;
   html: string | null;
@@ -256,9 +271,27 @@ function feuilleDemandeePar(cible: string | undefined): FeuilleOuverte | null {
   return c === null ? null : { type: "modifier", cible: c };
 }
 
+/** Le modèle demandé par l'adresse, s'il est dans la galerie et à la personne. */
+function modeleUtilisable(
+  id: string | null,
+  galerie: readonly Modele[],
+  possedes: ReadonlySet<string>,
+): string | null {
+  if (id === null) return null;
+  const m = galerie.find((x) => x.id === id);
+  return m !== undefined && (!m.premium || possedes.has(m.id)) ? m.id : null;
+}
+
 export function useAtelier(libre = false): Atelier {
-  const params = useLocalSearchParams<{ dossierId?: string; cible?: string }>();
+  const params = useLocalSearchParams<{
+    dossierId?: string;
+    cible?: string;
+    modele?: string;
+  }>();
   const cibleDemandee = params.cible;
+  /** Le modèle que l'adresse demande (galerie « Utiliser ce modèle », Mes CV
+   *  « Voir avec un autre modèle ») ; retenu s'il est utilisable. */
+  const modeleDemande = useRef<string | null>(params.modele ?? null);
   // En mode libre, la clé du brouillon tient lieu d'identifiant : aucune
   // route serveur ne la reçoit (voir les gardes `libre` plus bas).
   const dossierId = libre ? CLE_BROUILLON_LIBRE : (params.dossierId ?? "");
@@ -449,6 +482,35 @@ export function useAtelier(libre = false): Atelier {
     [libre, sauverMaintenant],
   );
 
+  // ── Le modèle du dossier ───────────────────────────────────────────────
+
+  /** Le modèle part au dossier (`PUT /{id}/template`) ; le dossier rendu
+   *  remplace le nôtre (propositions, couverture, `template_id`), jamais le CV
+   *  local. Refusé `template_locked` : on remet `precedent` et on le dit ;
+   *  autre panne : le choix reste à l'écran et dans le brouillon. */
+  const retenirSurLeDossier = useCallback(
+    (id: string, precedent: string | null) => {
+      if (libre) return;
+      changerModeleDuDossier(dossierId, id)
+        .then((lu) => {
+          if (vivant.current) poserDossier(lu);
+        })
+        .catch((cause: unknown) => {
+          console.warn("[karria] modèle du dossier non retenu", cause);
+          if (!vivant.current) return;
+          if (cause instanceof ErreurApi && cause.raison === "template_locked") {
+            modeleRef.current = precedent;
+            setModeleId(precedent);
+            rendre(true);
+            Alert.alert(TEXTES.modeleVerrouille);
+            return;
+          }
+          Alert.alert(TEXTES.modeleNonRetenu);
+        });
+    },
+    [libre, dossierId, poserDossier, rendre],
+  );
+
   // ── Le chargement ──────────────────────────────────────────────────────
 
   // Libre : le CV de base, le modèle choisi, la galerie ; pas de dossier.
@@ -487,7 +549,10 @@ export function useAtelier(libre = false): Atelier {
         cvRef.current = cvInitial;
         setHistorique(historiqueDe(cvInitial));
         const gratuits = galerie.filter((m) => !m.premium || miens.has(m.id));
+        const demande = modeleUtilisable(modeleDemande.current, galerie, miens);
+        modeleDemande.current = null;
         const modele =
+          demande ??
           (reprise ? brouillon.modeleId : null) ??
           choisi?.modeleId ??
           gratuits[0]?.id ??
@@ -500,12 +565,14 @@ export function useAtelier(libre = false): Atelier {
         }
         setErreur(null);
         rendre(true);
+        if (demande !== null) retenir(cvInitial);
         // Première étape : le modèle — sauf si l'adresse demande autre chose
-        // (« Je corrige »), ou si l'on reprend un brouillon.
+        // (« Je corrige »), si elle apporte déjà un modèle, ou si l'on
+        // reprend un brouillon.
         const demandee = feuilleDemandee.current;
         feuilleDemandee.current = null;
         if (demandee !== null) setFeuille(demandee);
-        else if (!reprise) setFeuille({ type: "modele" });
+        else if (!reprise && demande === null) setFeuille({ type: "modele" });
       })
       .catch((cause: unknown) => {
         console.warn("[karria] atelier libre : CV illisible", cause);
@@ -517,7 +584,7 @@ export function useAtelier(libre = false): Atelier {
     return () => {
       actif = false;
     };
-  }, [libre, rendre]);
+  }, [libre, rendre, retenir]);
 
   useEffect(() => {
     if (libre) return undefined;
@@ -553,7 +620,10 @@ export function useAtelier(libre = false): Atelier {
         cvRef.current = cvInitial;
         setHistorique(historiqueDe(cvInitial));
         const gratuits = galerie.filter((m) => !m.premium || miens.has(m.id));
+        const demande = modeleUtilisable(modeleDemande.current, galerie, miens);
+        modeleDemande.current = null;
         const modele =
+          demande ??
           lu.modeleId ??
           brouillon?.modeleId ??
           choisi?.modeleId ??
@@ -561,7 +631,11 @@ export function useAtelier(libre = false): Atelier {
           null;
         modeleRef.current = modele;
         setModeleId(modele);
-        premiereVisite.current = lu.modeleId === null && brouillon === null;
+        // Venu de la galerie avec un modèle : le dossier le retient tout de suite.
+        if (demande !== null && demande !== lu.modeleId)
+          retenirSurLeDossier(demande, null);
+        premiereVisite.current =
+          lu.modeleId === null && brouillon === null && demande === null;
         if (reprise && brouillon.dernierChemin !== null) {
           cheminRef.current = brouillon.dernierChemin;
           setCheminChoisi(brouillon.dernierChemin);
@@ -583,7 +657,7 @@ export function useAtelier(libre = false): Atelier {
     return () => {
       actif = false;
     };
-  }, [libre, dossierId, poserDossier, rendre, ouvrirLaSuite]);
+  }, [libre, dossierId, poserDossier, rendre, ouvrirLaSuite, retenirSurLeDossier]);
 
   // Tant que Karria adapte : relecture toutes les deux secondes.
   const adaptation = dossier?.adaptation ?? null;
@@ -821,21 +895,30 @@ export function useAtelier(libre = false): Atelier {
 
   const choisirModele = useCallback(
     (id: string) => {
+      const precedent = modeleRef.current;
+      if (precedent === id) return;
+      // Seul le rendu change : `cvRef`, l'historique et la sauvegarde du CV
+      // ne sont pas touchés — c'est la promesse « changer de modèle ne perd rien ».
       modeleRef.current = id;
       setModeleId(id);
       setPossedes((p) => (p.has(id) ? p : new Set([...p, id])));
       rendre(true);
       const courant = cvRef.current;
       if (courant !== null) retenir(courant);
+      if (!libre) retenirSurLeDossier(id, precedent);
     },
-    [rendre, retenir],
+    [libre, rendre, retenir, retenirSurLeDossier],
   );
 
   const garderModele = useCallback(() => {
     const courant = cvRef.current;
     if (courant !== null) retenir(courant);
+    // Le choix fait à la première visite (sans geste) va aussi au dossier.
+    const modele = modeleRef.current;
+    if (!libre && modele !== null && dossier !== null && dossier.modeleId !== modele)
+      retenirSurLeDossier(modele, null);
     setFeuille(null);
-  }, [retenir]);
+  }, [libre, dossier, retenir, retenirSurLeDossier]);
 
   const miseEnAvant = useMemo<Atelier["miseEnAvant"]>(
     () => ({
@@ -904,6 +987,11 @@ export function useAtelier(libre = false): Atelier {
       pousserRoute({ pathname: "/atelier/[dossierId]/finaliser", params: { dossierId } });
   }, [sauverMaintenant, pousserRoute, dossierId, libre]);
 
+  const modele = useMemo(
+    () => modeles.find((m) => m.id === modeleId) ?? null,
+    [modeles, modeleId],
+  );
+
   return {
     libre,
     dossier,
@@ -912,6 +1000,7 @@ export function useAtelier(libre = false): Atelier {
     cv,
     cvDeBase,
     modeleId,
+    modele,
     modeles,
     possedes,
     html,

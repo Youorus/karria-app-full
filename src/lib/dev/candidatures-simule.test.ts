@@ -18,6 +18,7 @@ import {
   retirerConsentementIa,
   VERSION_SIMULEE,
 } from "./consentement-simule";
+import { reinitialiserModeles, repondreModeles } from "./modeles-simule";
 import { reinitialiserOffres, repondreOffres } from "./offres-simule";
 import { repondreAtelier } from "./atelier-simule";
 
@@ -36,6 +37,7 @@ const appeler = (methode: string, chemin: string, corps?: unknown, maintenant = 
 describe("Le faux serveur des dossiers", () => {
   beforeEach(() => {
     reinitialiserOffres();
+    reinitialiserModeles();
     reinitialiserCandidatures(T0);
     accepterConsentementIa(VERSION_SIMULEE);
   });
@@ -393,5 +395,61 @@ describe("Le faux serveur des dossiers", () => {
     expect((await appeler("POST", `/applications/${pret.id}/applied`, {})).statut).toBe(
       200,
     );
+  });
+  it("change le modèle du dossier à tout moment, sans toucher au reste ; refuse un Premium non possédé", async () => {
+    const liste = await appeler("GET", "/applications?applied=false");
+    const pret = liste.corps.items.find((c: { status: string }) => c.status === "pret");
+    const avant = (await appeler("GET", `/applications/${pret.id}`)).corps;
+    const marketing = "9b2e7c41-3f6d-4a8b-b1c2-5e7f9a0d1b02";
+
+    const change = await appeler(
+      "PUT",
+      `/applications/${pret.id}/template`,
+      { template_id: marketing },
+      T0 + 60_000,
+    );
+    expect(change.statut).toBe(200);
+    expect(change.corps.template_id).toBe(marketing);
+    expect(change.corps.cv).toEqual(avant.cv);
+    expect(change.corps.propositions).toEqual(avant.propositions);
+    expect(change.corps.letter).toEqual(avant.letter);
+    expect(change.corps.updated_at > avant.updated_at).toBe(true);
+
+    // Idempotent : le même modèle redemandé ne touche pas `updated_at`.
+    const encore = await appeler(
+      "PUT",
+      `/applications/${pret.id}/template`,
+      { template_id: marketing },
+      T0 + 120_000,
+    );
+    expect(encore.corps.updated_at).toBe(change.corps.updated_at);
+
+    // `null` rend la main au modèle choisi de la personne.
+    const nul = await appeler("PUT", `/applications/${pret.id}/template`, {
+      template_id: null,
+    });
+    expect(nul.statut).toBe(200);
+    expect(nul.corps.template_id).toBeNull();
+
+    // Un Premium non possédé : la même porte qu'à l'ouverture.
+    const premium = (
+      await lire(repondreModeles("GET", "/templates/", undefined))
+    ).corps.find((m: { is_premium: boolean }) => m.is_premium);
+    const refus = await appeler("PUT", `/applications/${pret.id}/template`, {
+      template_id: premium.id,
+    });
+    expect(refus.statut).toBe(403);
+    expect(refus.corps.error.details).toEqual({
+      reason: "template_locked",
+      template_id: premium.id,
+    });
+
+    expect((await appeler("PUT", `/applications/${pret.id}/template`, {})).statut).toBe(
+      422,
+    );
+    expect(
+      (await appeler("PUT", "/applications/inconnu/template", { template_id: null }))
+        .statut,
+    ).toBe(404);
   });
 });

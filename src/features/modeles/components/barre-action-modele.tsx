@@ -5,9 +5,10 @@
  * et la couleur suivent
  * l'état, comme dans la V1 :
  *
- * - déjà possédé → « Voir tous les modèles », en vert, « Ce modèle est
- *   déjà à toi » au-dessus — ou « Continuer dans l'atelier » quand un
- *   dossier y est ouvert (acheté pendant qu'on adaptait son CV) ;
+ * - déjà possédé → « Utiliser ce modèle », en vert : l'atelier libre, sur
+ *   le CV de la personne, dans ce modèle — ou « Continuer dans l'atelier »
+ *   quand un dossier y est ouvert (acheté pendant qu'on adaptait son CV) :
+ *   le dossier prend ce modèle ;
  * - gratuit → « Obtenir ce modèle », puis « Ajout en cours… », puis
  *   « Ajouté à ta collection ! » ;
  * - Premium → « Débloquer ce modèle · 4,99 € » en or, avec le cadenas : le
@@ -15,8 +16,8 @@
  *   navigateur ; « Paiement en cours… » le temps d'y aller et d'en revenir.
  *   Si les paiements sont éteints pour cette plateforme, le bouton le dit.
  *
- * La génération d'un CV avec ce modèle (« Créer mon CV avec ce modèle »)
- * arrivera avec le Studio, dans l'onglet CV.
+ * « Voir tous les modèles » reste accessible par le retour : le bouton du
+ * pied est pour l'action qu'on vient chercher, pas pour revenir en arrière.
  */
 
 import { Pressable } from "react-native";
@@ -36,10 +37,10 @@ interface Props {
   acquisition: EtatAcquisition;
   paiementsActifs: boolean;
   onObtenir: () => void;
-  onVoirLaGalerie: () => void;
-  /** Un dossier est ouvert dans l'atelier : le bouton y renvoie. */
+  /** Un modèle à soi : l'atelier, avec les données de la personne. */
+  onUtiliser: () => void;
+  /** Un dossier est ouvert dans l'atelier : le bouton le dit. */
   atelierEnCours?: boolean;
-  onContinuerDansLAtelier?: () => void;
 }
 
 export function BarreActionModele({
@@ -47,21 +48,17 @@ export function BarreActionModele({
   acquisition,
   paiementsActifs,
   onObtenir,
-  onVoirLaGalerie,
+  onUtiliser,
   atelierEnCours = false,
-  onContinuerDansLAtelier,
 }: Props) {
   const possede = acquisition === "possede" || acquisition === "ajoute";
   const occupe = acquisition === "en-cours" || acquisition === "paiement";
   const prix = prixLisible(modele.prix);
 
-  const versLAtelier = possede && atelierEnCours && onContinuerDansLAtelier !== undefined;
   const libelle = possede
-    ? versLAtelier
+    ? atelierEnCours
       ? "Continuer dans l'atelier"
-      : acquisition === "ajoute"
-        ? "Ajouté à ta collection !"
-        : "Voir tous les modèles"
+      : "Utiliser ce modèle"
     : acquisition === "en-cours"
       ? "Ajout en cours…"
       : acquisition === "paiement"
@@ -73,9 +70,11 @@ export function BarreActionModele({
           : "Obtenir ce modèle";
 
   const aide = possede
-    ? versLAtelier
-      ? "Ce modèle est à toi — ton CV en cours t'attend dans l'atelier."
-      : "Ce modèle est à toi — prêt pour ton prochain CV."
+    ? atelierEnCours
+      ? "Ce modèle est à toi — ton CV en cours le prend dans l'atelier."
+      : acquisition === "ajoute"
+        ? "Ajouté à ta collection ! Ton CV s'y met en page dans l'atelier."
+        : "Ce modèle est à toi — ton CV s'y met en page dans l'atelier."
     : acquisition === "erreur"
       ? modele.premium
         ? "Le paiement n'a pas pu s'ouvrir. Réessaie dans un instant."
@@ -99,9 +98,7 @@ export function BarreActionModele({
   return (
     <PiedFlottant aide={aide}>
       <Pressable
-        onPress={
-          versLAtelier ? onContinuerDansLAtelier : possede ? onVoirLaGalerie : onObtenir
-        }
+        onPress={possede ? onUtiliser : onObtenir}
         disabled={desactive}
         className={`h-[52px] items-center justify-center rounded-[14px] ${fond} ${
           desactive ? "opacity-60" : ""

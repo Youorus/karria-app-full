@@ -41,6 +41,7 @@ import { useCouleurs } from "@/theme/use-couleurs";
 import { BoutonFormat } from "../components/bouton-format";
 import { CadranAts } from "../components/cadran-ats";
 import { FeuilleEnvoi } from "../components/feuille-envoi";
+import { PastilleModele } from "../components/pastille-modele";
 import { TEXTES, useFinaliser, type Document, type Format } from "../hooks/use-finaliser";
 import type { Export } from "../types/atelier.types";
 
@@ -231,6 +232,12 @@ export function EcranFinaliser({ libre = false }: { libre?: boolean }) {
                   telechargement={f.telechargement}
                   onTelecharger={(format) => f.telecharger("cv", format)}
                 />
+                <HStack className="items-center">
+                  <PastilleModele
+                    libelle={f.exportCv.modele?.libelle ?? null}
+                    onPress={f.changerDeModele}
+                  />
+                </HStack>
                 {!f.libre && f.dossier?.lettre !== null ? (
                   <CarteDocument
                     document="lettre"

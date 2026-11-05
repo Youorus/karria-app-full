@@ -38,6 +38,7 @@
 
 import { consentementIaAccorde, refusIa } from "./consentement-simule";
 import { cvSimule } from "./cv-simule";
+import { trouverModele } from "./modeles-simule";
 import { marquerPostuleeSimulee, offreSimulee } from "./offres-simule";
 
 // ─────────────────────────────────────────────────────────────────────
@@ -838,6 +839,34 @@ export function repondreCandidatures(
     dossier.adaptation = "en_cours";
     dossier.adaptation_prete_a = maintenant + DELAI_ADAPTATION_MS;
     toucher(dossier, maintenant);
+    return json(200, versDossier(dossier));
+  }
+
+  if (reste === "template" && methode === "PUT") {
+    if (!("template_id" in ((corps ?? {}) as Record<string, unknown>))) {
+      return erreur(422, "invalid_input", "`template_id` est requis (ou null).", {
+        field: "template_id",
+      });
+    }
+    const template = champ(corps, "template_id");
+    if (template !== null && typeof template !== "string") {
+      return erreur(422, "invalid_input", "`template_id` doit être un identifiant.", {
+        field: "template_id",
+      });
+    }
+    if (typeof template === "string") {
+      const modele = trouverModele(template);
+      if (modele !== undefined && modele.is_premium && !modele.possede) {
+        return erreur(403, "template_locked", "Ce modèle Premium n'est pas à toi.", {
+          template_id: template,
+        });
+      }
+    }
+    // Idempotent : le même modèle redemandé ne touche pas `updated_at`.
+    if (dossier.template_id !== template) {
+      dossier.template_id = template;
+      toucher(dossier, maintenant);
+    }
     return json(200, versDossier(dossier));
   }
 

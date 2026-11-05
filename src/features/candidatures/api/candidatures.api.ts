@@ -306,6 +306,21 @@ export async function modifierCvDuDossier(id: string, cv: Cv): Promise<Dossier> 
   );
 }
 
+/** Le modèle de CV du dossier, changé à tout moment (même pendant
+ *  l'adaptation) ; `null` rend la main au modèle choisi de la personne.
+ *  Rien d'autre ne bouge : le CV adapté, les propositions et la lettre
+ *  restent tels quels. `403 template_locked` (`details.template_id`). */
+export async function changerModeleDuDossier(
+  id: string,
+  modeleId: string | null,
+): Promise<Dossier> {
+  return versDossier(
+    await http.put<DossierBrut>(`/applications/${id}/template`, {
+      template_id: modeleId,
+    }),
+  );
+}
+
 /** `accepter` applique `apres` ; `refuser` remet `avant` ; `revenir` remet
  *  `avant` et laisse la proposition en attente. */
 export async function deciderProposition(

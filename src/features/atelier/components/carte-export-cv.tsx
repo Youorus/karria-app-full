@@ -33,6 +33,7 @@ import type { Modele } from "@/features/modeles/types/modeles.types";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import { libelleDuModele, ligneDeCreation, TEXTES_MES_CV } from "../services/mes-cv";
+import { TEXTES } from "../services/presentation";
 import type { Format } from "../services/telechargement";
 import type { Export } from "../types/atelier.types";
 import { BoutonFormat } from "./bouton-format";
@@ -114,6 +115,8 @@ interface Props {
   onTelecharger: (format: Format) => void;
   onEnvoyer: () => void;
   onSupprimer: () => void;
+  /** « Voir avec un autre modèle » : l'atelier libre, la feuille du modèle ouverte. */
+  onAutreModele: () => void;
 }
 
 export function CarteExportCv({
@@ -128,6 +131,7 @@ export function CarteExportCv({
   onTelecharger,
   onEnvoyer,
   onSupprimer,
+  onAutreModele,
 }: Props) {
   const couleurs = useCouleurs();
   const reduit = useReducedMotion();
@@ -188,6 +192,12 @@ export function CarteExportCv({
             />
           ) : null}
           <Box className="flex-1" />
+          <Rond
+            icone="modeles"
+            libelle={TEXTES.autreModele}
+            onPress={onAutreModele}
+            desactive={occupe}
+          />
           <Rond
             icone="lettre"
             libelle={TEXTES_MES_CV.envoyer}

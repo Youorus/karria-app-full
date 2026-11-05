@@ -72,6 +72,13 @@ export const TEXTES = {
   modeleAutresPhrase:
     "Un paiement unique, et le modèle reste à toi — pour ce CV et les suivants.",
   modeleGarder: "Garder ce modèle",
+  modeleChanger: "Changer",
+  modeleChoisir: "Choisir un modèle",
+  modeleChangerLong: "Changer de modèle",
+  modeleNonRetenu:
+    "Le modèle est appliqué ici, mais le dossier n'a pas pu le retenir. Il sera réessayé.",
+  modeleVerrouille: "Ce modèle Premium n'est pas à toi : l'ancien est gardé.",
+  autreModele: "Voir avec un autre modèle",
   modelePaiement: "Paiement en cours…",
   modeleAttente:
     "Paiement pas encore confirmé. Si tu as payé, le modèle arrivera dans quelques minutes.",
@@ -106,6 +113,7 @@ export const TEXTES = {
     "Ces informations viennent de ton CV et de l'offre : modifie-les dans l'atelier.",
   // L'atelier libre (« Nouveau CV », sans dossier).
   nouveauCv: "Nouveau CV",
+  nouveauCvSousTitre: "À partir de ton CV, sans le modifier",
   voirMesCv: "Voir mes CV",
   // Finaliser.
   finaliserTitre: "Ton dossier",

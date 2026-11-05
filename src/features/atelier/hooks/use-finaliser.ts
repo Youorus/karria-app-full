@@ -118,6 +118,8 @@ export interface EcranFinaliser {
   telechargement: Telechargement | null;
   telecharger: (document: Document, format: Format) => void;
   corriger: (controle: ControleAts) => void;
+  /** Revoir le CV dans un autre modèle : l'atelier, la feuille du modèle ouverte. */
+  changerDeModele: () => void;
   optimiser: () => void;
   /** L'adresse du compte, pour la pré-remplir. */
   adresseDuCompte: string | null;
@@ -378,6 +380,15 @@ export function useFinaliser(libre = false): EcranFinaliser {
     [optimiser, remplacer, dossierId, libre],
   );
 
+  const changerDeModele = useCallback(() => {
+    if (libre) remplacer({ pathname: "/atelier/libre", params: { cible: "modele" } });
+    else
+      remplacer({
+        pathname: "/atelier/[dossierId]",
+        params: { dossierId, cible: "modele" },
+      });
+  }, [remplacer, dossierId, libre]);
+
   const score = exportCv?.ats ?? null;
 
   return {
@@ -396,6 +407,7 @@ export function useFinaliser(libre = false): EcranFinaliser {
     telechargement,
     telecharger,
     corriger,
+    changerDeModele,
     optimiser,
     adresseDuCompte,
     envoi,
