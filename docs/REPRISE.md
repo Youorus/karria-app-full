@@ -5,6 +5,77 @@
 
 **Dernière mise à jour : 2026-11-05**
 
+## Session du 2026-11-05 (soir) — Espace Candidatures : client API des dossiers, onglet, détail, feuille « As-tu candidaté ? » (Fable)
+
+**Demande de Marc** : l'onglet Candidatures (`(onglets)/dossiers.tsx`, jusqu'ici « à venir ») devient
+l'espace de suivi des dossiers de candidature (une offre figée + le CV adapté + la lettre, générés à
+une date ; savoir si l'on a candidaté, et quand). API : `karria_api_v2` module `applications`
+(ADR-0033, **en production** sur `/api/v1/applications`). Contrat recopié dans
+`docs/contrat-api-candidatures.md`. **Un autre agent travaille en parallèle sur l'atelier**
+(`src/features/atelier/**`, `/atelier/[dossierId]`, « Adapter mon CV » dans la fiche d'offre) : rien
+de la fiche d'offre ni des modèles n'a été touché ici. `app.json` / `package.json` modifiés dans le
+dépôt (expo-sharing, webview, file-system) **ne sont pas de cette session** — pas commités.
+
+**Livré (`src/features/candidatures/`)** :
+
+- **Client API complet** (`api/candidatures.api.ts`, types `types/candidatures.types.ts`, conversions
+  testées) : `ouvrirDossier`, `lireDossiers(candidatees)`, `lireDossier`, `supprimerDossier`,
+  `relancerAdaptation`, `modifierCvDuDossier` (Cv → brut par `versCvBrut`), `deciderProposition`,
+  `ebaucherLettre`, `modifierLettre`, `regenererParagraphe`, `marquerCandidate`, `retirerCandidate`,
+  `lireExportsDuDossier` (`GET /cv/me/generated-cvs?dossier_id=`). Le CV d'un dossier est traduit par
+  `versCv` du domaine `cv` (exporté, paramètre élargi : pas d'`id` ni d'`image_url`). Les erreurs du
+  contrat (`proposition_invalid`, `dossier_conflict`, `cv_invalid`/`letter_invalid` + `fields`,
+  `ai_rate_limited`…) arrivent telles quelles dans `ErreurApi.raison`/`details` — listées dans
+  l'en-tête du fichier pour l'atelier. **Les routes d'IA (créer, relancer, ébaucher, réécrire) sont à
+  envelopper avec `useActionIa` par l'appelant** (usage `application`).
+- **Faux serveur** `lib/dev/candidatures-simule.ts` (testé, 15 cas) : trois dossiers d'avance (un
+  candidaté avec deux exports, un prêt avec lettre, un en cours qui passe `faite` **à la relecture**
+  après 6 s — `DELAI_ADAPTATION_MS`), propositions fabriquées par règles (intitulé et à-propos
+  appliqués d'office, mission et compétences `proposee`), lettre à quatre paragraphes typés,
+  validations `cv_invalid`/`letter_invalid` avec `fields`, `proposition_path_invalid`, porte IA, et
+  « j'ai candidaté » qui marque l'offre `applied` dans `offres-simule` (`marquerPostuleeSimulee`).
+  `POST /applications` copie le vrai CV de `cv-simule` (`cvSimule()`), `409 cv_missing` sinon.
+  Branché dans `serveur-simule.ts` **avant** le CV (il tient `/cv/me/generated-cvs`) ;
+  `/applications` ajouté à `SERVI_PAR_LA_V2`. `application` ajouté aux `purposes` simulés.
+- **Onglet Candidatures** (`screens/ecran-candidatures.tsx`, `hooks/use-dossiers.ts`, testé) : liste
+  des pochettes (`components/carte-dossier.tsx` : tuile d'entreprise, titre, les deux feuilles
+  dessinées `feuilles-documents.tsx` — la lettre en pointillé si absente —, ville, « Généré hier »,
+  état en une phrase avec un point `point-etat.tsx` : « Karria adapte ton CV… » (point qui respire),
+  « N propositions à relire », « Prêt à envoyer », « Candidaté le 3 nov. »), segments « Toutes /
+  Candidatées » avec effectifs (filtre local, une seule lecture), tri par date de génération, relecture
+  au focus, tirer pour actualiser, **glisser pour supprimer** (`ReanimatedSwipeable`, confirmation
+  par alerte, carte rendue si le serveur refuse), état vide invitant, invité → porte `dossiers`,
+  **annonce native après la 3e carte** (`useAnnonceEmplacement("candidatures")`, emplacement ajouté à
+  `journal-impressions`, rien sans pub), retour discret sous l'en-tête (`services/retour-discret.ts`).
+- **Détail** (`/candidatures/[id]`, `screens/ecran-dossier.tsx`, `hooks/use-dossier.ts`) : titre,
+  état, offre figée compacte (`carte-offre-figee.tsx` ; « Voir l'offre » si elle est encore dans
+  l'index — vérifié par `lireOffre`, 404 ⇒ « Voir la source » + « Cette offre n'est plus en ligne »),
+  deux vignettes avec un vrai aperçu du contenu (`vignette-document.tsx`, `apercuDuCv` /
+  `apercuDeLaLettre`) qui ouvrent la **lecture** (`/candidatures/[id]/lecture?document=cv|lettre`,
+  `ecran-lecture-dossier.tsx` : CV section par section, lettre paragraphe par paragraphe, signature
+  du CV), fichiers exportés du dossier (PDF/Word, ouverts dans le navigateur), « J'ai candidaté » /
+  « Finalement non » avec la date longue et une phrase de confirmation, bouton bleu flottant
+  « Continuer dans l'atelier » → `/atelier/[dossierId]` (chemin écrit, `as Chemin` : la route est à
+  l'atelier), « Supprimer ce dossier » discret en bas. Relecture toutes les 2 s tant que
+  `adaptation = en_cours`.
+- **Feuille « As-tu candidaté à cette offre ? »** : `components/feuille-candidature.tsx`, export
+  nommé `FeuilleCandidature({ visible, dossierId, onFermer, onMarque? })`, hook
+  `use-feuille-candidature.ts`. « Oui, c'est fait » marque le dossier, pose « C'est noté. Bonne
+  chance ! » dans le retour discret et `router.navigate("/dossiers")` ; « Pas encore » referme sans
+  déplacer. À appeler par l'atelier après un export/envoi.
+- **Consentement IA** : usage `application` ajouté à `UsageIa` et `TEXTES_IA` (« Adapter ton CV et
+  écrire ta lettre pour une offre » ; envoi : « ton CV et l'offre, pour les rapprocher »).
+- Routes déclarées dans `(app)/_layout.tsx` (`candidatures/[id]/index`, `candidatures/[id]/lecture`,
+  fondu depuis le bas comme un détail d'offre).
+
+`npm run check` vert (507 tests), `npx expo export --platform ios` produit un paquet. **Rien n'a été
+lancé sur simulateur ni appareil** : la liste, le glissement, la feuille, le pied flottant et les
+vignettes ne sont vérifiés que par les tests et l'empaquetage. **À regarder à l'écran** : la hauteur
+des vignettes (`aspect-[0.78]`), le glissement sous une carte animée (Swipeable + FadeInDown), le
+voile de la feuille sur Android, « Voir l'offre » quand `lireOffre` répond autre chose qu'un 404 (on
+suppose alors que l'offre existe). **Reste** : la route `/atelier/[dossierId]` (agent atelier),
+l'appel de `FeuilleCandidature` depuis l'atelier, un essai sur iPhone contre la production.
+
 ## Session du 2026-11-05 — Mises à jour toutes seules (EAS Update), porte de version, publicité native élargie (Fable)
 
 **Trois livrables de Marc**, commits `fe595f1` (version), `63932d1` (EAS Update), `f81edaf`
