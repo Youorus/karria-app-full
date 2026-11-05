@@ -85,6 +85,23 @@ export const PARAMETRE_ADIEU = "adieu";
 
 const Contexte = createContext<Session | null>(null);
 
+/**
+ * Ce qui appartient au compte et ne doit pas survivre pour le suivant — le
+ * même geste à la déconnexion et à la suppression du compte : les droits
+ * (sans pub), les brouillons du CV et ses sections « à vérifier », les
+ * brouillons de l'atelier, le dossier en cours, l'accord sur l'IA, et les
+ * exports retenus pour le lecteur (liens signés).
+ */
+function purgerCeQuiEstAuCompte(): void {
+  poserSansPub(false);
+  oublierTousLesBrouillons();
+  effacerVerification();
+  oublierTousLesBrouillonsAtelier();
+  oublierLesDocuments();
+  poserDossierEnCours(null);
+  poserConsentementIa(null);
+}
+
 export function FournisseurDeSession({ children }: { children: ReactNode }) {
   const [etat, setEtat] = useState<EtatSession>("verification");
   const router = useRouter();
@@ -110,31 +127,15 @@ export function FournisseurDeSession({ children }: { children: ReactNode }) {
   // POP_TO_TOP à la racine, où `(app)` est la seule route : « action non
   // traitée » en rouge en bas de l'écran, et rien de plus.
   const revenirALAccueil = useCallback(() => {
-    // Les droits sont ceux d'un compte : le prochain repart avec des annonces.
-    poserSansPub(false);
     // Qui sort veut l'accueil, pas le fil d'un invité, à la prochaine ouverture.
     void oublierDecouverte();
-    // L'accord sur l'IA est celui d'un compte : le prochain repart de zéro.
-    // Le CV est celui d'un compte : ses brouillons de formulaire et ses
-    // sections « à vérifier » ne doivent pas survivre pour le suivant.
-    oublierTousLesBrouillons();
-    effacerVerification();
-    // Les brouillons de l'atelier (un CV adapté par dossier) et le dossier
-    // en cours sont ceux d'un compte, eux aussi.
-    oublierTousLesBrouillonsAtelier();
-    // Les exports retenus pour le lecteur (liens signés) sont ceux d'un compte.
-    oublierLesDocuments();
-    poserDossierEnCours(null);
-    poserConsentementIa(null);
+    purgerCeQuiEstAuCompte();
     // L'achat laissé en attente et son merci sont ceux d'un compte, eux aussi.
     void purgerAchatALaDeconnexion();
     setEtat("anonyme");
     router.replace("/bienvenue");
   }, [router]);
 
-  // La session peut mourir sans que personne ne le demande : jeton de
-  // rafraîchissement refusé par le serveur. `lib/http.ts` le découvre et
-  // nous prévient ; c'est ici qu'on décide de ce que l'utilisateur voit.
   useEffect(() => {
     auMomentDeLaDeconnexion(revenirALAccueil);
   }, [revenirALAccueil]);
@@ -187,16 +188,7 @@ export function FournisseurDeSession({ children }: { children: ReactNode }) {
     }
     await oublierLesFournisseurs();
     await oublierSession();
-    poserSansPub(false);
-    // Le CV est celui d'un compte : ses brouillons de formulaire et ses
-    // sections « à vérifier » ne doivent pas survivre pour le suivant.
-    oublierTousLesBrouillons();
-    effacerVerification();
-    // Les brouillons de l'atelier (un CV adapté par dossier) et le dossier
-    // en cours sont ceux d'un compte, eux aussi.
-    oublierTousLesBrouillonsAtelier();
-    poserDossierEnCours(null);
-    poserConsentementIa(null);
+    purgerCeQuiEstAuCompte();
     // L'achat laissé en attente et son merci sont ceux d'un compte, eux aussi.
     await purgerAchatALaDeconnexion();
     setEtat("anonyme");

@@ -16,8 +16,8 @@
  * Une WebView sur le lien signé montrerait le PDF, mais chaque geste
  * suivant (partager, enregistrer) repartirait sur le réseau, et le faux
  * serveur n'a rien à servir. Le fichier est téléchargé **une fois**, à
- * l'ouverture ; ses premiers octets sont vérifiés (`%PDF-`) avant tout
- * affichage ; il vit le temps de l'écran et il est effacé en le quittant
+ * l'ouverture ; ses cinq premiers octets sont vérifiés (`%PDF-`) avant tout
+ * affichage, et l'écran fermé entre-temps n'ouvre rien ; il vit le temps de l'écran et il est effacé en le quittant
  * (`supprimerExport`) — un CV ne reste pas dans le cache.
  *
  * ═══ Android ═══
@@ -52,6 +52,7 @@ import {
   enregistrerFichier,
   MIME,
   partagerFichier,
+  premiersOctets,
   repertoireDesExports,
   telechargerFichier,
 } from "../services/telechargement";
@@ -143,10 +144,18 @@ export function useLecteurDocument(): EcranLecteur {
         supprimerExport(f);
         return;
       }
-      if (format === "pdf" && !estUnPdf((await f.bytes()).subarray(0, 5))) {
-        supprimerExport(f);
-        if (vivant) setLecture({ etat: "erreur", message: TEXTES_LECTEUR.erreurContenu });
-        return;
+      if (format === "pdf") {
+        const octets = await premiersOctets(f, 5);
+        // L'écran a pu se fermer pendant la lecture : rien ne s'ouvre alors.
+        if (!vivant) {
+          supprimerExport(f);
+          return;
+        }
+        if (!estUnPdf(octets)) {
+          supprimerExport(f);
+          setLecture({ etat: "erreur", message: TEXTES_LECTEUR.erreurContenu });
+          return;
+        }
       }
       fichier.current = f;
       setLecture({ etat: "pret", uri: f.uri });

@@ -188,6 +188,11 @@ export function documentMemorise(id: unknown): DocumentALire | null {
   return typeof id === "string" ? (memoire.get(id) ?? null) : null;
 }
 
+/** Un export effacé n'a plus de lien à retenir. */
+export function oublierDocument(id: string): void {
+  memoire.delete(id);
+}
+
 /** À la déconnexion : plus rien à lire. */
 export function oublierLesDocuments(): void {
   memoire.clear();

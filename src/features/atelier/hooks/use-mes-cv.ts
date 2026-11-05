@@ -56,6 +56,7 @@ import { effacerExport, envoyerExport, lireMesExports } from "../api/documents.a
 import { exportsLibres, sousTitreDesCv, TEXTES_MES_CV } from "../services/mes-cv";
 import { messageDEnvoi, nomDeFichier } from "../services/presentation";
 import { telechargerEtPartager, type Format } from "../services/telechargement";
+import { oublierDocument } from "../services/lecteur";
 import type { Export } from "../types/atelier.types";
 import { useOuvrirLecteur } from "./use-ouvrir-lecteur";
 
@@ -231,6 +232,8 @@ export function useMesCv(): EcranMesCv {
         style: "destructive",
         onPress: () => {
           setExports((liste) => liste.filter((e) => e.id !== exporte.id));
+          // Le lecteur n'a plus rien à retenir de cet export.
+          oublierDocument(exporte.id);
           effacerExport(exporte.id).catch((cause: unknown) => {
             console.warn("[karria] export non supprimé", cause);
             if (!(cause instanceof ErreurApi && cause.statut === 404)) {

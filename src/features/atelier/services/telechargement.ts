@@ -90,6 +90,31 @@ export async function telechargerFichier(
   return File.downloadFileAsync(url, destination);
 }
 
+/** Les premiers octets d'un fichier (au moins `n` s'il les a), sans le
+ *  lire en entier : le flux est fermé après le premier morceau. */
+export async function premiersOctets(fichier: File, n: number): Promise<Uint8Array> {
+  const lecteur = fichier.readableStream().getReader();
+  try {
+    const morceaux: Uint8Array[] = [];
+    let total = 0;
+    while (total < n) {
+      const { value, done } = await lecteur.read();
+      if (done || value === undefined) break;
+      morceaux.push(value);
+      total += value.length;
+    }
+    const tout = new Uint8Array(total);
+    let position = 0;
+    for (const m of morceaux) {
+      tout.set(m, position);
+      position += m.length;
+    }
+    return tout.subarray(0, n);
+  } finally {
+    await lecteur.cancel().catch(() => undefined);
+  }
+}
+
 /** La feuille du système, le fichier seul. Faux si le partage est indisponible. */
 export async function enregistrerFichier(
   fichier: File,
