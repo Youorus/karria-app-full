@@ -27,7 +27,8 @@
 
 import { ecrireLocal, lireLocal } from "@/lib/magasin-local";
 
-export type Emplacement = "fil" | "detail_offre" | "galerie" | "cv" | "attente_import";
+export type Emplacement =
+  "fil" | "detail_offre" | "galerie" | "cv" | "attente_import" | "candidatures";
 
 /** Par emplacement, par jour (`AAAA-MM-JJ`), un nombre. */
 export type Journal = Partial<Record<Emplacement, Record<string, number>>>;

@@ -67,6 +67,16 @@ export default function LayoutApp() {
           name="offre/[id]"
           options={{ animation: "fade_from_bottom", animationDuration: 240 }}
         />
+        {/* Un dossier de candidature, et la lecture d'un de ses documents :
+            des détails, qui montent et se quittent comme celui d'une offre. */}
+        <Stack.Screen
+          name="candidatures/[id]/index"
+          options={{ animation: "fade_from_bottom", animationDuration: 240 }}
+        />
+        <Stack.Screen
+          name="candidatures/[id]/lecture"
+          options={{ animation: "fade_from_bottom", animationDuration: 240 }}
+        />
         {/* Le modèle, lui, s'ouvre en fondu simple sur Android : le zoom
             Reanimated de la vignette (`use-ouverture-modele.ts`) porte le
             mouvement, un glissement vertical le contredirait. Sur iOS, le
