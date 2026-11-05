@@ -5,6 +5,119 @@
 
 **Dernière mise à jour : 2026-11-05**
 
+## Session du 2026-11-05 (nuit) — « Mes CV », l'atelier libre (« Nouveau CV »), la pub dans Mes CV et sous le score (Fable)
+
+**Demande de Marc** : dans l'onglet CV, pas de bouton pour **créer un CV** ; voir ses CV déjà
+mis en page (génériques, pas liés à une candidature, avec différents modèles), en créer de
+nouveaux ; et « le maximum de pub, au plus d'endroits ». Un autre agent travaillait en parallèle
+sur `features/auth/**`, `calme-tactile.ts`, `ecran-detail-offre.tsx`, `consentement-simule.ts` :
+rien de tout cela n'a été touché ici (dans `journal-impressions.ts`, seules des valeurs
+d'`Emplacement` ont été ajoutées).
+
+### Ce qui est livré
+
+- **L'icône « Mes CV » dans l'en-tête de l'onglet CV** (`cv/screens/ecran-cv.tsx`,
+  `BoutonEnTeteRond` à droite, icône `pile` = `doc.on.doc` / `file_copy`, nouvelle entrée du
+  catalogue `components/icone.tsx`), visible dans tous les états, y compris `CvRempli`. Une
+  icône, pas un badge ni un menu. Invité : la porte `cv` (`cv.mes-cv`), puis reprise.
+- **L'écran « Mes CV »** (`app/(app)/cv/mes-cv.tsx` → `atelier/screens/ecran-mes-cv.tsx`,
+  hook `atelier/hooks/use-mes-cv.ts`, carte `atelier/components/carte-export-cv.tsx`,
+  règles `atelier/services/mes-cv.ts` testées). **Rangé dans `features/atelier`** et non dans
+  `cv` : la liste est la sortie de l'atelier (exports, téléchargement, envoi, Finaliser), et
+  `atelier` importe déjà `cv` — l'inverse ferait un cycle. Liste de
+  `GET /cv/me/generated-cvs?kind=cv` **filtrée côté app sur `dossierId === null`** (voir les
+  écarts), du plus récent au plus ancien, relue au focus. Carte : vignette du modèle (depuis
+  la galerie `lireModeles`, en cache ; sans galerie, le nom seul), nom du modèle, « Créé hier »,
+  toucher = **aperçu** (le PDF dans le navigateur intégré), boutons **PDF / Word**
+  (`components/bouton-format.tsx`, extrait de Finaliser), deux ronds **envoyer par e-mail**
+  (`FeuilleEnvoi` réutilisée, `POST /documents/exports/{id}/send`, mêmes quotas et mêmes
+  messages) et **supprimer** (alerte système, `DELETE /cv/me/generated-cvs/{id}`, carte
+  retirée aussitôt, rendue si le serveur refuse). Pied flottant : **« Nouveau CV »**, seule
+  action bleue. État vide : deux feuilles, « Ton premier CV mis en page », une phrase.
+  Le téléchargement commun est dans `atelier/services/telechargement.ts`
+  (`telechargerEtPartager` : `cache/atelier/exports/`, feuille de partage, fichier supprimé) —
+  Finaliser l'emploie aussi désormais.
+- **L'atelier libre** = « Nouveau CV » (`app/(app)/atelier/libre/{index,finaliser}.tsx`, route
+  **statique**, préférée à `[dossierId]` par expo-router ; `EcranAtelier({ libre })`,
+  `useAtelier(libre)`). Même feuille temps réel sur le **CV de base** (`/cv/me`), même
+  édition par toucher (Modifier, En avant, Intitulé, annuler/rétablir), **sans** Karria (la
+  barre a quatre places, `avecKarria={false}`), sans note, sans lettre ; « Finaliser » mène
+  droit aux exports. Première étape : **la feuille du modèle** (achat Stripe compris, par
+  `use-choix-modele` inchangé), sauf reprise d'un brouillon. **Rien n'écrit sur `/cv/me`** :
+  pas de `PUT`, pas de sauvegarde différée (`planifierSauvegarde` et `sauverMaintenant` sont
+  des non-opérations en libre) ; les retouches vivent dans le brouillon local
+  `CLE_BROUILLON_LIBRE = "libre"` (`brouillon-atelier.ts`), repris seulement s'il est **plus
+  récent que `misAJour` du CV de base** (sinon on repart du CV — en simulation, le CV semé est
+  daté du démarrage, donc on repart toujours de lui après un relancement : voulu). CV vide →
+  `TEXTES.sansCvPhrase` + « Revenir ». « Reporter ces retouches dans mon CV » n'est **pas**
+  proposé (c'eût été un geste explicite de plus ; à discuter).
+- **Finaliser libre** (`useFinaliser(libre)`, `EcranFinaliser({ libre })`) : un seul export,
+  `POST /cv/me/generated-cvs` avec `cv` = brouillon libre (ou le CV de base) et **sans**
+  `dossier_id` (`documents.api.ts › exporterCvLibre`) ; cadran ATS, points, « Je corrige »
+  (→ `/atelier/libre?cible=` ; « mots-clés » n'a pas de Karria : il mène à l'à-propos),
+  PDF/Word, « Envoyer par e-mail » (feuille « Ton CV, en pièce jointe »), pas de « As-tu
+  candidaté ? » ; **« Voir mes CV »** sous le document → `router.dismissTo("/cv/mes-cv")`, la
+  liste relue au focus montre la nouvelle entrée.
+- **Publicité** : `mes_cv` (une carte **après la deuxième** de la liste), `mes_cv_vide` (sous
+  l'invitation de l'état vide, au milieu de l'écran, loin du pied), et un emplacement de plus,
+  **`finaliser_score`** : une fois les documents là, **sous le score ATS et ses points,
+  au-dessus des documents** (les deux modes), en plus de `finaliser` pendant la génération —
+  deux objets, deux impressions. Rien pour un invité, rien sans pub. Documenté dans
+  `karria_api_v2/docs/atelier-cv-feuille-de-route.md` § 7 (commit `8024744`, poussé).
+- **API `documents`** (`atelier/api/documents.api.ts`) : `exporterCvLibre`, `lireMesExports`,
+  `effacerExport`, `envoyerExport` ; `Export.dossierId` ; `versScoreAts` tolère un `ats` absent
+  (un export de dossier d'avance du faux serveur n'en a pas — le vrai serveur l'envoie
+  toujours).
+- **Faux serveur** : `atelier-simule.ts` tient désormais **tout** `/cv/me/generated-cvs`
+  (`GET` liste fusionnée avec les exports des dossiers via
+  `candidatures-simule › exportsSimulesDesDossiers`, `GET`/`DELETE /{id}`, `POST` qui prend le
+  **CV de base** `cvSimule()` sans `cv`, `409 cv_missing` sinon), `POST /documents/exports/{id}/send`,
+  et **sème deux CV libres** (Minimalist il y a 9 jours, Meridian il y a 2 jours) pour que
+  « Mes CV » ait une liste et son annonce. `candidatures-simule.ts` ne sert plus le `GET` (ses
+  tests passent par `repondreAtelier`). **`EXPO_PUBLIC_SIMULATION_CV=rempli`** (`cv-simule.ts`)
+  pose au démarrage le CV que l'import aurait lu : l'onglet CV est rempli sans sélecteur de
+  fichiers — indispensable pour Maestro.
+
+### Vu sur le simulateur iPhone 17 (Maestro, `EXPO_PUBLIC_API_MODE=simulation EXPO_PUBLIC_SIMULATION_CV=rempli`)
+
+Onglet CV rempli (Awa DIALLO) avec l'icône « Mes CV » à droite de l'en-tête → « Mes CV »,
+« 2 CV mis en page », cartes Meridian (« Créé le 3 nov. ») et Minimalist avec vignettes, PDF /
+Word / enveloppe / corbeille, **annonce native après la deuxième carte** (impression
+« mes_cv » journalisée), « Nouveau CV » en pied → atelier libre : « Nouveau CV / Meridian »,
+feuille « Avec quel modèle ? » par-dessus la page rendue → « Garder ce modèle » → barre à
+**quatre** gestes (Modifier · En avant · Intitulé · Finaliser) ; toucher « Awa DIALLO » sur la
+feuille → formulaire Identité → « Annuler » referme, l'intitulé reste surligné → Finaliser :
+cadran 83/100, trois points, « Envoyer par e-mail » → « À mon adresse toi@exemple.fr » →
+envoyé → retour à l'atelier. L'export libre apparaît ensuite dans la liste (sous-titre
+« 3 CV mis en page » attendu par le flux ; vu à l'écran : la liste relue après Finaliser).
+
+### Non vérifié / à savoir
+
+- **Le défilement de l'écran Finaliser sous Maestro** : les balayages (`swipe`, `scroll`,
+  lents ou rapides) n'ont fait défiler **ni** le Finaliser libre **ni** celui d'un dossier,
+  avec ou sans l'annonce `finaliser_score` (essayé désactivée) — donc le bas de l'écran (carte
+  « Mon CV », « Voir mes CV », l'annonce sous le score) n'a été vu que par la hiérarchie
+  d'accessibilité, pas en capture. Les taps y répondent. **À faire au doigt** : si ça ne défile
+  pas non plus, c'est la `ScrollView` de `ecran-finaliser.tsx` (pré-existante) à regarder.
+- Maestro a « touché » une fois l'intitulé sur la page **à travers** la demi-feuille de
+  l'intitulé ouverte, ce qui a ouvert le formulaire Identité par-dessus et laissé une feuille
+  pleine qui ne se fermait plus — un doigt réel tombe sur le voile de la demi-feuille, pas
+  sur la WebView ; non reproduit ensuite (Identité → Annuler referme bien, en libre comme en
+  dossier). À garder en tête si « une feuille ne se ferme plus » revient.
+- « Ouvrir » (aperçu dans le navigateur) et PDF/Word en simulation : les URL
+  `storage.karria.fr/simule/…` ne répondent pas — à essayer contre la production.
+- Le retour Stripe réel depuis l'atelier libre (même code que l'atelier d'un dossier), Android,
+  les textes à relire par Marc.
+- `npm run check` vert (**559** tests), `npx expo export --platform ios` produit un paquet.
+
+### Écarts de contrat
+
+- `GET /cv/me/generated-cvs` n'a **pas de filtre « sans dossier »** (`dossier_id` donné
+  seulement) : « Mes CV » filtre côté app (`exportsLibres`). Un `?dossier_id=null` (ou
+  `?orphan=true`) côté API éviterait de lire tous les exports des dossiers.
+- Un export ne porte pas le nom de la personne : « Mes CV » lit `/cv/me` pour nommer le
+  fichier téléchargé « CV - Prénom Nom.pdf » comme le serveur le fait.
+
 ## Session du 2026-11-05 (soir) — Le consentement IA « en continuant », et la pub de la fiche d'offre au-dessus du pli (Fable)
 
 **Demande de Marc** : (1) faire accepter l'IA à l'inscription, naturellement, plutôt que par la
@@ -15,7 +128,7 @@ comptée à chaque ouverture d'une offre ? » API en face : `karria_api_v2` ADR-
 ### Chantier 1 — `src/features/auth`
 
 - **La phrase** de `feuille-connexion.tsx` : « En continuant, tu acceptes nos Conditions
-  Générales, notre Politique de Confidentialité, et que *Karria s'appuie sur des modèles d'IA*
+  Générales, notre Politique de Confidentialité, et que _Karria s'appuie sur des modèles d'IA_
   pour t'aider » — le troisième lien ouvre **`feuille-information-ia.tsx`** (titre « Karria et
   l'IA » : ce qui part, chez qui, pourquoi, les deux promesses, lien politique, « Compris »,
   aucun bouton d'accord). Un `Modal` **imbriqué** dans celui de la connexion (sur iOS un second
