@@ -74,6 +74,60 @@ par défaut, le dossier (`PUT /applications/{id}/color`) et l'export ; ADR-0034,
   `accordIaPourLeScore` intacte) sont partis dans un de ses commits. `npm run check` est vert
   (typecheck, lint, prettier, 614 tests) sur l'arbre entier au moment du commit.
 
+## Session du 2026-11-05 (soir) — le partage porte Karria, et un lecteur de documents à nous (Fable)
+
+**Demandes de Marc** : (1) en ouvrant un CV exporté, l'app affichait le PDF dans le navigateur
+intégré avec « storage.karria.fr » en en-tête — il veut un nom neutre ; (2) à chaque partage (CV,
+lettre, offre), le destinataire doit avoir de quoi télécharger Karria, comme chez les grandes apps.
+
+**Livré** (commits `042cd11`, `b029b32`, `8325015` sur `main`, `npm run check` vert, 627 tests) :
+- **Lecteur** `app/(app)/lecture-document.tsx` → `atelier/screens/ecran-lecteur.tsx` +
+  `hooks/use-lecteur-document.ts` : en-tête Karria « ‹ Mes CV » / « ‹ Dossier », titre
+  « CV · Prénom Nom » / « Lettre · Entreprise » / « Mon CV », sous-titre « PDF · Modèle ». iOS :
+  WebView sur le fichier téléchargé dans le cache (sans JavaScript, origine `file://` seule, lecture
+  bornée au répertoire des exports). Android : la WebView ne rend pas les PDF → le lecteur du
+  téléphone s'ouvre (`expo-intent-launcher`, ACTION_VIEW, URI de contenu) ; aucun lecteur → l'écran
+  le dit. Word : pas d'aperçu. Pied flottant Télécharger (feuille système, fichier seul) / Partager.
+  Fichier effacé en quittant. `use-mes-cv › ouvrir` et `use-dossier › ouvrirExport` y passent ;
+  `ouvrirSource` reste le navigateur.
+- **Sécurité (deux revues du coordinateur, corrigées)** : la route ne reçoit qu'un `id` ; le document
+  (lien signé, genre, nom, modèle, retour) est **mémorisé dans l'app** (`services/lecteur.ts ›
+  memoriserDocument`), oublié à la déconnexion/suppression (`use-session › purgerCeQuiEstAuCompte`)
+  et quand l'export est effacé ; lien `https://storage.karria.fr` seulement ; nom de fichier
+  recalculé par `nomDeFichier` et refusé s'il traverse ; `%PDF-` vérifié sur les 5 premiers octets ;
+  `app/+native-intent.ts` → `lib/liens-systeme.ts` : **liste blanche** des écrans ouvrables de
+  l'extérieur (`/offre/<id>`, onglets, dossier, modèle, atelier libre, `paiement/retour`), après
+  normalisation par `URL` — tout le reste → `/offres`.
+- **Partage** : `services/telechargement.ts` — iOS `Share.share({ url: fichier, message })` avec
+  « Mon CV, préparé avec Karria — l'app qui adapte ton CV à chaque offre : https://karria.fr/app »
+  (`presentation.ts › messageDePartageDocument`) ; Android garde `expo-sharing` (le pied de page du
+  document, posé par l'API, porte la référence). `telechargerEtPartager(url, nom, format, genre?)`
+  garde sa signature pour Finaliser.
+- **Offres** : `messageDePartage` → « Vue sur Karria : https://karria.fr/offre/<id> » d'abord, puis
+  « Postuler : … », puis « Télécharge Karria : https://karria.fr/app » (`lienPublicOffre`, `LIEN_APP`).
+- **Liens universels** : `app.json` → `ios.associatedDomains` (`applinks:karria.fr`, `www`),
+  `android.intentFilters` autoVerify `https://karria.fr/offre/*` ; test `offres/services/lien-universel.test.ts`
+  (le lien partagé est bien celui que `liens.ts` route, et la déclaration native est là).
+  **Il faut un nouveau build natif** (entitlement + filtre d'intention), pas un OTA.
+- **Simulation** : `lib/dev/stockage-simule.ts` écrit un vrai petit PDF (validé par pypdf) à la place
+  de `storage.karria.fr/simule/…` ; `absent-en-production.ts` complété.
+- Contrat : `docs/contrat-api-documents.md` § 2 « Le pied de page Karria » (API : ADR-0035).
+
+**Site** (`karria-landing`, branche **`partage`**, à fusionner par Marc) : `app/offre/[id]/page.tsx`
+(API publique `GET /offers/{id}`, OpenGraph, « Ouvrir dans Karria » = `karria://` puis repli
+`/app`, badges, « Postuler sur le site de l'employeur », introuvable → page qui invite),
+`app/app/page.tsx` (iPhone → App Store, Android → Google Play dès `APP_LINKS.googlePlayAvailable`,
+sinon badges ; `utm_*` conservés), `public/.well-known/apple-app-site-association`
+(**`TEAMID_A_COMPLETER`**) et `assetlinks.json` (**`EMPREINTE_SHA256_A_COMPLETER`**), en-têtes JSON
+et exclusion de la redirection www dans `next.config.ts`. Google Play : pas de lien sur le site
+(`googlePlay: "#"`, `googlePlayAvailable: false`) — la place est prévue.
+
+**Non vérifié sur appareil** : le lecteur (WebView iOS sur `file://`, intent Android), la feuille
+`Share.share` iOS avec fichier + message, l'ouverture à froid/à chaud d'un lien `https://karria.fr/offre/<id>`
+(dépend de l'AASA publié avec le bon TEAMID et d'un build avec l'entitlement). `npm run check` vert.
+**Piège** : un fichier `*.test.ts` dans `src/app/` casse la génération des routes typées
+(`.expo/types/router.d.ts` vidé) — régénéré avec `@expo/router-server › regenerateDeclarations`.
+
 ## Session du 2026-11-05 (après-midi) — l'achat « en attente » se revérifie tout seul, et le merci arrive (Fable)
 
 **Contexte** : le matin, un vrai café de 2,99 € payé pendant que l'API répondait 500 ; l'app a dit
