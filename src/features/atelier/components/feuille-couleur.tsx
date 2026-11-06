@@ -7,6 +7,15 @@
  * CV au-dessus, avec les vraies données. On ne montre pas de nuancier
  * abstrait, on montre le CV.
  *
+ * ═══ Ce que la couleur change ═══
+ *
+ * Le serveur habille le **décor** du modèle — bandes, filets, frises, puces,
+ * pictogrammes — et laisse le texte tel quel (ADR-0034 § 2026-11-06) ; un
+ * texte posé sur une bande qui ne se lirait plus passe en blanc ou en noir.
+ * La WebView rend ce que le serveur renvoie : rien à recoloriser ici. Le
+ * sous-titre le dit en une phrase ; la pastille « D'origine » est la couleur
+ * du décor du modèle (`modele.couleur`, mesurée en galerie).
+ *
  * ═══ Trois gestes, du plus simple au plus précis ═══
  *
  * 1. Une rangée de **pastilles** : la couleur d'origine du modèle en premier

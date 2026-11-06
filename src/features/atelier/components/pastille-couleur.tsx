@@ -4,9 +4,10 @@
  * ═══ Un rond de la couleur, un mot ═══
  *
  * Même capsule que la pastille du modèle, posée juste à sa droite sur la
- * feuille : un rond de la couleur principale **réelle** du CV (celle qu'on a
- * posée, sinon celle du modèle) et le mot « Couleur ». Le rond dit l'état,
- * le mot dit le geste ; ni l'un ni l'autre n'a besoin d'une étiquette.
+ * feuille : un rond de la couleur **réelle** du décor du CV (celle qu'on a
+ * posée, sinon celle du modèle — ses bandes, filets et puces, pas son texte)
+ * et le mot « Couleur ». Le rond dit l'état, le mot dit le geste ; ni l'un ni
+ * l'autre n'a besoin d'une étiquette.
  *
  * Tant que la couleur n'est pas connue (galerie pas encore lue, modèle sans
  * couleur mesurée) : un rond vide, au contour du texte — le geste reste là.

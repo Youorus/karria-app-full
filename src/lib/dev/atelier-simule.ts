@@ -29,12 +29,15 @@
  * Deux CV libres sont semés (Meridian, Minimalist) pour que « Mes CV » ait
  * une liste à montrer — et son annonce après la deuxième carte.
  *
- * ═══ La couleur principale (ADR-0034) ═══
+ * ═══ La couleur principale (ADR-0034, § 2026-11-06) ═══
  *
- * `primary_color` au rendu et à l'export remplace l'accent du modèle (titres,
- * filets, bande latérale) — normalisé en `#RRGGBB`, `422` sinon, comme le
- * vrai serveur. Le choix par défaut la retient (`primary_color`) et rend la
- * couleur d'origine du modèle (`default_primary_color`) ; l'export la porte.
+ * `primary_color` au rendu et à l'export habille le **décor** du modèle
+ * (bande latérale, filets, puces, pastilles) et laisse le texte tel quel —
+ * les titres gardent leur couleur ; sur la bande, le texte passe en noir si
+ * la couleur choisie est claire (`texteSur`), comme le vrai serveur. Normalisé
+ * en `#RRGGBB`, `422` sinon. Le choix par défaut la retient (`primary_color`)
+ * et rend la couleur d'origine du modèle (`default_primary_color`, la couleur
+ * du décor) ; l'export la porte.
  *
  * ═══ L'envoi ═══
  *
@@ -329,32 +332,55 @@ function sansAccents(t: string): string {
 // Le rendu
 // ─────────────────────────────────────────────────────────────────────
 
+/** Le noir ou le blanc qui se lit sur cette couleur (luminance relative, WCAG) —
+ *  ce que fait le vrai serveur pour un texte posé sur une bande recolorée. */
+export function texteSur(hex: string): "#111111" | "#FFFFFF" {
+  const lin = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const r = lin(parseInt(hex.slice(1, 3), 16));
+  const g = lin(parseInt(hex.slice(3, 5), 16));
+  const b = lin(parseInt(hex.slice(5, 7), 16));
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  // Contraste du blanc : (1,05) / (L + 0,05) ≥ 4,5 ⇔ L ≤ 0,183.
+  return luminance > 0.183 ? "#111111" : "#FFFFFF";
+}
+
+/** Le style de page d'un modèle simulé : `encre` est la couleur de ses titres
+ *  (un texte, jamais recoloré), `decor` celle de sa bande, de ses filets et de
+ *  ses puces (ce que `primary_color` change). */
 function styleDePage(
-  accent: string,
+  encre: string,
+  decor: string,
   police: string,
   colonnes: 1 | 2,
   pages: number,
 ): string {
+  const surBande = texteSur(decor);
+  const filetSurBande =
+    surBande === "#FFFFFF" ? "rgba(255,255,255,.35)" : "rgba(0,0,0,.25)";
   return `
   @page { size: A4; margin: 0; }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: ${police}; color: #1b1b1b; font-size: 10.5pt; line-height: 1.45; }
   .page { position: relative; width: 210mm; height: ${pages * PAGE_HAUTEUR_MM}mm; background: #fff; overflow: hidden; display: ${colonnes === 2 ? "grid" : "block"}; grid-template-columns: 64mm 1fr; }
-  .bande { background: ${accent}; color: #fff; padding: 16mm 8mm; min-height: 100%; }
-  .bande h1, .bande h2 { color: #fff; }
+  .bande { background: ${decor}; color: ${surBande}; padding: 16mm 8mm; min-height: 100%; }
+  .bande h1, .bande h2 { color: ${surBande}; }
   .corps { padding: 16mm 14mm; }
   h1 { font-size: 24pt; margin: 0 0 2mm; line-height: 1.1; letter-spacing: -0.01em; }
-  .intitule { font-size: 12pt; color: ${colonnes === 2 ? "rgba(255,255,255,.85)" : accent}; margin-bottom: 5mm; display: block; }
-  h2 { font-size: 9.5pt; text-transform: uppercase; letter-spacing: .12em; color: ${accent}; margin: 7mm 0 2.5mm; border-bottom: 1px solid ${accent}33; padding-bottom: 1mm; }
-  .bande h2 { border-color: rgba(255,255,255,.35); }
+  .intitule { font-size: 12pt; color: ${colonnes === 2 ? surBande : encre}; margin-bottom: 5mm; display: block; opacity: ${colonnes === 2 ? ".85" : "1"}; }
+  h2 { font-size: 9.5pt; text-transform: uppercase; letter-spacing: .12em; color: ${encre}; margin: 7mm 0 2.5mm; border-bottom: 1px solid ${decor}; padding-bottom: 1mm; }
+  .bande h2 { border-color: ${filetSurBande}; }
   .contact span { display: block; margin-bottom: 1mm; font-size: 9.5pt; }
   .element { margin-bottom: 4mm; }
   .element .ligne { display: flex; justify-content: space-between; gap: 4mm; font-weight: 700; }
   .element .meta { font-size: 9pt; color: #555; }
   ul { margin: 1.5mm 0 0; padding-left: 4.5mm; }
   li { margin-bottom: .8mm; }
-  .pastilles span { display: inline-block; padding: .8mm 2.5mm; margin: 0 1.5mm 1.5mm 0; border: 1px solid ${colonnes === 2 ? "rgba(255,255,255,.5)" : `${accent}66`}; border-radius: 3mm; font-size: 9pt; }
-  .coupure { position: absolute; left: 0; right: 0; border-top: 1px dashed ${accent}88; pointer-events: none; }
+  li::marker { color: ${decor}; }
+  .pastilles span { display: inline-block; padding: .8mm 2.5mm; margin: 0 1.5mm 1.5mm 0; border: 1px solid ${colonnes === 2 ? filetSurBande : decor}; border-radius: 3mm; font-size: 9pt; }
+  .coupure { position: absolute; left: 0; right: 0; border-top: 1px dashed ${decor}88; pointer-events: none; }
   `;
 }
 
@@ -417,7 +443,7 @@ export function htmlDuCv(
   couleur: string | null = null,
 ): { html: string; pages: number; warnings: string[] } {
   const modele = MODELES[templateId] ?? MODELES["9b2e7c41-3f6d-4a8b-b1c2-5e7f9a0d1b02"];
-  const accent = couleur ?? modele.accent;
+  const decor = couleur ?? modele.accent;
   const volume = JSON.stringify(cv).length;
   const pages = volume > 2_600 ? 2 : 1;
   const competences = (cv.skills ?? []).map((s) => s.name);
@@ -442,7 +468,7 @@ export function htmlDuCv(
     warnings.push("photo_missing");
   if (pages > 1) warnings.push("more_than_one_page");
 
-  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>fit</title><style>${styleDePage(accent, modele.police, modele.colonnes, pages)}</style></head><body><div class="page">${corps}${atelier ? coupures : ""}</div>${scriptDeFit(pages)}</body></html>`;
+  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>fit</title><style>${styleDePage(modele.accent, decor, modele.police, modele.colonnes, pages)}</style></head><body><div class="page">${corps}${atelier ? coupures : ""}</div>${scriptDeFit(pages)}</body></html>`;
   return { html, pages, warnings };
 }
 
@@ -452,7 +478,7 @@ export function htmlDeLettre(
   couleur: string | null = null,
 ): { html: string; pages: number; warnings: string[] } {
   const modele = MODELES[templateId] ?? MODELES["9b2e7c41-3f6d-4a8b-b1c2-5e7f9a0d1b02"];
-  const accent = couleur ?? modele.accent;
+  const decor = couleur ?? modele.accent;
   const s = lettre.sender ?? {};
   const r = lettre.recipient ?? {};
   const nom = `${s.first_name ?? ""} ${s.last_name ?? ""}`.trim();
@@ -479,7 +505,7 @@ export function htmlDeLettre(
   const corpsTexte = paragraphes.reduce((n, p) => n + (p.text ?? "").length, 0);
   if (corpsTexte > 3_200) warnings.push("body_too_long");
 
-  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>fit</title><style>${styleDePage(accent, modele.police, 1, 1)}
+  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>fit</title><style>${styleDePage(modele.accent, decor, modele.police, 1, 1)}
   .lettre { padding: 20mm 22mm; font-size: 11pt; line-height: 1.6; }
   .exp { margin-bottom: 8mm; } .exp span { display: block; font-size: 9.5pt; color: #444; } .exp .nom { font-weight: 700; font-size: 12pt; color: #1b1b1b; }
   .dest { text-align: right; margin-bottom: 8mm; } .dest span { display: block; }

@@ -86,7 +86,8 @@ export const TEXTES = {
   // La couleur principale (ADR-0034).
   couleur: "Couleur",
   couleurTitre: "Quelle couleur ?",
-  couleurSousTitre: "Les titres, les filets et les bandes du modèle.",
+  couleurSousTitre:
+    "Ta couleur habille les bandes, les filets et les puces. Le texte reste lisible.",
   couleurOrigine: "D'origine",
   couleurNuance: "Plus clair ou plus sombre",
   couleurPlusClair: "Plus clair",

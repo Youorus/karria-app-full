@@ -6,6 +6,7 @@ import {
   possederModeleAtelier,
   reinitialiserAtelier,
   repondreAtelier,
+  texteSur,
 } from "./atelier-simule";
 
 const MERIDIAN = "6f1c2b0e-8d4a-4c1e-9a57-0b3f1e2d4c01";
@@ -228,7 +229,23 @@ describe("le faux serveur de l'atelier", () => {
       }),
     );
     expect(rendu.statut).toBe(200);
-    expect(rendu.corps?.html).toContain("#7B1E2B");
+    const html = String(rendu.corps?.html);
+    // Le décor prend la couleur ; les titres (un texte) gardent la leur.
+    expect(html).toContain(".bande { background: #7B1E2B; color: #FFFFFF;");
+    expect(html).toContain("li::marker { color: #7B1E2B; }");
+    expect(html).toContain(
+      "color: #1f2937; margin: 7mm 0 2.5mm; border-bottom: 1px solid #7B1E2B;",
+    );
+    // Une couleur claire sur la bande : le texte de la bande passe en noir.
+    const clair = await lire(
+      repondreAtelier("POST", `/documents/${MERIDIAN}/render`, {
+        cv,
+        primary_color: "#F2E8C9",
+      }),
+    );
+    expect(String(clair.corps?.html)).toContain(
+      ".bande { background: #F2E8C9; color: #111111;",
+    );
     const faux = await lire(
       repondreAtelier("POST", `/documents/${MERIDIAN}/render`, {
         cv,
@@ -276,5 +293,14 @@ describe("le faux serveur de l'atelier", () => {
       repondreAtelier("GET", "/user-templates/me/selected", undefined),
     );
     expect((lu.corps?.template as { id: string }).id).toBe(MERIDIAN);
+  });
+});
+
+describe("le texte posé sur une bande recolorée", () => {
+  it("passe en noir sur une couleur claire et reste blanc sur une sombre", () => {
+    expect(texteSur("#1F3A5F")).toBe("#FFFFFF");
+    expect(texteSur("#7B1E2B")).toBe("#FFFFFF");
+    expect(texteSur("#F2E8C9")).toBe("#111111");
+    expect(texteSur("#FFFFFF")).toBe("#111111");
   });
 });
