@@ -3,7 +3,51 @@
 > Document de passation. À lire en premier par toute personne ou IA qui
 > reprend le travail, avec `AGENTS.md`. Mis à jour à chaque fin de session.
 
-**Dernière mise à jour : 2026-11-05**
+**Dernière mise à jour : 2026-11-06**
+
+## Session du 2026-11-06 — la lettre : celle du modèle, ou la lettre sobre (Fable) — branche `feat/lettres`, NON poussée
+
+**Demande de Marc** : choisir entre la lettre assortie au modèle de CV (quand il en a une) et une
+lettre sobre sur page blanche ; la galerie montre ce que l'atelier rend. Côté API
+(`karria_api_v2`, branche `feat/lettres`, ADR-0036, migration 21) : `letter_style` au rendu et à
+l'export, `letter_style_served` / `letter_style` en retour, `PUT /applications/{id}/letter-style`,
+`cover_letters` / `has_letter` / `pages[].style` dans la galerie.
+
+### Ce qui est livré (`npm run check` vert, 632 tests, aucun « problem »)
+
+- **La pastille « Du modèle · Sobre »** (`atelier/components/pastille-style-lettre.tsx`,
+  `testID="pastille-style-lettre"`, `style-lettre-modele` / `style-lettre-sobre`) : une capsule
+  de la même matière que la pastille du modèle, à sa droite sur la feuille de l'écran Lettre,
+  deux mots séparés d'un filet — le style courant en gras, l'autre en gris ; rôle `radiogroup` /
+  `radio`. Elle n'apparaît que si le modèle courant a une lettre assortie (`Modele.lettreAssortie`) :
+  sinon la lettre sobre est servie et rien n'est à choisir.
+- **Le hook** (`use-lettre.ts` : `lettreAssortie`, `styleLettre`, `choisirStyleLettre`) : le choix
+  redessine la lettre tout de suite (même file de rendu, `rendreLettre(…, couleur, style)`) et part
+  au dossier (`candidatures.api.ts › changerStyleDeLettreDuDossier`) ; le dossier le retient
+  (`Dossier.styleLettre`, lu à l'ouverture) ; le texte de la lettre et son édition ne bougent pas.
+  **Finaliser** exporte la lettre dans le style du dossier (`exporterLettre({ style })`) ;
+  `Export.styleLettre`, `Rendu.styleLettreServi`.
+- **Le service pur** `candidatures/services/style-lettre.ts` (`modele` ↔ `template`, `sobre` ↔
+  `plain`, `styleLettreServi`), testé.
+- **La galerie** : `Apercu.libelle` vient du serveur (« Lettre assortie » / « Lettre sobre »),
+  `Apercu.styleLettre` ; `Modele.lettreAssortie` remplace `avecLettre` (la carte « Lettre de
+  motivation assortie » du détail et le « LM » de la carte ne parlent que de la lettre assortie —
+  la lettre sobre se voit dans le carrousel, sans commentaire).
+- **Faux serveurs** : `atelier-simule.ts` (Meridian a une lettre assortie, les autres non ;
+  `letter_style` → `letter_style_served`, lettre sobre en Carlito noir sur blanc, `422` sur un
+  style inconnu, `letter_style` sur l'export), `candidatures-simule.ts` (`letter_style` sur le
+  dossier et la carte, `PUT /letter-style` idempotent, `422`), `modeles-simule.ts`
+  (`cover_letters`, `has_letter`, page lettre du détail) ; tests dans les trois `*-simule.test.ts`.
+- Contrats : `docs/contrat-api-documents.md`, `contrat-api-candidatures.md` (copies de l'API),
+  `contrat-api-modeles.md` (`cover_letters`, `has_letter`, `pages[].style`).
+
+### Non vérifié
+
+L'écran Lettre avec la pastille **n'a pas été vu sur appareil** (ni simulateur) : typage, lint et
+tests seulement. À regarder : la capsule et la pastille du modèle sur un petit écran (deux capsules
+côte à côte à gauche, `right-4` laisse l'espace), le rendu de la lettre sobre dans la WebView
+(polices Carlito par URL publique `assets/fonts/`, posées à la première demande).
+
 
 ## Session du 2026-11-05 (soir) — la couleur principale du CV se choisit dans l'atelier (Fable)
 

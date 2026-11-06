@@ -64,7 +64,18 @@ Seuls les modèles **publiés** (passés par la porte de qualité de l'ADR-0020)
     "primary_color": "#000000",
     "font_family": "Raleway",
     "has_photo": true,
-    "cover_letters": [],
+    "has_letter": false,
+    "cover_letters": [
+      {
+        "id": "plain",
+        "label": "Lettre sobre",
+        "style": "plain",
+        "signed_thumbnail_url": "https://…/plain-letter/v1/vignette.webp?…",
+        "signed_preview_url": "https://…/plain-letter/v1/apercu.png?…",
+        "signed_full_url": "https://…/plain-letter/v1/apercu_pleine_page.png?…",
+        "thumbnail_blurhash": "dBSs50…"
+      }
+    ],
     "version": 1,
     "columns": 2,
     "formats": ["pdf", "docx"],
@@ -77,6 +88,12 @@ Seuls les modèles **publiés** (passés par la porte de qualité de l'ADR-0020)
 
 - `primary_color` et `font_family` sont **mesurés** dans le PDF du modèle (couleur
   dominante des titres, famille principale), plus des étiquettes déclaratives.
+- `cover_letters` (**2026-11-06, ADR-0036**) : la lettre que ce modèle sert — exactement ce
+  que l'atelier rend. Un seul élément : la lettre **assortie** (`id: "template"`, `style:
+  "template"`, « Lettre assortie », ingérée avec le CV et mesurée par la même porte) si le
+  modèle en a une — `has_letter: true` —, sinon la lettre **sobre** de Karria (`id: "plain"`,
+  « Lettre sobre », page blanche, Carlito 11 pt), dont les aperçus sont communs à tous les
+  modèles. Vide tant que la commande `plain-letter` n'a pas tourné sur l'environnement.
 - `fields_added` : les champs que le modèle d'origine n'avait pas et que Karria ajoute
   dans son style (aujourd'hui `headline`, le poste visé). Rien à faire côté app, c'est
   une information pour le détail.
@@ -106,14 +123,15 @@ Seuls les modèles **publiés** (passés par la porte de qualité de l'ADR-0020)
 
 ## `GET /templates/{id}` → `200 Modele`
 
-Le même objet, plus `pages` : les images du carrousel (le CV d'exemple, puis les
-lettres assorties). `404 template_not_found`.
+Le même objet, plus `pages` : les images du carrousel (le CV d'exemple, puis sa lettre —
+assortie, sinon sobre). `404 template_not_found`.
 
 ```json
 {
   "…": "…",
   "pages": [
-    { "kind": "cv", "label": "CV", "signed_thumbnail_url": "…", "signed_full_url": "…" }
+    { "kind": "cv", "label": "CV", "signed_thumbnail_url": "…", "signed_full_url": "…", "style": null },
+    { "kind": "letter", "label": "Lettre sobre", "signed_thumbnail_url": "…", "signed_full_url": "…", "style": "plain" }
   ]
 }
 ```
