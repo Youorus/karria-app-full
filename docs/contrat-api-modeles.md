@@ -75,8 +75,11 @@ Seuls les modèles **publiés** (passés par la porte de qualité de l'ADR-0020)
 ]
 ```
 
-- `primary_color` et `font_family` sont **mesurés** dans le PDF du modèle (couleur
-  dominante des titres, famille principale), plus des étiquettes déclaratives.
+- `primary_color` et `font_family` sont **mesurés** dans le PDF du modèle, plus des
+  étiquettes déclaratives. **2026-11-06 (ADR-0034)** : `primary_color` est la couleur du
+  **décor** du modèle — bandes, filets, puces, dominante par surface — et non celle des
+  titres ; c'est ce que la couleur choisie dans l'atelier remplace (le texte ne bouge pas).
+  `null` : un modèle sans décor, que la couleur n'habille pas.
 - `fields_added` : les champs que le modèle d'origine n'avait pas et que Karria ajoute
   dans son style (aujourd'hui `headline`, le poste visé). Rien à faire côté app, c'est
   une information pour le détail.
@@ -133,8 +136,9 @@ lettres assorties). `404 template_not_found`.
   possédé. Le choix sert de modèle par défaut aux exports. **2026-11-05 (ADR-0034)** :
   `primary_color` est la couleur principale posée par la personne (`#RRGGBB`, `null` = celle
   du modèle, `422` sur un autre code) ; `default_primary_color` est la couleur d'origine du
-  modèle choisi (sa `primary_color` de galerie), pour afficher « D'origine ». Le `PUT`
-  **remplace** le choix entier : omettre `primary_color` la retire.
+  modèle choisi (sa `primary_color` de galerie — **la couleur de son décor** depuis le
+  2026-11-06), pour afficher « D'origine ». Le `PUT` **remplace** le choix entier : omettre
+  `primary_color` la retire.
 
 ```json
 {

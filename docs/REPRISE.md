@@ -65,6 +65,34 @@ sans la rechoisir demandait une route de plus — ajoutée, même session, `karr
 - **Reste** : relire et fusionner `feat/portrait` (app **et** API — l'app appelle une route que
   seule la branche API sert ; fusionner l'API d'abord), puis vérifier sur iPhone avec une vraie
   photo.
+## Session du 2026-11-06 — couleur du CV, version 2 : le décor change, le texte reste (Fable) — branche `feat/couleurs`, NON poussée
+
+**Demande de Marc** : « La couleur primaire ne doit jamais toucher le texte : sur un CV texte
+noir / bande rouge, elle change la bande, pas le texte — sauf si c'est nécessaire pour rester
+lisible. » Côté API (`karria_api_v2/docs/REPRISE.md`, ADR-0034 § 2026-11-06, branche
+`feat/couleurs`) : `primary_color` de la galerie = la couleur du **décor** (mesurée par
+surface) ; la couleur choisie n'habille que bandes, filets, puces, séparateurs et pictogrammes
+monochromes ; un texte posé sur une bande recolorée qui ne se lit plus (< 4,5:1) passe en
+blanc ou noir ; `refresh-colors` à lancer en prod. Aucune route ni champ nouveau.
+
+### Ce qui change dans l'app (`npm run check` vert, 628 tests)
+
+- **Textes** (`presentation.ts`) : sous-titre de la feuille « Quelle couleur ? » → « Ta couleur
+  habille les bandes, les filets et les puces. Le texte reste lisible. » Les pastilles, le
+  curseur de nuance et le code couleur ne bougent pas ; la pastille « D'origine » montre la
+  couleur du décor du modèle (`modele.couleur`, ce que la galerie mesure désormais).
+- **Rien à recoloriser côté app** : la WebView rend ce que le serveur renvoie (vérifié dans
+  `feuille-couleur.tsx` / `use-atelier.ts` : la couleur ne fait que repartir au rendu).
+- **Serveur simulé** (`lib/dev/atelier-simule.ts`) aligné : `styleDePage(encre, decor, …)` —
+  la couleur habille la bande, les filets sous les titres, les puces (`li::marker`), les
+  pastilles ; les titres gardent l'encre du modèle ; le texte de la bande passe en `#111111`
+  si la couleur est claire (`texteSur`, luminance WCAG). Tests dans `atelier-simule.test.ts`.
+- Contrats : `docs/contrat-api-documents.md` (copie de l'API) et `contrat-api-modeles.md`
+  (`primary_color` = couleur du décor, `default_primary_color` idem).
+
+**Reste** : voir sur appareil la feuille couleur avec le vrai serveur une fois l'API déployée
+et `refresh-colors` lancé ; la lettre ne suit plus la couleur (son accent est un texte) — à
+décider dans le lot lettre.
 
 ## Session du 2026-11-05 (soir) — la couleur principale du CV se choisit dans l'atelier (Fable)
 
