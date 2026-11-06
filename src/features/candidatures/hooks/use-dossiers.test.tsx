@@ -47,6 +47,7 @@ function carte(
   return {
     id,
     couleur: null,
+    styleLettre: null,
     offre: {
       id: `offre-${id}`,
       titre: `Offre ${id}`,

@@ -34,7 +34,7 @@ function modele(id: number, categorie: string, premium = false): Modele {
     police: null,
     avecPhoto: false,
     apercus: [],
-    avecLettre: false,
+    lettreAssortie: false,
   };
 }
 

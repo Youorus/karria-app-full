@@ -7,12 +7,16 @@
  * d'une heure : on ne les garde pas d'une session à l'autre.
  */
 
+/** La lettre que le modèle sert (ADR-0036) : `template` (assortie, mesurée avec
+ *  le CV) ou `plain` (la lettre sobre de Karria) — exactement ce que l'atelier rend. */
 export interface LettreBrute {
   id: number | string;
   label: string;
+  style?: "template" | "plain";
   signed_thumbnail_url: string | null;
   signed_preview_url: string | null;
   signed_full_url: string | null;
+  thumbnail_blurhash?: string | null;
 }
 
 /** Une page du carrousel du détail (`GET /templates/{id}`). */
@@ -21,6 +25,8 @@ export interface PageBrute {
   label: string;
   signed_thumbnail_url: string | null;
   signed_full_url: string | null;
+  /** Page `letter` : `template` ou `plain`. */
+  style?: "template" | "plain" | null;
 }
 
 export interface ModeleBrut {
@@ -44,6 +50,8 @@ export interface ModeleBrut {
   primary_color: string | null;
   font_family: string | null;
   has_photo: boolean;
+  /** Le modèle a une lettre assortie, publiée avec lui. */
+  has_letter?: boolean;
   cover_letters?: LettreBrute[];
   /** Seulement dans le détail. */
   pages?: PageBrute[] | null;
@@ -75,13 +83,16 @@ export interface PossessionBrute {
 
 // ─────────────────────────────────────────────────────────────────────
 
-/** Une page du carrousel du détail : le CV ou une lettre assortie. */
+/** Une page du carrousel du détail : le CV, puis la lettre (assortie, sinon sobre). */
 export interface Apercu {
   cle: string;
   type: "cv" | "lettre";
+  /** « CV », « Lettre assortie » ou « Lettre sobre » — le libellé du serveur. */
   libelle: string;
   miniature: string | null;
   image: string | null;
+  /** Page lettre : « modèle » (assortie) ou « sobre ». */
+  styleLettre: "modele" | "sobre" | null;
 }
 
 export interface Modele {
@@ -106,9 +117,10 @@ export interface Modele {
   couleur: string | null;
   police: string | null;
   avecPhoto: boolean;
-  /** Les pages du carrousel : le CV d'abord, puis ses lettres. */
+  /** Les pages du carrousel : le CV d'abord, puis sa lettre (assortie, sinon sobre). */
   apercus: Apercu[];
-  avecLettre: boolean;
+  /** Le modèle a une lettre **assortie** ; sinon l'atelier sert la lettre sobre. */
+  lettreAssortie: boolean;
 }
 
 export interface Avis {

@@ -24,11 +24,22 @@
  * `#RRGGBB` et répond `422` sur un autre code : on envoie toujours
  * `normaliserCode` (`services/couleur.ts`).
  *
+ * Le **style de lettre** (`letter_style`, ADR-0036) part au rendu et à l'export
+ * d'une lettre : `template` (la lettre assortie du modèle) ou `plain` (la
+ * lettre sobre) ; `null` = par défaut. La réponse dit le style réellement
+ * servi (`letter_style_served`, `letter_style`) : un modèle sans lettre
+ * assortie sert la sobre.
+ *
  * Le CV part dans la forme de `GET /cv/me` : on réutilise `versCvBrut` des
  * dossiers — une seule traduction du CV dans l'application.
  */
 
 import { versCvBrut } from "@/features/candidatures/api/candidatures.api";
+import {
+  type StyleLettre,
+  versStyleLettre,
+  versStyleLettreBrut,
+} from "@/features/candidatures/services/style-lettre";
 import type { Cv } from "@/features/cv/types/cv.types";
 import { http } from "@/lib/http";
 
@@ -80,6 +91,7 @@ export function versExport(b: ExportBrut): Export {
     docx: b.docx_url ?? null,
     ats: versScoreAts(b.ats),
     couleur: b.primary_color ?? null,
+    styleLettre: versStyleLettre(b.letter_style),
   };
 }
 
@@ -97,7 +109,12 @@ export function versEnvoi(b: EnvoiBrut): Envoi {
 }
 
 function versRendu(b: RenduBrut): Rendu {
-  return { html: b.html, pages: b.pages, avertissements: b.warnings };
+  return {
+    html: b.html,
+    pages: b.pages,
+    avertissements: b.warnings,
+    styleLettreServi: versStyleLettre(b.letter_style_served),
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -121,16 +138,19 @@ export async function rendreCv(
   );
 }
 
-/** La lettre, ancrée, dans le modèle du dossier — et sa couleur. */
+/** La lettre, ancrée, dans le style demandé (lettre du modèle ou lettre sobre)
+ *  — et la couleur du dossier. `styleLettreServi` dit ce qui a été rendu. */
 export async function rendreLettre(
   modeleId: string,
   lettre: LettreDocumentBrute,
   couleur: string | null = null,
+  style: StyleLettre | null = null,
 ): Promise<Rendu> {
   return versRendu(
     await http.post<RenduBrut>(`/documents/${modeleId}/render`, {
       letter: lettre,
       primary_color: couleur,
+      letter_style: versStyleLettreBrut(style),
     }),
   );
 }
@@ -200,12 +220,14 @@ export async function effacerExport(id: string): Promise<void> {
   await http.delete(`/cv/me/generated-cvs/${id}`);
 }
 
-/** Exporte la lettre d'un dossier — un document à part, `kind: "letter"`. */
+/** Exporte la lettre d'un dossier — un document à part, `kind: "letter"` —
+ *  dans le style retenu par le dossier ; l'export dit le style servi. */
 export async function exporterLettre(options: {
   lettre: LettreDocumentBrute;
   modeleId: string;
   dossierId: string;
   couleur?: string | null;
+  style?: StyleLettre | null;
 }): Promise<Export> {
   return versExport(
     await http.post<ExportBrut>("/documents/letters/export", {
@@ -214,6 +236,7 @@ export async function exporterLettre(options: {
       formats: ["pdf", "docx"],
       dossier_id: options.dossierId,
       primary_color: options.couleur ?? null,
+      letter_style: versStyleLettreBrut(options.style ?? null),
     }),
   );
 }

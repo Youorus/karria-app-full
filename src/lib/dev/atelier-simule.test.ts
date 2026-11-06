@@ -184,6 +184,7 @@ describe("le faux serveur de l'atelier", () => {
     );
     expect(lettre.statut).toBe(201);
     expect(lettre.corps?.kind).toBe("letter");
+    expect(lettre.corps?.letter_style).toBe("template");
 
     const ids = [exporte.corps?.id, lettre.corps?.id];
     const envoi = await lire(
@@ -276,5 +277,57 @@ describe("le faux serveur de l'atelier", () => {
       repondreAtelier("GET", "/user-templates/me/selected", undefined),
     );
     expect((lu.corps?.template as { id: string }).id).toBe(MERIDIAN);
+  });
+});
+
+describe("le style de lettre (ADR-0036)", () => {
+  const MARKETING = "9b2e7c41-3f6d-4a8b-b1c2-5e7f9a0d1b02";
+  const lettre = {
+    recipient: { company: "Acme" },
+    subject: "Candidature",
+    paragraphs: [{ kind: "libre", text: "x" }],
+    sender: { first_name: "Awa", last_name: "Diallo" },
+  };
+
+  it("rend la lettre du modèle par défaut quand il en a une, la sobre sur demande, et dit le style servi", async () => {
+    const parDefaut = await lire(
+      repondreAtelier("POST", `/documents/${MERIDIAN}/render`, { letter: lettre }),
+    );
+    expect(parDefaut.statut).toBe(200);
+    expect(parDefaut.corps?.letter_style_served).toBe("template");
+    const sobre = await lire(
+      repondreAtelier("POST", `/documents/${MERIDIAN}/render`, {
+        letter: lettre,
+        letter_style: "plain",
+      }),
+    );
+    expect(sobre.corps?.letter_style_served).toBe("plain");
+    expect(String(sobre.corps?.html)).toContain("Carlito");
+    const faux = await lire(
+      repondreAtelier("POST", `/documents/${MERIDIAN}/render`, {
+        letter: lettre,
+        letter_style: "fancy",
+      }),
+    );
+    expect(faux.statut).toBe(422);
+  });
+
+  it("sert la lettre sobre quoi qu'on demande quand le modèle n'a pas de lettre assortie", async () => {
+    const rendu = await lire(
+      repondreAtelier("POST", `/documents/${MARKETING}/render`, {
+        letter: lettre,
+        letter_style: "template",
+      }),
+    );
+    expect(rendu.corps?.letter_style_served).toBe("plain");
+    const exporte = await lire(
+      repondreAtelier("POST", "/documents/letters/export", {
+        template_id: MARKETING,
+        letter: lettre,
+        letter_style: "template",
+      }),
+    );
+    expect(exporte.statut).toBe(201);
+    expect(exporte.corps?.letter_style).toBe("plain");
   });
 });

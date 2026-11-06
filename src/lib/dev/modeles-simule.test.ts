@@ -45,7 +45,26 @@ describe("le faux serveur des modèles", () => {
     expect(detail.statut).toBe(200);
     expect(detail.corps.pages).toEqual([
       expect.objectContaining({ kind: "cv", label: "CV" }),
+      expect.objectContaining({
+        kind: "letter",
+        label: "Lettre assortie",
+        style: "template",
+      }),
     ]);
+    expect(detail.corps.has_letter).toBe(true);
+    expect(detail.corps.cover_letters[0]).toMatchObject({
+      id: "template",
+      style: "template",
+    });
+    // Un modèle sans lettre assortie montre la lettre sobre de Karria.
+    const [, marketing] = galerie.corps;
+    const sobre = await appeler("GET", `/templates/${marketing.id}`);
+    expect(sobre.corps.has_letter).toBe(false);
+    expect(sobre.corps.pages[1]).toMatchObject({
+      kind: "letter",
+      label: "Lettre sobre",
+      style: "plain",
+    });
 
     const avis = await appeler("GET", `/templates/${meridian.id}/reviews`);
     expect(avis.statut).toBe(200);

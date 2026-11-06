@@ -48,6 +48,11 @@ import { versCv } from "@/features/cv/api/cv.api";
 import type { CompetenceBrute, Cv, ExperienceBrute } from "@/features/cv/types/cv.types";
 import { http } from "@/lib/http";
 
+import {
+  type StyleLettre,
+  versStyleLettre,
+  versStyleLettreBrut,
+} from "../services/style-lettre";
 import type {
   CarteDossier,
   CarteDossierBrute,
@@ -155,6 +160,7 @@ export function versDossier(b: DossierBrut): Dossier {
     offre: versOffreFigee(b.offer),
     modeleId: b.template_id,
     couleur: b.primary_color ?? null,
+    styleLettre: versStyleLettre(b.letter_style),
     cv: versCv({ ...b.cv, updated_at: b.updated_at }),
     empreinteCvDeBase: b.cv_base_hash,
     baseChangee: b.base_changed,
@@ -177,6 +183,7 @@ export function versCarteDossier(b: CarteDossierBrute): CarteDossier {
     offre: versOffreFigee(b.offer),
     modeleId: b.template_id,
     couleur: b.primary_color ?? null,
+    styleLettre: versStyleLettre(b.letter_style),
     statut: b.status,
     adaptation: b.adaptation,
     couverture: b.coverage_ratio,
@@ -333,6 +340,21 @@ export async function changerCouleurDuDossier(
   return versDossier(
     await http.put<DossierBrut>(`/applications/${id}/color`, {
       primary_color: couleur,
+    }),
+  );
+}
+
+/** Le style de lettre du dossier (ADR-0036) : « modèle » (la lettre assortie du
+ *  modèle de CV) ou « sobre » (la lettre sur page blanche) ; `null` rend la
+ *  main au défaut. Retenu par le dossier ; c'est le rendu qui dit le style
+ *  réellement servi. */
+export async function changerStyleDeLettreDuDossier(
+  id: string,
+  style: StyleLettre | null,
+): Promise<Dossier> {
+  return versDossier(
+    await http.put<DossierBrut>(`/applications/${id}/letter-style`, {
+      letter_style: versStyleLettreBrut(style),
     }),
   );
 }

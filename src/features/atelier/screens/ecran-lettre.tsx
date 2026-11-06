@@ -3,10 +3,11 @@
  *
  * Sans lettre : l'orbe, la question, deux voies (Karria écrit · plus tard).
  * Avec : l'en-tête de l'atelier, la feuille au centre (même composant que
- * le CV) avec la pastille du modèle à la même place que dans l'atelier,
- * les conseils du rendu en une ligne discrète, et un seul bouton bleu en
- * pied : « Continuer » vers Finaliser. Toucher un paragraphe ouvre la
- * feuille basse : je modifie, ou Karria réécrit.
+ * le CV) avec la pastille du modèle à la même place que dans l'atelier —
+ * et, si le modèle a une lettre assortie, la pastille « Du modèle · Sobre »
+ * juste à sa droite —, les conseils du rendu en une ligne discrète, et un
+ * seul bouton bleu en pied : « Continuer » vers Finaliser. Toucher un
+ * paragraphe ouvre la feuille basse : je modifie, ou Karria réécrit.
  */
 
 import { Pressable } from "react-native";
@@ -30,6 +31,7 @@ import { FeuilleCv } from "../components/feuille-cv";
 import { FeuilleModele } from "../components/feuille-modele";
 import { FeuilleParagraphe } from "../components/feuille-paragraphe";
 import { PastilleModele } from "../components/pastille-modele";
+import { PastilleStyleLettre } from "../components/pastille-style-lettre";
 import { useChoixModele } from "../hooks/use-choix-modele";
 import { TEXTES, useLettre } from "../hooks/use-lettre";
 
@@ -148,12 +150,21 @@ export function EcranLettre() {
                 </Texte>
               </Box>
             ) : (
-              <Box className="absolute left-4 top-2">
+              <HStack
+                className="absolute left-4 right-4 top-2 items-center gap-2"
+                pointerEvents="box-none"
+              >
                 <PastilleModele
                   libelle={l.modele?.libelle ?? null}
                   onPress={l.ouvrirModele}
                 />
-              </Box>
+                {l.lettreAssortie ? (
+                  <PastilleStyleLettre
+                    style={l.styleLettre}
+                    onChoisir={l.choisirStyleLettre}
+                  />
+                ) : null}
+              </HStack>
             )}
           </Box>
         )}

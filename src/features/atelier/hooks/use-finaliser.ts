@@ -278,6 +278,8 @@ export function useFinaliser(libre = false): EcranFinaliser {
               modeleId,
               dossierId,
               couleur,
+              // Le dossier retient aussi le style de lettre (ADR-0036).
+              style: lu.styleLettre,
             }).catch((cause: unknown) => {
               // Le CV compte d'abord : une lettre qui échoue se dit, ne bloque pas.
               console.warn("[karria] export de la lettre en échec", cause);

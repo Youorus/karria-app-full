@@ -123,6 +123,12 @@ export const TEXTES = {
     "Ex. : plus court, plus direct, cite mon expérience chez Zara",
   lettreGarderAncien: "Garder l'ancien",
   lettreGarderNouveau: "Garder le nouveau",
+  // Le style de la lettre (ADR-0036) : celle du modèle, ou la sobre.
+  lettreStyleModele: "Du modèle",
+  lettreStyleSobre: "Sobre",
+  lettreStyleAide: "Style de la lettre",
+  lettreStyleNonRetenu:
+    "Ce style est appliqué ici, mais le dossier n'a pas pu le retenir. Il sera réessayé.",
   lettreHorsLettre:
     "Ces informations viennent de ton CV et de l'offre : modifie-les dans l'atelier.",
   // L'atelier libre (« Nouveau CV », sans dossier).
