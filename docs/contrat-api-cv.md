@@ -141,6 +141,8 @@ brouillon. Renvoie le CV au format `GET /cv/me`.
   jamais une URL (ADR-0008 de l'API). Dans le brouillon et dans
   `GET /cv/me`, la photo revient avec une `image_url` recalculée à chaque
   lecture ; le client ne la persiste pas.
+- La photo **déjà sur le CV** se retravaille sans la rechoisir :
+  `POST /cv/me/photo/enhance` (ci-dessous, 2026-11-06).
 
 ## Précisions et écarts fixés côté API — 2026-10-21
 
@@ -266,6 +268,22 @@ Erreurs : `404 cv_not_found` sans CV ; `422 chapter_invalid` avec
 `details.fields: [{ field, reason }]` (`field` en snake_case du contrat :
 `first_name`, `links.0.url`…) ; `chapter_items_expected` /
 `chapter_data_expected`.
+
+### `POST /cv/me/photo/enhance` → `201 { image_id, image_url, enhanced: true }` — retravailler la photo déjà en place (2026-11-06)
+
+Session **et** consentement à l'IA requis (`403 ai_consent_required`, usage
+`photo_enhancement`, ADR-0025) : la photo part chez le générateur d'image.
+Sans corps. Le serveur relit la photo du CV dans le bucket, la passe au même
+générateur que `POST /cv/photo` (`enhance=true`) et rend la version
+retravaillée **en attente**, comme une photo envoyée : le CV ne change pas.
+L'app montre l'originale et la retravaillée ; « Garder cette version » →
+`PUT /cv/me/chapters/photo` avec `{ "data": { "image_id" } }` ; « Garder
+l'originale » → rien, elle n'a pas bougé (la retravaillée en attente est
+oubliée à la prochaine écriture de la photo, ou avec le compte).
+
+Erreurs : `404 cv_not_found` sans CV ; `409 photo_missing` (`rule_violation`)
+si le CV n'a pas de photo ; `422 photo_enhance_refused` et
+`503 photo_enhance_unavailable` comme `POST /cv/photo`.
 
 ### `GET /cv/suggestions?kind=…&q=…` → `200 { items: string[] }` — suggestions à la saisie (2026-11-04)
 

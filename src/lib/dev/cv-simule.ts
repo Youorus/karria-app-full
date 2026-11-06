@@ -735,7 +735,17 @@ const ROUTES_IA = new Set([
   "POST /cv/import",
   "POST /voice/transcribe",
   "POST /cv/draft/interpret",
+  "POST /cv/me/photo/enhance",
 ]);
+
+/** « Retravaille » une image : la simulation ne génère rien, elle rend la
+ *  même image sous un nouvel identifiant marqué `enhanced` — assez pour
+ *  éprouver la comparaison et le choix, jamais pour juger le rendu. */
+function photoAmelioree(image: string): Response {
+  const id = `img_${photos.size + 1}`;
+  photos.set(id, image);
+  return json(201, { image_id: id, image_url: image, enhanced: true });
+}
 
 function porteIa(): Response {
   const refus = refusIa();
@@ -884,15 +894,32 @@ export function repondreCv(methode: string, chemin: string, corps: unknown): Res
     }
     if (parties.find((p) => p.fieldName === "enhance")?.string === "true") {
       if (!consentementIaAccorde()) return porteIa();
-      return erreur(
-        503,
-        "photo_enhance_unavailable",
-        "L'amélioration de photo arrive avec la nouvelle API.",
-      );
+      return photoAmelioree(image);
     }
     const id = `img_${photos.size + 1}`;
     photos.set(id, image);
     return json(201, { image_id: id, image_url: image, enhanced: false });
+  }
+
+  if (route === "POST /cv/me/photo/enhance") {
+    // La photo déjà sur le CV, sans la rechoisir : le CV ne change pas, la
+    // retravaillée attend qu'on la retienne par `PUT /cv/me/chapters/photo`.
+    if (etat.cv === null) {
+      return erreur(
+        404,
+        "cv_not_found",
+        "Aucun CV à modifier : crée-le ou importe-le d'abord.",
+      );
+    }
+    const actuelle = etat.cv.image_url;
+    if (typeof actuelle !== "string") {
+      return erreur(
+        409,
+        "photo_missing",
+        "Ton CV n'a pas encore de photo : ajoute-en une d'abord.",
+      );
+    }
+    return photoAmelioree(actuelle);
   }
 
   if (route === "POST /cv/draft/interpret") {

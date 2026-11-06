@@ -15,14 +15,15 @@ exigée, erreurs au format `{ error: { code, message, details } }`.
 Le serveur est la porte. Chaque route qui confie une donnée de la personne à
 un modèle refuse tant qu'aucun consentement **valable** n'existe :
 
-| Route                            | Ce qui part                               | Usage (`purposes`)   |
-| -------------------------------- | ----------------------------------------- | -------------------- |
-| `POST /assistant/messages`       | tes messages à Karria, sa mémoire de toi  | `assistant`          |
-| `POST /voice/transcribe`         | ta voix                                   | `transcription`      |
-| `POST /cv/draft/interpret`       | tes réponses sur ton parcours             | `cv_creation`        |
-| `POST /cv/import`                | le fichier de ton CV                      | `cv_import`          |
-| `POST /cv/photo` (`enhance=true`) | ta photo                                 | `photo_enhancement`  |
-| `POST /cv/me/generated-cvs`      | le score ATS de ton CV, pour l'expliquer  | `template_analysis`  |
+| Route                             | Ce qui part                              | Usage (`purposes`)  |
+| --------------------------------- | ---------------------------------------- | ------------------- |
+| `POST /assistant/messages`        | tes messages à Karria, sa mémoire de toi | `assistant`         |
+| `POST /voice/transcribe`          | ta voix                                  | `transcription`     |
+| `POST /cv/draft/interpret`        | tes réponses sur ton parcours            | `cv_creation`       |
+| `POST /cv/import`                 | le fichier de ton CV                     | `cv_import`         |
+| `POST /cv/photo` (`enhance=true`) | ta photo                                 | `photo_enhancement` |
+| `POST /cv/me/photo/enhance`       | la photo déjà sur ton CV                 | `photo_enhancement` |
+| `POST /cv/me/generated-cvs`       | le score ATS de ton CV, pour l'expliquer | `template_analysis` |
 
 Sans amélioration (`enhance=false`), la photo ne quitte pas Karria : pas de
 porte. Lire son CV, son brouillon, valider un chapitre, finaliser : aucun
@@ -52,8 +53,15 @@ avec `details.retry_after` au-delà de 120 lectures / 10 min.
 {
   "version": "2026-10.3f9a1c2e", // à renvoyer dans `ai_disclosure_version`
   "providers": [{ "id": "gemini", "name": "Google Gemini" }],
-  "purposes": ["assistant", "transcription", "cv_creation", "cv_import",
-               "photo_enhancement", "template_analysis", "application"]
+  "purposes": [
+    "assistant",
+    "transcription",
+    "cv_creation",
+    "cv_import",
+    "photo_enhancement",
+    "template_analysis",
+    "application",
+  ],
 }
 ```
 
@@ -68,13 +76,13 @@ par e-mail elle voyage sur le parcours et se consigne à `verify`.
 
 Ce que le serveur en fait, **sans jamais faire échouer la connexion** :
 
-| Situation à la connexion                          | Effet                                              |
-| ------------------------------------------------- | -------------------------------------------------- |
-| version = version courante, aucun accord          | accord consigné (même preuve que le `PUT`, horodaté) |
-| version = version courante, accord courant existant | rien : la date d'origine reste                   |
-| version ≠ version courante (fournisseur changé)   | rien : la feuille demandera                        |
-| champ absent (app ancienne, information non chargée) | rien : la feuille demandera                     |
-| accord **retiré** dans les paramètres             | rien : un retrait explicite ne se renverse pas ainsi |
+| Situation à la connexion                             | Effet                                                |
+| ---------------------------------------------------- | ---------------------------------------------------- |
+| version = version courante, aucun accord             | accord consigné (même preuve que le `PUT`, horodaté) |
+| version = version courante, accord courant existant  | rien : la date d'origine reste                       |
+| version ≠ version courante (fournisseur changé)      | rien : la feuille demandera                          |
+| champ absent (app ancienne, information non chargée) | rien : la feuille demandera                          |
+| accord **retiré** dans les paramètres                | rien : un retrait explicite ne se renverse pas ainsi |
 
 Après la connexion, rien ne change : `GET /auth/me` dit `required: false`
 si l'accord a été consigné, et la porte `403 ai_consent_required` reste le
@@ -101,12 +109,12 @@ d'envoyer `ai_disclosure_version`.
       "cv_creation",
       "cv_import",
       "photo_enhancement",
-      "template_analysis"
-    ]
+      "template_analysis",
+    ],
   },
   "accepted_version": null, // la version du dernier accord, ou null
   "accepted_at": null, // ISO 8601, ou null
-  "revoked_at": null // ISO 8601 si la personne a retiré son accord
+  "revoked_at": null, // ISO 8601 si la personne a retiré son accord
 }
 ```
 

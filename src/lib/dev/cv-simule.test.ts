@@ -172,6 +172,40 @@ describe("L'édition directe d'une section", () => {
   });
 });
 
+describe("La photo déjà en place, retravaillée (POST /cv/me/photo/enhance)", () => {
+  it("exige l'accord IA, une photo sur le CV, et rend une retravaillée en attente", async () => {
+    retirerConsentementIa();
+    expect((await appeler("POST", "/cv/me/photo/enhance")).statut).toBe(403);
+    accepterConsentementIa(VERSION_SIMULEE);
+
+    // Le CV existe (import précédent) mais n'a pas de photo.
+    const sansPhoto = await appeler("POST", "/cv/me/photo/enhance");
+    expect(sansPhoto.statut).toBe(409);
+    expect(
+      (sansPhoto.corps.error as { details: { reason: string } }).details.reason,
+    ).toBe("photo_missing");
+
+    const envoyee = await appeler("POST", "/cv/photo", {
+      getParts: () => [
+        { fieldName: "image", uri: "file:///moi.jpg" },
+        { fieldName: "enhance", string: "false" },
+      ],
+    });
+    expect(envoyee.statut).toBe(201);
+    await appeler("PUT", "/cv/me/chapters/photo", {
+      data: { image_id: envoyee.corps.image_id },
+    });
+
+    const retravaillee = await appeler("POST", "/cv/me/photo/enhance");
+    expect(retravaillee.statut).toBe(201);
+    expect(retravaillee.corps.enhanced).toBe(true);
+    expect(retravaillee.corps.image_id).not.toBe(envoyee.corps.image_id);
+    // Le CV n'a pas bougé tant qu'on n'a pas retenu la retravaillée.
+    const cv = await appeler("GET", "/cv/me");
+    expect(cv.corps.image_url).toBe("file:///moi.jpg");
+  });
+});
+
 describe("Le brouillon", () => {
   it("ne devient un CV qu'une fois chaque chapitre validé ou passé", async () => {
     await appeler("POST", "/cv/draft");
