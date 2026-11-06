@@ -3,7 +3,68 @@
 > Document de passation. À lire en premier par toute personne ou IA qui
 > reprend le travail, avec `AGENTS.md`. Mis à jour à chaque fin de session.
 
-**Dernière mise à jour : 2026-11-05**
+**Dernière mise à jour : 2026-11-06**
+
+## Session du 2026-11-06 — « Rendre ma photo professionnelle » depuis l'onglet CV (Fable) — BRANCHE `feat/portrait`, NON POUSSÉE
+
+**Demande de Marc** : « Au niveau de l'onglet CV, quand l'utilisateur change son avatar, lui donner
+la possibilité d'optimiser sa photo par IA pour la rendre professionnelle — ce qui faisait appel à
+l'un des plus puissants modèles Gemini de génération d'images. Tu n'as pas rajouté cette
+fonctionnalité : corrige-la. » L'amélioration existait dans la **création** (`etape-photo.tsx`) mais
+pas dans l'**édition** (`/cv/modifier/photo`, où mène l'avatar de `cv-rempli.tsx`). Côté API, elle
+n'existait qu'à l'envoi (`POST /cv/photo`, `enhance=true`) : retravailler la photo **déjà en place**
+sans la rechoisir demandait une route de plus — ajoutée, même session, `karria_api_v2/docs/REPRISE.md`.
+
+### Ce qui est livré (`npm run check` vert, 642 tests ; `npx expo export --platform ios` produit un paquet)
+
+- **`services/photo.ts`** (pur, testé, 4 cas) : `TEXTES_PHOTO` — la promesse (celle de la création,
+  mot pour mot : « lumière, fond neutre, cadrage… »), les libellés (« Rendre ma photo
+  professionnelle », « Ta photo » / « Retravaillée », « Garder cette version » / « Garder
+  l'originale », « Même personne, même expression… ») — et `messageDAmelioration(cause)` :
+  `photo_enhance_refused` → changer de photo, `photo_enhance_unavailable` → réessayer plus tard,
+  `photo_missing`, `cv_not_found`, réseau ; jamais de jargon.
+- **`components/portrait-photo.tsx`** : le portrait carré avec son libellé, partagé ;
+  `etape-photo.tsx` (création) l'utilise et lit la promesse dans le service — comportement inchangé.
+- **`hooks/use-modifier-cv.ts`** — `photo.etape: EtapePhoto` (`repos` → `amelioration` →
+  `comparaison { origine: "nouvelle" | "actuelle", originale, amelioree, idAmelioree }`),
+  `photo.changer(source)` (le choix ne part plus tout de suite : il mène à `amelioration`),
+  `photo.ameliorer(oui)` (oui → `televerserPhoto(uri, true)` ; non → envoi tel quel, comme avant),
+  `photo.ameliorerActuelle()` (→ `ameliorerPhotoActuelle()`, `POST /cv/me/photo/enhance`),
+  `photo.garder("originale" | "amelioree")` (améliorée → `PUT /cv/me/chapters/photo` par
+  `imageId` ; originale d'une nouvelle photo → envoi sans amélioration ; originale déjà en place →
+  rien, elle n'a pas bougé). Toute amélioration passe par `useActionIa` : `avecConsentement` avant
+  le geste, `rejouerSiConsentementRequis` sur le 403, usage **`photo_enhancement`** (valeur exacte
+  de `UsageIa`). Échec → `comparaison` sans retravaillée + `photo.probleme` humain.
+  Tests : 5 cas de plus dans `use-modifier-cv.test.tsx` (parcours complet, refus de l'amélioration,
+  photo en place gardée sans appel, refus du générateur, rejeu après l'accord).
+- **`components/edition/formulaire-photo.tsx`** (vue seule, 5 cas testés) : au repos **avec** une
+  photo, « Rendre ma photo professionnelle » est le geste principal, prendre/choisir en contour,
+  « Retirer » discret ; sans photo, « Prendre une photo » reste principal et rien n'est proposé.
+  Après le choix : la nouvelle photo, la promesse, le geste et « Garder l'originale ». Comparaison :
+  les deux portraits côte à côte, une ligne qui dit ce qui a bougé et ce qui n'a pas bougé, deux
+  boutons. Pas d'icône « étincelles », pas de badge, aucune couleur hors thème.
+- **`api/cv.api.ts › ameliorerPhotoActuelle()`** ; **`lib/dev/cv-simule.ts`** : `POST /cv/photo`
+  avec `enhance=true` rend désormais une « retravaillée » (même image, `enhanced: true`) derrière la
+  porte IA au lieu d'un 503 ; `POST /cv/me/photo/enhance` (403 sans accord, 404 sans CV,
+  409 `photo_missing`, 201 sinon) ; test dans `cv-simule.test.ts`.
+- **Contrats** : `docs/contrat-api-cv.md` (section `POST /cv/me/photo/enhance`, 2026-11-06),
+  `docs/contrat-api-consentement-ia.md` (la route dans la table des usages).
+
+### Non vérifié / à savoir
+
+- **Rien vu sur un appareil ni sur le simulateur** dans cette session (types, lint, Prettier,
+  Jest, export Metro seulement). À regarder : la hauteur de l'écran photo avec quatre boutons sur
+  un petit iPhone, le fondu entre les trois temps, la lisibilité des deux portraits en mode sombre.
+- En **SIMULATION**, la « retravaillée » est la même image : on éprouve le parcours, pas le rendu.
+  Le vrai rendu (Gemini image, tâche LLM `portrait`) se juge en production, ~10 s d'attente — le
+  bouton le dit (« Karria travaille ta photo… »).
+- La **création** garde son icône « étincelles » et ses libellés (« Oui, améliore-la ») : seul le
+  texte de la promesse est partagé ; je n'ai pas retouché son esthétique, hors périmètre.
+- Les avertissements `act()` dans la sortie de Jest viennent de l'atelier (`file-de-rendu.ts`),
+  chantier d'un autre agent ; aucun des miens.
+- **Reste** : relire et fusionner `feat/portrait` (app **et** API — l'app appelle une route que
+  seule la branche API sert ; fusionner l'API d'abord), puis vérifier sur iPhone avec une vraie
+  photo.
 
 ## Session du 2026-11-05 (soir) — la couleur principale du CV se choisit dans l'atelier (Fable)
 
