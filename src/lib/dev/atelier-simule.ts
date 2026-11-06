@@ -111,6 +111,8 @@ interface ExportSimule {
   template: { id: string; label: string; version: number };
   ats_safe: boolean;
   primary_color: string | null;
+  /** Lettre : le style servi ; `null` pour un CV. */
+  letter_style: StyleDeLettre | null;
   dossier_id: string | null;
   company_name: string | null;
   created_at: string;
@@ -133,9 +135,18 @@ interface EnvoiSimule {
 /** Les modèles que le faux serveur sait rendre : les trois de
  *  `modeles-simule.ts`, par identifiant. Recopiés ici — le faux serveur est
  *  le contrat, il ne dépend pas du reste. */
+/** `lettre` : le modèle a une lettre assortie (ADR-0036) ; sinon la lettre
+ *  sobre est servie quoi qu'on demande — comme le vrai serveur. */
 const MODELES: Record<
   string,
-  { label: string; colonnes: 1 | 2; accent: string; police: string; premium: boolean }
+  {
+    label: string;
+    colonnes: 1 | 2;
+    accent: string;
+    police: string;
+    premium: boolean;
+    lettre: boolean;
+  }
 > = {
   "6f1c2b0e-8d4a-4c1e-9a57-0b3f1e2d4c01": {
     label: "Meridian",
@@ -143,6 +154,7 @@ const MODELES: Record<
     accent: "#1f2937",
     police: "Georgia, serif",
     premium: false,
+    lettre: true,
   },
   "9b2e7c41-3f6d-4a8b-b1c2-5e7f9a0d1b02": {
     label: "Marketing",
@@ -150,6 +162,7 @@ const MODELES: Record<
     accent: "#3f3f46",
     police: "Helvetica, Arial, sans-serif",
     premium: false,
+    lettre: false,
   },
   "c4d81a93-7e25-4f0b-8c6d-2a9e4b7f3c03": {
     label: "Minimalist",
@@ -157,8 +170,25 @@ const MODELES: Record<
     accent: "#0f766e",
     police: "Futura, 'Trebuchet MS', sans-serif",
     premium: true,
+    lettre: false,
   },
 };
+
+type StyleDeLettre = "template" | "plain";
+
+/** Le style réellement servi pour un choix : la lettre assortie n'existe que si
+ *  le modèle en a une, et elle est le défaut. `undefined` : choix invalide. */
+function styleServi(templateId: string, demande: unknown): StyleDeLettre | undefined {
+  if (
+    demande !== null &&
+    demande !== undefined &&
+    demande !== "template" &&
+    demande !== "plain"
+  )
+    return undefined;
+  if (!MODELES[templateId]?.lettre) return "plain";
+  return demande === "plain" ? "plain" : "template";
+}
 
 const ADRESSE_DU_COMPTE = "toi@exemple.fr";
 const ENVOIS_PAR_JOUR = 5;
@@ -476,9 +506,21 @@ export function htmlDeLettre(
   lettre: LettreRecue,
   templateId: string,
   couleur: string | null = null,
-): { html: string; pages: number; warnings: string[] } {
+  style: StyleDeLettre = "plain",
+): {
+  html: string;
+  pages: number;
+  warnings: string[];
+  letter_style_served: StyleDeLettre;
+} {
   const modele = MODELES[templateId] ?? MODELES["9b2e7c41-3f6d-4a8b-b1c2-5e7f9a0d1b02"];
-  const decor = couleur ?? modele.accent;
+  // La lettre sobre ne porte aucune couleur de modèle : noir sur blanc, en
+  // Carlito (la jumelle de Calibri), comme la vraie. La lettre du modèle garde
+  // l'encre du modèle pour ses textes ; seul son décor prend la couleur choisie.
+  const sobre = style === "plain";
+  const decor = sobre ? "#111111" : (couleur ?? modele.accent);
+  const encre = sobre ? "#111111" : modele.accent;
+  const police = sobre ? "Carlito, Calibri, 'Segoe UI', sans-serif" : modele.police;
   const s = lettre.sender ?? {};
   const r = lettre.recipient ?? {};
   const nom = `${s.first_name ?? ""} ${s.last_name ?? ""}`.trim();
@@ -505,13 +547,13 @@ export function htmlDeLettre(
   const corpsTexte = paragraphes.reduce((n, p) => n + (p.text ?? "").length, 0);
   if (corpsTexte > 3_200) warnings.push("body_too_long");
 
-  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>fit</title><style>${styleDePage(modele.accent, decor, modele.police, 1, 1)}
-  .lettre { padding: 20mm 22mm; font-size: 11pt; line-height: 1.6; }
-  .exp { margin-bottom: 8mm; } .exp span { display: block; font-size: 9.5pt; color: #444; } .exp .nom { font-weight: 700; font-size: 12pt; color: #1b1b1b; }
+  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>fit</title><style>${styleDePage(encre, decor, police, 1, 1)}
+  .lettre { padding: ${sobre ? "22mm 25mm" : "20mm 22mm"}; font-size: 11pt; line-height: ${sobre ? "1.5" : "1.6"}; }
+  .exp { margin-bottom: 8mm; } .exp span { display: block; font-size: ${sobre ? "10.5pt" : "9.5pt"}; color: #444; } .exp .nom { font-weight: 700; font-size: ${sobre ? "15pt" : "12pt"}; color: #1b1b1b; }
   .dest { text-align: right; margin-bottom: 8mm; } .dest span { display: block; }
-  .objet { font-weight: 700; color: ${modele.accent}; margin: 6mm 0; }
-  p { margin: 0 0 4mm; text-align: justify; }
-  .signature { margin-top: 10mm; font-weight: 700; }
+  .objet { font-weight: 700; color: ${encre}; margin: 6mm 0; }
+  p { margin: 0 0 ${sobre ? "5.4mm" : "4mm"}; text-align: justify; }
+  .signature { margin-top: ${sobre ? "12mm" : "10mm"}; font-weight: ${sobre ? "400" : "700"}; }
   </style></head><body><div class="page"><div class="lettre">
   <div class="exp">${ancre("sender.full_name", nom, "span", "nom")}${ancre("sender.headline", s.headline)}${ancre("sender.email", s.email)}${ancre("sender.phone", s.phone)}${ancre("sender.city", s.city)}</div>
   <div class="dest">${logo}${ancre("recipient.company", r.company)}${ancre("recipient.city", r.city)}<span>${s.city ? `${echapper(s.city)}, le ${date}` : `Le ${date}`}</span></div>
@@ -521,7 +563,7 @@ export function htmlDeLettre(
   ${ancre("closing", lettre.closing ?? "Je vous prie d'agréer, Madame, Monsieur, mes salutations distinguées.", "p")}
   <div class="signature">${echapper(nom)}</div>
   </div></div>${scriptDeFit(1)}</body></html>`;
-  return { html, pages: 1, warnings };
+  return { html, pages: 1, warnings, letter_style_served: style };
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -684,6 +726,7 @@ function nouvelExport(
     template: { id: templateId, label: modele.label, version: 1 },
     ats_safe: atsSafe,
     primary_color: couleur,
+    letter_style: null,
     dossier_id: dossierId,
     company_name: companyName,
     created_at: new Date(maintenant).toISOString(),
@@ -773,10 +816,20 @@ export function repondreAtelier(
     }
     const letter = champ(corps, "letter");
     const cv = champ(corps, "cv");
-    if (letter && typeof letter === "object")
-      return json(200, htmlDeLettre(letter as LettreRecue, templateId, couleur));
+    if (letter && typeof letter === "object") {
+      const style = styleServi(templateId, champ(corps, "letter_style"));
+      if (style === undefined) {
+        return erreur(422, "invalid_input", "`letter_style` vaut template ou plain.", {
+          field: "letter_style",
+        });
+      }
+      return json(200, htmlDeLettre(letter as LettreRecue, templateId, couleur, style));
+    }
     if (cv && typeof cv === "object")
-      return json(200, htmlDuCv(cv as CvRecu, templateId, true, couleur));
+      return json(200, {
+        ...htmlDuCv(cv as CvRecu, templateId, true, couleur),
+        letter_style_served: null,
+      });
     return erreur(422, "nothing_to_render", "Ni CV, ni lettre.");
   }
 
@@ -874,16 +927,32 @@ export function repondreAtelier(
         ? (champ(corps, "dossier_id") as string)
         : null;
     const entreprise = (letter as LettreRecue).recipient?.company ?? null;
-    const exporte = nouvelExport(
-      "letter",
-      templateId,
-      dossierId,
-      entreprise,
-      false,
-      { explanation: null, explanation_status: "unavailable" },
-      1,
-      maintenant,
-    );
+    const style = styleServi(templateId, champ(corps, "letter_style"));
+    if (style === undefined) {
+      return erreur(422, "invalid_input", "`letter_style` vaut template ou plain.", {
+        field: "letter_style",
+      });
+    }
+    const couleurLettre = couleurRecue(corps);
+    if (couleurLettre === undefined) {
+      return erreur(422, "invalid_input", "Un code couleur s'écrit #rrggbb.", {
+        field: "primary_color",
+      });
+    }
+    const exporte = {
+      ...nouvelExport(
+        "letter",
+        templateId,
+        dossierId,
+        entreprise,
+        false,
+        { explanation: null, explanation_status: "unavailable" },
+        1,
+        maintenant,
+        couleurLettre,
+      ),
+      letter_style: style,
+    };
     etat.exports.set(exporte.id, exporte);
     return json(201, exporte);
   }

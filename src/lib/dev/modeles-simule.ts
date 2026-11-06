@@ -80,6 +80,25 @@ interface ChampsDuModele {
   ats: { readiness: "good" | "warning"; warnings: string[] };
 }
 
+/** La lettre que le modèle sert (ADR-0036) : assortie pour Meridian, la lettre
+ *  sobre pour les autres — la même image d'attente, le vrai serveur sert les
+ *  aperçus de la lettre. */
+function lettre(
+  nom: NomDImage,
+  image: { vignette: string | null; page: string | null; flou: string },
+) {
+  const assortie = nom === "meridian";
+  return {
+    id: assortie ? "template" : "plain",
+    label: assortie ? "Lettre assortie" : "Lettre sobre",
+    style: assortie ? ("template" as const) : ("plain" as const),
+    signed_thumbnail_url: image.vignette,
+    signed_preview_url: image.page,
+    signed_full_url: image.page,
+    thumbnail_blurhash: image.flou,
+  };
+}
+
 function modele(nom: NomDImage, champs: ChampsDuModele) {
   const image = IMAGES[nom];
   return {
@@ -90,7 +109,8 @@ function modele(nom: NomDImage, champs: ChampsDuModele) {
     signed_preview_url: image.page,
     signed_full_url: image.page,
     thumbnail_blurhash: image.flou,
-    cover_letters: [] as never[],
+    has_letter: nom === "meridian",
+    cover_letters: [lettre(nom, image)],
     version: 1,
     formats: ["pdf", "docx"],
     fields_added: ["headline"],
@@ -154,7 +174,7 @@ const MODELES = [
   }),
 ];
 
-/** Les pages du carrousel du détail (`GET /templates/{id}`). */
+/** Les pages du carrousel du détail (`GET /templates/{id}`) : le CV, puis la lettre. */
 function pages(m: (typeof MODELES)[number]) {
   return [
     {
@@ -162,7 +182,15 @@ function pages(m: (typeof MODELES)[number]) {
       label: "CV",
       signed_thumbnail_url: m.signed_thumbnail_url,
       signed_full_url: m.signed_full_url,
+      style: null,
     },
+    ...m.cover_letters.map((l) => ({
+      kind: "letter",
+      label: l.label,
+      signed_thumbnail_url: l.signed_thumbnail_url,
+      signed_full_url: l.signed_full_url,
+      style: l.style,
+    })),
   ];
 }
 

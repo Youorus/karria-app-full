@@ -94,6 +94,8 @@ interface DossierSimule {
   template_id: string | null;
   /** La couleur principale posée par la personne (`#RRGGBB`), ou `null` (ADR-0034). */
   primary_color: string | null;
+  /** Le style de lettre retenu (`template` | `plain`), ou `null` : par défaut (ADR-0036). */
+  letter_style: "template" | "plain" | null;
   cv: Record<string, unknown>;
   cv_base_hash: string;
   base_changed: boolean;
@@ -526,6 +528,7 @@ function versDossier(d: DossierSimule) {
     offer: d.offer,
     template_id: d.template_id,
     primary_color: d.primary_color,
+    letter_style: d.letter_style,
     cv: d.cv,
     cv_base_hash: d.cv_base_hash,
     base_changed: d.base_changed,
@@ -549,6 +552,7 @@ function versCarte(d: DossierSimule) {
     offer: { offer_id, title, company, logo_url, city, contract_label, source_url },
     template_id: d.template_id,
     primary_color: d.primary_color,
+    letter_style: d.letter_style,
     status: statutDe(d),
     adaptation: d.adaptation,
     coverage_ratio: couverture(d.offer, d.cv).ratio,
@@ -572,6 +576,7 @@ function nouveauDossier(
     offer: offre,
     template_id: template,
     primary_color: null,
+    letter_style: null,
     cv: copie(cv),
     cv_base_hash: empreinte(cv),
     base_changed: false,
@@ -900,6 +905,27 @@ export function repondreCandidatures(
     }
     if (dossier.primary_color !== couleur) {
       dossier.primary_color = couleur;
+      toucher(dossier, maintenant);
+    }
+    return json(200, versDossier(dossier));
+  }
+
+  if (reste === "letter-style" && methode === "PUT") {
+    // Le style de lettre du dossier (ADR-0036) : `template` | `plain` | null.
+    // Retenu tel quel ; c'est le rendu qui dit le style servi. Idempotent.
+    if (!("letter_style" in ((corps ?? {}) as Record<string, unknown>))) {
+      return erreur(422, "invalid_input", "`letter_style` est requis (ou null).", {
+        field: "letter_style",
+      });
+    }
+    const style = champ(corps, "letter_style");
+    if (style !== null && style !== "template" && style !== "plain") {
+      return erreur(422, "invalid_input", "`letter_style` vaut template ou plain.", {
+        field: "letter_style",
+      });
+    }
+    if (dossier.letter_style !== style) {
+      dossier.letter_style = style;
       toucher(dossier, maintenant);
     }
     return json(200, versDossier(dossier));

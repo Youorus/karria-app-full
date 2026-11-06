@@ -42,13 +42,12 @@ sont limitées à **30 appels par 10 minutes et par compte** (`429 ai_rate_limit
     "excerpt": "Nous recherchons une conseillère…", // une ligne
     "description": "Nous recherchons…", // le texte complet, figé
     "keywords": ["conseillere de vente", "relation client", "caisse", "…"],
-    "published_at": "2026-11-01T00:00:00Z"
+    "published_at": "2026-11-01T00:00:00Z",
   },
   "template_id": null, // le modèle de CV choisi, ou null
   "primary_color": null, // la couleur principale posée par la personne (#RRGGBB), ou null (ADR-0034)
-  "cv": {
-    /* la copie adaptée, au format GET /cv/me, SANS image_url ni id */
-  },
+  "letter_style": null, // le style de lettre retenu : "template" | "plain" | null (ADR-0036)
+  "cv": {/* la copie adaptée, au format GET /cv/me, SANS image_url ni id */},
   "cv_base_hash": "3f9a…",
   "base_changed": false, // le CV de base a changé (ou disparu) depuis la copie
   "propositions": [
@@ -58,7 +57,7 @@ sont limitées à **30 appels par 10 minutes et par compte** (`429 ai_rate_limit
       "before": "Vendeuse",
       "after": "Conseillère de vente",
       "reason": "L'offre nomme le poste ainsi.",
-      "state": "acceptee" // proposee | acceptee | refusee
+      "state": "acceptee", // proposee | acceptee | refusee
     },
     {
       "id": "8e2f…",
@@ -66,7 +65,7 @@ sont limitées à **30 appels par 10 minutes et par compte** (`429 ai_rate_limit
       "before": "Accueillir les clients",
       "after": "Accueillir et conseiller les clients",
       "reason": "L'offre insiste sur le conseil.",
-      "state": "proposee"
+      "state": "proposee",
     },
     {
       "id": "9f30…",
@@ -74,8 +73,8 @@ sont limitées à **30 appels par 10 minutes et par compte** (`429 ai_rate_limit
       "before": [{ "id": "…", "name": "Caisse", "level": "advanced" }, "…"],
       "after": [{ "id": "…", "name": "Relation client", "level": "expert" }, "…"],
       "reason": "La relation client d'abord.",
-      "state": "proposee"
-    }
+      "state": "proposee",
+    },
   ],
   "letter": null, // ou Letter, voir plus bas
   "coverage": { "present": ["caisse", "…"], "missing": ["merchandising"], "ratio": 0.75 },
@@ -84,7 +83,7 @@ sont limitées à **30 appels par 10 minutes et par compte** (`429 ai_rate_limit
   "adaptation_error": null, // ai_unavailable | ai_output_invalid | queue_unavailable si echouee
   "applied_at": null,
   "created_at": "2026-11-05T10:00:00Z",
-  "updated_at": "2026-11-05T10:00:04Z"
+  "updated_at": "2026-11-05T10:00:04Z",
 }
 ```
 
@@ -123,9 +122,9 @@ sont limitées à **30 appels par 10 minutes et par compte** (`429 ai_rate_limit
     { "kind": "interet_entreprise", "text": "…" },
     { "kind": "interet_poste", "text": "…" },
     { "kind": "competences", "text": "…" },
-    { "kind": "pourquoi_moi", "text": "…" }
+    { "kind": "pourquoi_moi", "text": "…" },
   ],
-  "closing": "Je vous prie d'agréer, Madame, Monsieur, mes salutations distinguées."
+  "closing": "Je vous prie d'agréer, Madame, Monsieur, mes salutations distinguées.",
 }
 ```
 
@@ -139,9 +138,18 @@ avec le nom du CV. Même forme que ce que `documents` met en page (ADR-0030).
 ```jsonc
 {
   "id": "9a4b…",
-  "offer": { "offer_id": "…", "title": "…", "company": "…", "logo_url": "…", "city": "…", "contract_label": "CDI", "source_url": "…" },
+  "offer": {
+    "offer_id": "…",
+    "title": "…",
+    "company": "…",
+    "logo_url": "…",
+    "city": "…",
+    "contract_label": "CDI",
+    "source_url": "…",
+  },
   "template_id": null,
   "primary_color": null,
+  "letter_style": null,
   "status": "candidate",
   "adaptation": "faite",
   "coverage_ratio": 0.75,
@@ -149,7 +157,7 @@ avec le nom du CV. Même forme que ce que `documents` met en page (ADR-0030).
   "has_letter": true,
   "applied_at": "2026-11-06T09:12:00Z",
   "created_at": "…",
-  "updated_at": "…"
+  "updated_at": "…",
 }
 ```
 
@@ -233,6 +241,19 @@ Corps `{ "decision": "accepter" | "refuser" | "revenir" }`. `accepter` applique
 `404 proposition_not_found` ; `409 proposition_path_invalid` si l'élément visé
 a été retiré du CV à la main.
 
+### `PUT /applications/{id}/letter-style` → `200 Dossier`
+
+**2026-11-06, ADR-0036.** Corps `{ "letter_style": "template" | "plain" | null }`.
+`template` : la lettre assortie du modèle de CV ; `plain` : la lettre sobre de Karria (page
+blanche) ; `null` : par défaut — l'assortie si le modèle du dossier en a une, sinon la sobre.
+Le dossier **retient** le choix (il survit au changement de modèle et d'appareil) ; c'est le
+rendu et l'export de `documents` qui disent le style réellement servi (`letter_style_served`,
+`letter_style`) — un modèle sans lettre assortie sert la sobre quoi qu'il en soit. Rien
+d'autre ne change ; idempotent ; `422` hors `template` | `plain` | `null` ; `404
+dossier_not_found`. Le dossier (`Dossier`) et la carte (`CarteDossier`) portent
+**`letter_style`**. L'app envoie ce style dans `letter_style` du rendu et de l'export de la
+lettre (`contrat-api-documents.md`).
+
 ### `POST /applications/{id}/letter` → `200 Dossier`
 
 Karria écrit la première ébauche à partir de l'offre (et de ce que l'index
@@ -262,22 +283,22 @@ Retour à `brouillon` ou `pret` ; le fil retire `applied`. Idempotent.
 
 ## Les raisons d'erreur, en un tableau
 
-| Statut | `details.reason` | Quand |
-|---|---|---|
-| 401 | `unauthenticated` / `session_expired` | sans session, ou jeton périmé |
-| 403 | `ai_consent_required` | créer, relancer, ébaucher, réécrire sans accord à l'IA |
-| 403 | `template_locked` | modèle Premium non possédé (ouverture, ou `PUT /{id}/template`) |
-| 404 | `dossier_not_found`, `offer_not_found`, `proposition_not_found`, `letter_missing`, `paragraph_not_found` | |
-| 409 | `cv_missing` | pas de CV de base |
-| 409 | `adaptation_in_progress` | retoucher ou ébaucher pendant l'adaptation |
-| 409 | `adaptation_not_failed` | relancer sans échec |
-| 409 | `proposition_path_invalid` | l'élément visé n'existe plus |
-| 409 | `proposition_invalid` | la valeur ne tient pas dans son chemin (`details.path`, `details.why`), ou rend le CV invalide |
-| 409 | `dossier_conflict` | le dossier a été modifié pendant l'appel au modèle : relire et réessayer |
-| 422 | `cv_invalid`, `letter_invalid` | forme refusée, `details.fields` |
-| 422 | `cv_too_large` | corps de `PUT /{id}/cv` au-delà de 256 Kio (`details.size`, `details.limit`) |
-| 429 | `ai_rate_limited` | plus de 30 appels au modèle en 10 minutes pour ce compte ; `details.retry_after` en secondes |
-| 503 | `ai_unavailable`, `ai_output_invalid` | le modèle ne répond pas, ou hors schéma |
+| Statut | `details.reason`                                                                                         | Quand                                                                                          |
+| ------ | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| 401    | `unauthenticated` / `session_expired`                                                                    | sans session, ou jeton périmé                                                                  |
+| 403    | `ai_consent_required`                                                                                    | créer, relancer, ébaucher, réécrire sans accord à l'IA                                         |
+| 403    | `template_locked`                                                                                        | modèle Premium non possédé (ouverture, ou `PUT /{id}/template`)                                |
+| 404    | `dossier_not_found`, `offer_not_found`, `proposition_not_found`, `letter_missing`, `paragraph_not_found` |                                                                                                |
+| 409    | `cv_missing`                                                                                             | pas de CV de base                                                                              |
+| 409    | `adaptation_in_progress`                                                                                 | retoucher ou ébaucher pendant l'adaptation                                                     |
+| 409    | `adaptation_not_failed`                                                                                  | relancer sans échec                                                                            |
+| 409    | `proposition_path_invalid`                                                                               | l'élément visé n'existe plus                                                                   |
+| 409    | `proposition_invalid`                                                                                    | la valeur ne tient pas dans son chemin (`details.path`, `details.why`), ou rend le CV invalide |
+| 409    | `dossier_conflict`                                                                                       | le dossier a été modifié pendant l'appel au modèle : relire et réessayer                       |
+| 422    | `cv_invalid`, `letter_invalid`                                                                           | forme refusée, `details.fields`                                                                |
+| 422    | `cv_too_large`                                                                                           | corps de `PUT /{id}/cv` au-delà de 256 Kio (`details.size`, `details.limit`)                   |
+| 429    | `ai_rate_limited`                                                                                        | plus de 30 appels au modèle en 10 minutes pour ce compte ; `details.retry_after` en secondes   |
+| 503    | `ai_unavailable`, `ai_output_invalid`                                                                    | le modèle ne répond pas, ou hors schéma                                                        |
 
 ## Ce que l'app doit prévoir
 

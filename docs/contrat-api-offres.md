@@ -127,7 +127,7 @@ Paramètres de requête, tous facultatifs et combinables (les listes en CSV) :
 | `limit`           | 1–50, défaut 20                                                      | taille de page                                                                                                                   |
 | `offset`          | ≥ 0                                                                  | décalage ; `has_next` dit s'il reste des pages                                                                                   |
 | `sort`            | `relevance` \| `fresh` \| `nearest`                                  | voir « Le tri » ; `nearest` sans recherche localisée → `422 nearest_unavailable`                                                 |
-| `saved_only`      | bool                                                                 | les offres gardées (toutes, même expirées, **quelle que soit la vue**) ; les autres filtres et le tri s'y appliquent              |
+| `saved_only`      | bool                                                                 | les offres gardées (toutes, même expirées, **quelle que soit la vue**) ; les autres filtres et le tri s'y appliquent             |
 | `unseen_only`     | bool                                                                 | jamais affichées                                                                                                                 |
 | `unapplied_only`  | bool                                                                 | pas encore postulées                                                                                                             |
 | `contract_types`  | CSV de `cdi, cdd, interim, alternance, stage, freelance, saisonnier` |                                                                                                                                  |
@@ -284,10 +284,10 @@ l'apprentissage du classement (ADR-0019). Les envoyer quand on les connaît.
 
 ## Erreurs
 
-| Code HTTP | `error.code`      | Quand                                                                         |
-| --------- | ----------------- | ----------------------------------------------------------------------------- |
+| Code HTTP | `error.code`      | Quand                                                                                                                                                      |
+| --------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 401       | `unauthenticated` | session absente sur une route qui l'exige ; `account_required` pour un filtre personnel sans compte ; `session_expired` pour un jeton présenté mais refusé |
-| 403       | `forbidden`       | `ai_consent_required` sur `POST /assistant/messages` (voir `contrat-api-consentement-ia.md`) |
-| 429       | `rate_limited`    | `anonymous_rate_limited` (lecture sans compte, `retry_after`) ; `assistant_rate_limited` |
-| 404       | `offer_not_found` | `{id}` inconnu                                                                |
-| 422       | `invalid_input`   | paramètre hors bornes, `interaction_empty`, lieu incomplet (`lat` sans `lng`), `nearest_unavailable` |
+| 403       | `forbidden`       | `ai_consent_required` sur `POST /assistant/messages` (voir `contrat-api-consentement-ia.md`)                                                               |
+| 429       | `rate_limited`    | `anonymous_rate_limited` (lecture sans compte, `retry_after`) ; `assistant_rate_limited`                                                                   |
+| 404       | `offer_not_found` | `{id}` inconnu                                                                                                                                             |
+| 422       | `invalid_input`   | paramètre hors bornes, `interaction_empty`, lieu incomplet (`lat` sans `lng`), `nearest_unavailable`                                                       |

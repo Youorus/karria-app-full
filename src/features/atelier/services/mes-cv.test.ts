@@ -19,6 +19,7 @@ function exporte(partiel: Partial<Export>): Export {
     docx: null,
     ats: null,
     couleur: null,
+    styleLettre: null,
     ...partiel,
   };
 }

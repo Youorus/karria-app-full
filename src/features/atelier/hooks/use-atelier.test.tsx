@@ -134,7 +134,7 @@ function unModele(id: string, libelle: string, premium: boolean): Modele {
     police: null,
     avecPhoto: true,
     apercus: [],
-    avecLettre: false,
+    lettreAssortie: false,
   };
 }
 // Les fabriques de `jest.mock` sont hissées : elles ne voient que des
@@ -168,6 +168,7 @@ jest.mock("@/features/cv/api/cv.api", () => ({ lireMonCv: async () => mockCv }))
 const mockDossier: Dossier = {
   id: "dos_1",
   couleur: null,
+  styleLettre: null,
   offre: {
     id: "offre_1",
     titre: "Conseillère de vente",

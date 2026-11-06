@@ -35,7 +35,14 @@ Les prix sont ceux du serveur, en **centimes TTC** : l'app n'en écrit aucun.
     "interval": "month"
   },
   "coffees": [
-    { "count": 1, "lookup_key": "karria_coffee_1", "label": "1 café pour l'équipe Karria", "amount_cents": 299, "currency": "eur", "interval": null },
+    {
+      "count": 1,
+      "lookup_key": "karria_coffee_1",
+      "label": "1 café pour l'équipe Karria",
+      "amount_cents": 299,
+      "currency": "eur",
+      "interval": null
+    },
     { "count": 2, "amount_cents": 499, "...": "…" },
     { "count": 3, "amount_cents": 799, "...": "…" },
     { "count": 5, "amount_cents": 1299, "...": "…" }
