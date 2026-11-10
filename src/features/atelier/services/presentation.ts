@@ -86,7 +86,8 @@ export const TEXTES = {
   // La couleur principale (ADR-0034).
   couleur: "Couleur",
   couleurTitre: "Quelle couleur ?",
-  couleurSousTitre: "Les titres, les filets et les bandes du modèle.",
+  couleurSousTitre:
+    "Ta couleur habille les bandes, les filets et les puces. Le texte reste lisible.",
   couleurOrigine: "D'origine",
   couleurNuance: "Plus clair ou plus sombre",
   couleurPlusClair: "Plus clair",
@@ -123,6 +124,12 @@ export const TEXTES = {
     "Ex. : plus court, plus direct, cite mon expérience chez Zara",
   lettreGarderAncien: "Garder l'ancien",
   lettreGarderNouveau: "Garder le nouveau",
+  // Le style de la lettre (ADR-0036) : celle du modèle, ou la sobre.
+  lettreStyleModele: "Du modèle",
+  lettreStyleSobre: "Sobre",
+  lettreStyleAide: "Style de la lettre",
+  lettreStyleNonRetenu:
+    "Ce style est appliqué ici, mais le dossier n'a pas pu le retenir. Il sera réessayé.",
   lettreHorsLettre:
     "Ces informations viennent de ton CV et de l'offre : modifie-les dans l'atelier.",
   // L'atelier libre (« Nouveau CV », sans dossier).

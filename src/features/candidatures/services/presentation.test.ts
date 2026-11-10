@@ -21,6 +21,7 @@ function carte(partiel: Partial<CarteDossier>): CarteDossier {
   return {
     id: "d1",
     couleur: null,
+    styleLettre: null,
     offre: {
       id: "o1",
       titre: "Vendeuse",

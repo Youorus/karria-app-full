@@ -64,7 +64,18 @@ Seuls les modèles **publiés** (passés par la porte de qualité de l'ADR-0020)
     "primary_color": "#000000",
     "font_family": "Raleway",
     "has_photo": true,
-    "cover_letters": [],
+    "has_letter": false,
+    "cover_letters": [
+      {
+        "id": "plain",
+        "label": "Lettre sobre",
+        "style": "plain",
+        "signed_thumbnail_url": "https://…/plain-letter/v1/vignette.webp?…",
+        "signed_preview_url": "https://…/plain-letter/v1/apercu.png?…",
+        "signed_full_url": "https://…/plain-letter/v1/apercu_pleine_page.png?…",
+        "thumbnail_blurhash": "dBSs50…"
+      }
+    ],
     "version": 1,
     "columns": 2,
     "formats": ["pdf", "docx"],
@@ -75,8 +86,17 @@ Seuls les modèles **publiés** (passés par la porte de qualité de l'ADR-0020)
 ]
 ```
 
-- `primary_color` et `font_family` sont **mesurés** dans le PDF du modèle (couleur
-  dominante des titres, famille principale), plus des étiquettes déclaratives.
+- `primary_color` et `font_family` sont **mesurés** dans le PDF du modèle, plus des
+  étiquettes déclaratives. **2026-11-06 (ADR-0034)** : `primary_color` est la couleur du
+  **décor** du modèle — bandes, filets, puces, dominante par surface — et non celle des
+  titres ; c'est ce que la couleur choisie dans l'atelier remplace (le texte ne bouge pas).
+  `null` : un modèle sans décor, que la couleur n'habille pas.
+- `cover_letters` (**2026-11-06, ADR-0036**) : la lettre que ce modèle sert — exactement ce
+  que l'atelier rend. Un seul élément : la lettre **assortie** (`id: "template"`, `style:
+"template"`, « Lettre assortie », ingérée avec le CV et mesurée par la même porte) si le
+  modèle en a une — `has_letter: true` —, sinon la lettre **sobre** de Karria (`id: "plain"`,
+  « Lettre sobre », page blanche, Carlito 11 pt), dont les aperçus sont communs à tous les
+  modèles. Vide tant que la commande `plain-letter` n'a pas tourné sur l'environnement.
 - `fields_added` : les champs que le modèle d'origine n'avait pas et que Karria ajoute
   dans son style (aujourd'hui `headline`, le poste visé). Rien à faire côté app, c'est
   une information pour le détail.
@@ -106,14 +126,27 @@ Seuls les modèles **publiés** (passés par la porte de qualité de l'ADR-0020)
 
 ## `GET /templates/{id}` → `200 Modele`
 
-Le même objet, plus `pages` : les images du carrousel (le CV d'exemple, puis les
-lettres assorties). `404 template_not_found`.
+Le même objet, plus `pages` : les images du carrousel (le CV d'exemple, puis sa lettre —
+assortie, sinon sobre). `404 template_not_found`.
 
 ```json
 {
   "…": "…",
   "pages": [
-    { "kind": "cv", "label": "CV", "signed_thumbnail_url": "…", "signed_full_url": "…" }
+    {
+      "kind": "cv",
+      "label": "CV",
+      "signed_thumbnail_url": "…",
+      "signed_full_url": "…",
+      "style": null
+    },
+    {
+      "kind": "letter",
+      "label": "Lettre sobre",
+      "signed_thumbnail_url": "…",
+      "signed_full_url": "…",
+      "style": "plain"
+    }
   ]
 }
 ```
@@ -133,8 +166,9 @@ lettres assorties). `404 template_not_found`.
   possédé. Le choix sert de modèle par défaut aux exports. **2026-11-05 (ADR-0034)** :
   `primary_color` est la couleur principale posée par la personne (`#RRGGBB`, `null` = celle
   du modèle, `422` sur un autre code) ; `default_primary_color` est la couleur d'origine du
-  modèle choisi (sa `primary_color` de galerie), pour afficher « D'origine ». Le `PUT`
-  **remplace** le choix entier : omettre `primary_color` la retire.
+  modèle choisi (sa `primary_color` de galerie — **la couleur de son décor** depuis le
+  2026-11-06), pour afficher « D'origine ». Le `PUT` **remplace** le choix entier : omettre
+  `primary_color` la retire.
 
 ```json
 {
@@ -259,7 +293,6 @@ défaut ; `format` dit lequel). `score` sur 100 ; `level` : `good` (≥ 85), `fa
 
 Un export garde la **version** du modèle qui l'a produit : le même document se reproduit
 à l'identique même après une nouvelle version du modèle.
-
 
 ## Notes de service (backend, 2026-10-24)
 

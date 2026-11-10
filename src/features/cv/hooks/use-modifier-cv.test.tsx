@@ -23,20 +23,40 @@ const mockLireMonCv = jest.fn<() => Promise<Cv>>();
 const mockModifier =
   jest.fn<(c: CleChapitre, contenu: Jet | Jet[] | null) => Promise<Cv>>();
 const mockBack = jest.fn();
+const mockTeleverser =
+  jest.fn<
+    (
+      uri: string,
+      ameliorer: boolean,
+    ) => Promise<{ image: string; imageId: string; amelioree: boolean }>
+  >();
+const mockAmeliorerActuelle =
+  jest.fn<() => Promise<{ image: string; imageId: string; amelioree: boolean }>>();
+const mockChoisir = jest.fn<(source: string) => Promise<string | null>>();
+const mockRejouer =
+  jest.fn<(cause: unknown, usage: string, action: () => void) => boolean>();
 let mockSection = "identity";
 
 jest.mock("../api/cv.api", () => ({
   lireMonCv: () => mockLireMonCv(),
   modifierSection: (c: CleChapitre, contenu: Jet | Jet[] | null) =>
     mockModifier(c, contenu),
-  televerserPhoto: jest.fn(),
+  televerserPhoto: (uri: string, ameliorer: boolean) => mockTeleverser(uri, ameliorer),
+  ameliorerPhotoActuelle: () => mockAmeliorerActuelle(),
+}));
+jest.mock("@/features/auth/hooks/use-action-ia", () => ({
+  useActionIa: () => ({
+    avecConsentement: (_usage: string, action: () => void) => action(),
+    rejouerSiConsentementRequis: (cause: unknown, usage: string, action: () => void) =>
+      mockRejouer(cause, usage, action),
+  }),
 }));
 jest.mock("expo-router", () => ({
   useRouter: () => ({ back: mockBack, push: jest.fn(), replace: jest.fn() }),
   useLocalSearchParams: () => ({ section: mockSection }),
 }));
 jest.mock("./use-choix-photo", () => ({
-  useChoixPhoto: () => ({ probleme: null, choisir: jest.fn() }),
+  useChoixPhoto: () => ({ probleme: null, choisir: (s: string) => mockChoisir(s) }),
 }));
 
 const cv: Cv = {
@@ -302,5 +322,169 @@ describe("Modifier une section", () => {
     if (valeur?.section !== "experiences") throw new Error("section inattendue");
     expect(valeur.valeur.map((e) => e.entreprise)).toEqual(["Lidl", "Carrefour"]);
     expect(mockBack).not.toHaveBeenCalled();
+  });
+});
+
+describe("La photo : la changer, et la rendre plus pro", () => {
+  const avecPhoto: Cv = { ...cv, photo: "https://s/actuelle.jpg" };
+
+  beforeEach(() => {
+    mockSection = "photo";
+    mockLireMonCv.mockReset();
+    mockModifier.mockReset();
+    mockTeleverser.mockReset();
+    mockAmeliorerActuelle.mockReset();
+    mockChoisir.mockReset();
+    mockRejouer.mockReset().mockReturnValue(false);
+    mockModifier.mockImplementation((_c, contenu) =>
+      Promise.resolve({
+        ...cv,
+        photo:
+          contenu !== null && !Array.isArray(contenu) && contenu.chapitre === "photo"
+            ? contenu.donnees.image
+            : null,
+      }),
+    );
+  });
+
+  it("propose l'amélioration après le choix, compare, puis retient la retravaillée par son identifiant", async () => {
+    mockLireMonCv.mockResolvedValue(cv);
+    mockChoisir.mockResolvedValue("file:///nouvelle.jpg");
+    mockTeleverser.mockResolvedValue({
+      image: "https://s/retravaillee.jpg",
+      imageId: "img_2",
+      amelioree: true,
+    });
+    const { result } = renderHook(() => useModifierCv());
+    await waitFor(() => expect(result.current.chargement).toBe(false));
+
+    act(() => result.current.photo.changer("galerie"));
+    await waitFor(() =>
+      expect(result.current.photo.etape).toEqual({
+        nom: "amelioration",
+        originale: "file:///nouvelle.jpg",
+      }),
+    );
+    // Rien n'est parti : la décision est à la personne.
+    expect(mockTeleverser).not.toHaveBeenCalled();
+
+    act(() => result.current.photo.ameliorer(true));
+    await waitFor(() => expect(result.current.photo.etape.nom).toBe("comparaison"));
+    expect(mockTeleverser).toHaveBeenCalledWith("file:///nouvelle.jpg", true);
+    expect(result.current.photo.etape).toMatchObject({
+      origine: "nouvelle",
+      originale: "file:///nouvelle.jpg",
+      amelioree: "https://s/retravaillee.jpg",
+      idAmelioree: "img_2",
+    });
+
+    act(() => result.current.photo.garder("amelioree"));
+    await waitFor(() => expect(result.current.enregistrement).toBe("fait"));
+    expect(mockModifier).toHaveBeenCalledWith("photo", {
+      chapitre: "photo",
+      donnees: { image: "https://s/retravaillee.jpg", imageId: "img_2" },
+    });
+    expect(result.current.photo.etape).toEqual({ nom: "repos" });
+    expect(result.current.valeur).toEqual({
+      section: "photo",
+      valeur: { image: "https://s/retravaillee.jpg", imageId: null },
+    });
+  });
+
+  it("garder l'originale d'une nouvelle photo l'envoie telle quelle ; refuser l'amélioration aussi", async () => {
+    mockLireMonCv.mockResolvedValue(cv);
+    mockChoisir.mockResolvedValue("file:///nouvelle.jpg");
+    mockTeleverser.mockResolvedValue({
+      image: "https://s/nouvelle.jpg",
+      imageId: "img_1",
+      amelioree: false,
+    });
+    const { result } = renderHook(() => useModifierCv());
+    await waitFor(() => expect(result.current.chargement).toBe(false));
+
+    act(() => result.current.photo.changer("camera"));
+    await waitFor(() => expect(result.current.photo.etape.nom).toBe("amelioration"));
+    act(() => result.current.photo.ameliorer(false));
+    await waitFor(() => expect(result.current.enregistrement).toBe("fait"));
+    expect(mockTeleverser).toHaveBeenCalledWith("file:///nouvelle.jpg", false);
+    expect(mockModifier).toHaveBeenCalledWith("photo", {
+      chapitre: "photo",
+      donnees: { image: "https://s/nouvelle.jpg", imageId: "img_1" },
+    });
+  });
+
+  it("retravaille la photo déjà en place sans la rechoisir, et la garder ne demande rien", async () => {
+    mockLireMonCv.mockResolvedValue(avecPhoto);
+    mockAmeliorerActuelle.mockResolvedValue({
+      image: "https://s/retravaillee.jpg",
+      imageId: "img_9",
+      amelioree: true,
+    });
+    const { result } = renderHook(() => useModifierCv());
+    await waitFor(() => expect(result.current.chargement).toBe(false));
+
+    act(() => result.current.photo.ameliorerActuelle());
+    await waitFor(() => expect(result.current.photo.etape.nom).toBe("comparaison"));
+    expect(mockAmeliorerActuelle).toHaveBeenCalledTimes(1);
+    expect(mockChoisir).not.toHaveBeenCalled();
+    expect(result.current.photo.etape).toMatchObject({
+      origine: "actuelle",
+      originale: "https://s/actuelle.jpg",
+      amelioree: "https://s/retravaillee.jpg",
+    });
+
+    act(() => result.current.photo.garder("originale"));
+    expect(result.current.photo.etape).toEqual({ nom: "repos" });
+    expect(mockModifier).not.toHaveBeenCalled();
+    expect(mockTeleverser).not.toHaveBeenCalled();
+  });
+
+  it("dit avec des mots un refus du générateur et laisse l'originale", async () => {
+    mockLireMonCv.mockResolvedValue(avecPhoto);
+    mockAmeliorerActuelle.mockRejectedValue(
+      new ErreurApi("Impossible d'améliorer", 422, "photo_enhance_refused"),
+    );
+    const { result } = renderHook(() => useModifierCv());
+    await waitFor(() => expect(result.current.chargement).toBe(false));
+
+    act(() => result.current.photo.ameliorerActuelle());
+    await waitFor(() => expect(result.current.photo.etape.nom).toBe("comparaison"));
+    expect(result.current.photo.etape).toMatchObject({
+      amelioree: null,
+      idAmelioree: null,
+    });
+    expect(result.current.photo.probleme).toMatch(/une autre/);
+    expect(result.current.photo.probleme).not.toMatch(/photo_enhance/);
+    expect(result.current.photo.enCours).toBe(false);
+  });
+
+  it("sur un 403 d'accord IA, ouvre la feuille et rejoue le geste sans afficher d'erreur", async () => {
+    mockLireMonCv.mockResolvedValue(avecPhoto);
+    mockAmeliorerActuelle
+      .mockRejectedValueOnce(new ErreurApi("accord", 403, "ai_consent_required"))
+      .mockResolvedValueOnce({
+        image: "https://s/retravaillee.jpg",
+        imageId: "img_3",
+        amelioree: true,
+      });
+    let rejeu: (() => void) | null = null;
+    mockRejouer.mockImplementation((cause, usage, action) => {
+      if (!(cause instanceof ErreurApi) || cause.raison !== "ai_consent_required")
+        return false;
+      expect(usage).toBe("photo_enhancement");
+      rejeu = action;
+      return true;
+    });
+    const { result } = renderHook(() => useModifierCv());
+    await waitFor(() => expect(result.current.chargement).toBe(false));
+
+    act(() => result.current.photo.ameliorerActuelle());
+    await waitFor(() => expect(rejeu).not.toBeNull());
+    expect(result.current.photo.etape).toEqual({ nom: "repos" });
+    expect(result.current.photo.probleme).toBeNull();
+
+    act(() => rejeu?.());
+    await waitFor(() => expect(result.current.photo.etape.nom).toBe("comparaison"));
+    expect(mockAmeliorerActuelle).toHaveBeenCalledTimes(2);
   });
 });

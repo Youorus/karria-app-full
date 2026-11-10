@@ -7,8 +7,9 @@
  * - le carrousel : le CV puis ses lettres, plein écran au toucher ;
  * - la catégorie en capitales bleues (et la pastille Premium), le nom, la ligne de statistiques
  *   (vues, utilisations, note), les étiquettes (avec la couleur et la
- *   police du modèle), la description, « Lettre de motivation incluse »,
- *   puis « Avis et notes » ;
+ *   police du modèle), la description, « Lettre de motivation assortie » quand
+ *   le modèle en a une (sinon l'atelier sert la lettre sobre, visible dans le
+ *   carrousel), puis « Avis et notes » ;
  * - en pied, la barre d'action.
  *
  * ═══ La cohérence avec le reste ═══
@@ -204,17 +205,17 @@ export function EcranDetailModele() {
                   </Animated.View>
                 ) : null}
 
-                {modele.avecLettre ? (
+                {modele.lettreAssortie ? (
                   <Animated.View entering={entree(4)}>
                     <HStack className="items-start gap-3 rounded-carte bg-surface-primary p-4">
                       <Icone nom="lettre" couleur={couleurs.primaire} taille={20} />
                       <VStack className="flex-1 gap-0.5">
                         <Texte className="font-bold text-body text-foreground">
-                          Lettre de motivation incluse
+                          Lettre de motivation assortie
                         </Texte>
                         <Texte className="text-footnote text-muted-foreground">
-                          Une lettre assortie, aux mêmes couleurs, pour postuler avec un
-                          dossier cohérent.
+                          Dessinée avec ce CV, aux mêmes couleurs. Tu pourras aussi
+                          choisir la lettre sobre, sur page blanche.
                         </Texte>
                       </VStack>
                     </HStack>

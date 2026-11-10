@@ -11,11 +11,10 @@
  *    celle qu'on préfère, d'un toucher.
  *
  * Rien ne part au serveur sans geste de l'utilisateur, et l'amélioration
- * jamais sans son accord explicite.
+ * jamais sans son accord explicite. La promesse et le portrait sont ceux
+ * de l'édition aussi (`services/photo.ts`, `portrait-photo.tsx`).
  */
 
-import { Image } from "expo-image";
-import { Pressable } from "react-native";
 import Animated, { FadeInUp, useReducedMotion } from "react-native-reanimated";
 
 import { BoutonAction } from "@/components/bouton-action";
@@ -27,6 +26,8 @@ import { VStack } from "@/components/ui/vstack";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import type { Phase } from "../hooks/use-creation-cv";
+import { TEXTES_PHOTO } from "../services/photo";
+import { PortraitPhoto } from "./portrait-photo";
 
 interface Props {
   phase: Phase;
@@ -35,37 +36,6 @@ interface Props {
   onChoisir: (source: "camera" | "galerie") => void;
   onAmeliorer: (oui: boolean) => void;
   onGarder: (image: string) => void;
-}
-
-function Portrait({
-  image,
-  libelle,
-  onPress,
-}: {
-  image: string;
-  libelle: string;
-  onPress?: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={onPress === undefined}
-      className="flex-1 items-center gap-2"
-      accessibilityRole={onPress === undefined ? "image" : "button"}
-      accessibilityLabel={onPress === undefined ? libelle : `Garder : ${libelle}`}
-    >
-      <Box className="aspect-square w-full overflow-hidden rounded-carte border border-border-subtle bg-remplissage">
-        <Image
-          source={{ uri: image }}
-          style={{ width: "100%", height: "100%" }}
-          contentFit="cover"
-          transition={250}
-          accessible={false}
-        />
-      </Box>
-      <Texte className="font-bold text-footnote text-foreground">{libelle}</Texte>
-    </Pressable>
-  );
 }
 
 export function EtapePhoto({
@@ -134,20 +104,19 @@ export function EtapePhoto({
       <Animated.View entering={entree}>
         <VStack className="gap-4">
           <Box className="w-40 self-center">
-            <Portrait image={phase.originale} libelle="Ta photo" />
+            <PortraitPhoto image={phase.originale} libelle="Ta photo" />
           </Box>
           <HStack className="items-start gap-2 rounded-tuile bg-surface-primary p-3">
             <Icone nom="etincelles" couleur={couleurs.primaire} taille={16} />
             <Texte className="flex-1 text-footnote text-foreground">
-              Je peux la rendre plus pro : lumière, fond neutre, cadrage. Tu compareras
-              les deux et tu garderas celle que tu préfères.
+              {TEXTES_PHOTO.promesse}
             </Texte>
           </HStack>
           <BoutonAction
             libelle="Oui, améliore-la"
             onPress={() => onAmeliorer(true)}
             enCours={occupe}
-            libelleEnCours="Karria travaille ta photo…"
+            libelleEnCours={TEXTES_PHOTO.enCours}
             icone={<Icone nom="etincelles" couleur={couleurs.surPrimaire} taille={16} />}
           />
           <BoutonAction
@@ -166,13 +135,13 @@ export function EtapePhoto({
       <Animated.View entering={entree}>
         <VStack className="gap-4">
           <HStack className="gap-3">
-            <Portrait
+            <PortraitPhoto
               image={phase.originale}
               libelle="Ta photo"
               onPress={() => onGarder(phase.originale)}
             />
             {phase.amelioree !== null ? (
-              <Portrait
+              <PortraitPhoto
                 image={phase.amelioree}
                 libelle="Améliorée"
                 onPress={() => onGarder(phase.amelioree ?? phase.originale)}

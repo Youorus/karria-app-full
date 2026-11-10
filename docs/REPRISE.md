@@ -3,7 +3,140 @@
 > Document de passation. À lire en premier par toute personne ou IA qui
 > reprend le travail, avec `AGENTS.md`. Mis à jour à chaque fin de session.
 
-**Dernière mise à jour : 2026-11-05**
+**Dernière mise à jour : 2026-11-06**
+
+## Session du 2026-11-06 — « Rendre ma photo professionnelle » depuis l'onglet CV (Fable) — BRANCHE `feat/portrait`, NON POUSSÉE
+
+**Demande de Marc** : « Au niveau de l'onglet CV, quand l'utilisateur change son avatar, lui donner
+la possibilité d'optimiser sa photo par IA pour la rendre professionnelle — ce qui faisait appel à
+l'un des plus puissants modèles Gemini de génération d'images. Tu n'as pas rajouté cette
+fonctionnalité : corrige-la. » L'amélioration existait dans la **création** (`etape-photo.tsx`) mais
+pas dans l'**édition** (`/cv/modifier/photo`, où mène l'avatar de `cv-rempli.tsx`). Côté API, elle
+n'existait qu'à l'envoi (`POST /cv/photo`, `enhance=true`) : retravailler la photo **déjà en place**
+sans la rechoisir demandait une route de plus — ajoutée, même session, `karria_api_v2/docs/REPRISE.md`.
+
+### Ce qui est livré (`npm run check` vert, 642 tests ; `npx expo export --platform ios` produit un paquet)
+
+- **`services/photo.ts`** (pur, testé, 4 cas) : `TEXTES_PHOTO` — la promesse (celle de la création,
+  mot pour mot : « lumière, fond neutre, cadrage… »), les libellés (« Rendre ma photo
+  professionnelle », « Ta photo » / « Retravaillée », « Garder cette version » / « Garder
+  l'originale », « Même personne, même expression… ») — et `messageDAmelioration(cause)` :
+  `photo_enhance_refused` → changer de photo, `photo_enhance_unavailable` → réessayer plus tard,
+  `photo_missing`, `cv_not_found`, réseau ; jamais de jargon.
+- **`components/portrait-photo.tsx`** : le portrait carré avec son libellé, partagé ;
+  `etape-photo.tsx` (création) l'utilise et lit la promesse dans le service — comportement inchangé.
+- **`hooks/use-modifier-cv.ts`** — `photo.etape: EtapePhoto` (`repos` → `amelioration` →
+  `comparaison { origine: "nouvelle" | "actuelle", originale, amelioree, idAmelioree }`),
+  `photo.changer(source)` (le choix ne part plus tout de suite : il mène à `amelioration`),
+  `photo.ameliorer(oui)` (oui → `televerserPhoto(uri, true)` ; non → envoi tel quel, comme avant),
+  `photo.ameliorerActuelle()` (→ `ameliorerPhotoActuelle()`, `POST /cv/me/photo/enhance`),
+  `photo.garder("originale" | "amelioree")` (améliorée → `PUT /cv/me/chapters/photo` par
+  `imageId` ; originale d'une nouvelle photo → envoi sans amélioration ; originale déjà en place →
+  rien, elle n'a pas bougé). Toute amélioration passe par `useActionIa` : `avecConsentement` avant
+  le geste, `rejouerSiConsentementRequis` sur le 403, usage **`photo_enhancement`** (valeur exacte
+  de `UsageIa`). Échec → `comparaison` sans retravaillée + `photo.probleme` humain.
+  Tests : 5 cas de plus dans `use-modifier-cv.test.tsx` (parcours complet, refus de l'amélioration,
+  photo en place gardée sans appel, refus du générateur, rejeu après l'accord).
+- **`components/edition/formulaire-photo.tsx`** (vue seule, 5 cas testés) : au repos **avec** une
+  photo, « Rendre ma photo professionnelle » est le geste principal, prendre/choisir en contour,
+  « Retirer » discret ; sans photo, « Prendre une photo » reste principal et rien n'est proposé.
+  Après le choix : la nouvelle photo, la promesse, le geste et « Garder l'originale ». Comparaison :
+  les deux portraits côte à côte, une ligne qui dit ce qui a bougé et ce qui n'a pas bougé, deux
+  boutons. Pas d'icône « étincelles », pas de badge, aucune couleur hors thème.
+- **`api/cv.api.ts › ameliorerPhotoActuelle()`** ; **`lib/dev/cv-simule.ts`** : `POST /cv/photo`
+  avec `enhance=true` rend désormais une « retravaillée » (même image, `enhanced: true`) derrière la
+  porte IA au lieu d'un 503 ; `POST /cv/me/photo/enhance` (403 sans accord, 404 sans CV,
+  409 `photo_missing`, 201 sinon) ; test dans `cv-simule.test.ts`.
+- **Contrats** : `docs/contrat-api-cv.md` (section `POST /cv/me/photo/enhance`, 2026-11-06),
+  `docs/contrat-api-consentement-ia.md` (la route dans la table des usages).
+
+### Non vérifié / à savoir
+
+- **Rien vu sur un appareil ni sur le simulateur** dans cette session (types, lint, Prettier,
+  Jest, export Metro seulement). À regarder : la hauteur de l'écran photo avec quatre boutons sur
+  un petit iPhone, le fondu entre les trois temps, la lisibilité des deux portraits en mode sombre.
+- En **SIMULATION**, la « retravaillée » est la même image : on éprouve le parcours, pas le rendu.
+  Le vrai rendu (Gemini image, tâche LLM `portrait`) se juge en production, ~10 s d'attente — le
+  bouton le dit (« Karria travaille ta photo… »).
+- La **création** garde son icône « étincelles » et ses libellés (« Oui, améliore-la ») : seul le
+  texte de la promesse est partagé ; je n'ai pas retouché son esthétique, hors périmètre.
+- Les avertissements `act()` dans la sortie de Jest viennent de l'atelier (`file-de-rendu.ts`),
+  chantier d'un autre agent ; aucun des miens.
+- **Reste** : relire et fusionner `feat/portrait` (app **et** API — l'app appelle une route que
+  seule la branche API sert ; fusionner l'API d'abord), puis vérifier sur iPhone avec une vraie
+  photo.
+
+## Session du 2026-11-06 — couleur du CV, version 2 : le décor change, le texte reste (Fable) — branche `feat/couleurs`, NON poussée
+
+**Demande de Marc** : « La couleur primaire ne doit jamais toucher le texte : sur un CV texte
+noir / bande rouge, elle change la bande, pas le texte — sauf si c'est nécessaire pour rester
+lisible. » Côté API (`karria_api_v2/docs/REPRISE.md`, ADR-0034 § 2026-11-06, branche
+`feat/couleurs`) : `primary_color` de la galerie = la couleur du **décor** (mesurée par
+surface) ; la couleur choisie n'habille que bandes, filets, puces, séparateurs et pictogrammes
+monochromes ; un texte posé sur une bande recolorée qui ne se lit plus (< 4,5:1) passe en
+blanc ou noir ; `refresh-colors` à lancer en prod. Aucune route ni champ nouveau.
+
+### Ce qui change dans l'app (`npm run check` vert, 628 tests)
+
+- **Textes** (`presentation.ts`) : sous-titre de la feuille « Quelle couleur ? » → « Ta couleur
+  habille les bandes, les filets et les puces. Le texte reste lisible. » Les pastilles, le
+  curseur de nuance et le code couleur ne bougent pas ; la pastille « D'origine » montre la
+  couleur du décor du modèle (`modele.couleur`, ce que la galerie mesure désormais).
+- **Rien à recoloriser côté app** : la WebView rend ce que le serveur renvoie (vérifié dans
+  `feuille-couleur.tsx` / `use-atelier.ts` : la couleur ne fait que repartir au rendu).
+- **Serveur simulé** (`lib/dev/atelier-simule.ts`) aligné : `styleDePage(encre, decor, …)` —
+  la couleur habille la bande, les filets sous les titres, les puces (`li::marker`), les
+  pastilles ; les titres gardent l'encre du modèle ; le texte de la bande passe en `#111111`
+  si la couleur est claire (`texteSur`, luminance WCAG). Tests dans `atelier-simule.test.ts`.
+- Contrats : `docs/contrat-api-documents.md` (copie de l'API) et `contrat-api-modeles.md`
+  (`primary_color` = couleur du décor, `default_primary_color` idem).
+
+**Reste** : voir sur appareil la feuille couleur avec le vrai serveur une fois l'API déployée
+et `refresh-colors` lancé ; la lettre ne suit plus la couleur (son accent est un texte) — à
+décider dans le lot lettre.
+
+## Session du 2026-11-06 — la lettre : celle du modèle, ou la lettre sobre (Fable) — branche `feat/lettres`, NON poussée
+
+**Demande de Marc** : choisir entre la lettre assortie au modèle de CV (quand il en a une) et une
+lettre sobre sur page blanche ; la galerie montre ce que l'atelier rend. Côté API
+(`karria_api_v2`, branche `feat/lettres`, ADR-0036, migration 21) : `letter_style` au rendu et à
+l'export, `letter_style_served` / `letter_style` en retour, `PUT /applications/{id}/letter-style`,
+`cover_letters` / `has_letter` / `pages[].style` dans la galerie.
+
+### Ce qui est livré (`npm run check` vert, 632 tests, aucun « problem »)
+
+- **La pastille « Du modèle · Sobre »** (`atelier/components/pastille-style-lettre.tsx`,
+  `testID="pastille-style-lettre"`, `style-lettre-modele` / `style-lettre-sobre`) : une capsule
+  de la même matière que la pastille du modèle, à sa droite sur la feuille de l'écran Lettre,
+  deux mots séparés d'un filet — le style courant en gras, l'autre en gris ; rôle `radiogroup` /
+  `radio`. Elle n'apparaît que si le modèle courant a une lettre assortie (`Modele.lettreAssortie`) :
+  sinon la lettre sobre est servie et rien n'est à choisir.
+- **Le hook** (`use-lettre.ts` : `lettreAssortie`, `styleLettre`, `choisirStyleLettre`) : le choix
+  redessine la lettre tout de suite (même file de rendu, `rendreLettre(…, couleur, style)`) et part
+  au dossier (`candidatures.api.ts › changerStyleDeLettreDuDossier`) ; le dossier le retient
+  (`Dossier.styleLettre`, lu à l'ouverture) ; le texte de la lettre et son édition ne bougent pas.
+  **Finaliser** exporte la lettre dans le style du dossier (`exporterLettre({ style })`) ;
+  `Export.styleLettre`, `Rendu.styleLettreServi`.
+- **Le service pur** `candidatures/services/style-lettre.ts` (`modele` ↔ `template`, `sobre` ↔
+  `plain`, `styleLettreServi`), testé.
+- **La galerie** : `Apercu.libelle` vient du serveur (« Lettre assortie » / « Lettre sobre »),
+  `Apercu.styleLettre` ; `Modele.lettreAssortie` remplace `avecLettre` (la carte « Lettre de
+  motivation assortie » du détail et le « LM » de la carte ne parlent que de la lettre assortie —
+  la lettre sobre se voit dans le carrousel, sans commentaire).
+- **Faux serveurs** : `atelier-simule.ts` (Meridian a une lettre assortie, les autres non ;
+  `letter_style` → `letter_style_served`, lettre sobre en Carlito noir sur blanc, `422` sur un
+  style inconnu, `letter_style` sur l'export), `candidatures-simule.ts` (`letter_style` sur le
+  dossier et la carte, `PUT /letter-style` idempotent, `422`), `modeles-simule.ts`
+  (`cover_letters`, `has_letter`, page lettre du détail) ; tests dans les trois `*-simule.test.ts`.
+- Contrats : `docs/contrat-api-documents.md`, `contrat-api-candidatures.md` (copies de l'API),
+  `contrat-api-modeles.md` (`cover_letters`, `has_letter`, `pages[].style`).
+
+### Non vérifié
+
+L'écran Lettre avec la pastille **n'a pas été vu sur appareil** (ni simulateur) : typage, lint et
+tests seulement. À regarder : la capsule et la pastille du modèle sur un petit écran (deux capsules
+côte à côte à gauche, `right-4` laisse l'espace), le rendu de la lettre sobre dans la WebView
+(polices Carlito par URL publique `assets/fonts/`, posées à la première demande).
 
 ## Session du 2026-11-05 (soir) — la couleur principale du CV se choisit dans l'atelier (Fable)
 
@@ -81,6 +214,7 @@ intégré avec « storage.karria.fr » en en-tête — il veut un nom neutre ; (
 lettre, offre), le destinataire doit avoir de quoi télécharger Karria, comme chez les grandes apps.
 
 **Livré** (commits `042cd11`, `b029b32`, `8325015` sur `main`, `npm run check` vert, 627 tests) :
+
 - **Lecteur** `app/(app)/lecture-document.tsx` → `atelier/screens/ecran-lecteur.tsx` +
   `hooks/use-lecteur-document.ts` : en-tête Karria « ‹ Mes CV » / « ‹ Dossier », titre
   « CV · Prénom Nom » / « Lettre · Entreprise » / « Mon CV », sous-titre « PDF · Modèle ». iOS :
@@ -92,7 +226,7 @@ lettre, offre), le destinataire doit avoir de quoi télécharger Karria, comme c
   `ouvrirSource` reste le navigateur.
 - **Sécurité (deux revues du coordinateur, corrigées)** : la route ne reçoit qu'un `id` ; le document
   (lien signé, genre, nom, modèle, retour) est **mémorisé dans l'app** (`services/lecteur.ts ›
-  memoriserDocument`), oublié à la déconnexion/suppression (`use-session › purgerCeQuiEstAuCompte`)
+memoriserDocument`), oublié à la déconnexion/suppression (`use-session › purgerCeQuiEstAuCompte`)
   et quand l'export est effacé ; lien `https://storage.karria.fr` seulement ; nom de fichier
   recalculé par `nomDeFichier` et refusé s'il traverse ; `%PDF-` vérifié sur les 5 premiers octets ;
   `app/+native-intent.ts` → `lib/liens-systeme.ts` : **liste blanche** des écrans ouvrables de
@@ -135,6 +269,7 @@ et exclusion de la redirection www dans `next.config.ts`. Google Play : pas de l
 `karria_api_v2/docs/REPRISE.md`) : courriel + push `type: purchase` à chaque livraison, en prod.
 
 **Livré** (`npm run check` vert, 580 tests) :
+
 - `features/soutien/services/achat-en-attente.ts` : la session Stripe est **retenue** (magasin
   local, survit à un redémarrage) dès l'ouverture du paiement par les trois flux (détail d'un
   modèle, feuille de l'atelier, carte de soutien), oubliée quand « livré » ; sinon
@@ -165,7 +300,6 @@ et exclusion de la redirection www dans `next.config.ts`. Google Play : pas de l
 
 **Non vérifié** : sur un vrai téléphone (le retour au premier plan avec une vraie session Stripe
 en attente ; le push `purchase` touché ; la déconnexion pendant une relecture).
-
 
 ## Session du 2026-11-05 (matin) — le modèle se change à tout moment, sans rien perdre (Fable)
 

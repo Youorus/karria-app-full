@@ -11,6 +11,8 @@
  *   de pages) devient **le CV**, directement ; la réponse dit ce qui a été
  *   retenu, écarté et ce qu'il reste à vérifier.
  * - `PUT /cv/me/chapters/{c}` : remplacer une section du CV à la main.
+ * - `POST /cv/photo` : une photo, améliorée ou non à l'envoi ;
+ *   `POST /cv/me/photo/enhance` : retravailler celle déjà sur le CV.
  * - `GET /cv/suggestions` : des valeurs connues pour ce qu'on tape (poste,
  *   entreprise, ville, école, diplôme, compétence, langue).
  *
@@ -386,6 +388,25 @@ export async function televerserPhoto(
     formulaire.append("enhance", ameliorer ? "true" : "false");
     return formulaire;
   });
+  return { image: brut.image_url, imageId: brut.image_id, amelioree: brut.enhanced };
+}
+
+/**
+ * Retravaille la photo **déjà** sur le CV, sans la rechoisir
+ * (`POST /cv/me/photo/enhance`). L'améliorée revient en attente : le CV ne
+ * change que si l'on la retient ensuite par `modifierSection("photo", …)`
+ * avec son `imageId` ; garder l'originale ne demande rien au serveur.
+ */
+export async function ameliorerPhotoActuelle(): Promise<{
+  image: string;
+  imageId: string;
+  amelioree: boolean;
+}> {
+  const brut = await http.post<{
+    image_id: string;
+    image_url: string;
+    enhanced: boolean;
+  }>("/cv/me/photo/enhance", {});
   return { image: brut.image_url, imageId: brut.image_id, amelioree: brut.enhanced };
 }
 

@@ -77,9 +77,13 @@ function Formulaire({ v, m }: { v: ValeurSection; m: ReturnType<typeof useModifi
       return (
         <FormulairePhoto
           valeur={v.valeur}
+          etape={m.photo.etape}
           enCours={m.photo.enCours}
           probleme={m.photo.probleme}
           onChanger={m.photo.changer}
+          onAmeliorer={m.photo.ameliorer}
+          onAmeliorerActuelle={m.photo.ameliorerActuelle}
+          onGarder={m.photo.garder}
           onRetirer={m.photo.retirer}
         />
       );

@@ -2,8 +2,9 @@
  * Les modèles de CV et leur traduction — `docs/contrat-api-modeles.md`.
  *
  * - `GET /templates/` : la galerie (seuls les modèles publiés y sont).
- * - `GET /templates/{id}` : un modèle, avec ses `pages` (le CV, puis les
- *   lettres assorties) ; sans `pages`, on retombe sur ses lettres (V1).
+ * - `GET /templates/{id}` : un modèle, avec ses `pages` (le CV, puis sa lettre :
+ *   assortie s'il en a une, sinon la lettre sobre de Karria — ce que l'atelier
+ *   rend, ni plus ni moins) ; sans `pages`, on retombe sur `cover_letters` (V1).
  * - `GET /templates/{id}/reviews` : les avis.
  * - `POST /templates/{id}/view` : une vue, notée sans bloquer.
  * - `GET /user-templates/me` : les modèles déjà acquis (cochés ✓).
@@ -21,15 +22,22 @@ import type {
   PossessionBrute,
 } from "../types/modeles.types";
 
+function styleDePage(
+  style: "template" | "plain" | null | undefined,
+): "modele" | "sobre" | null {
+  return style === "template" ? "modele" : style === "plain" ? "sobre" : null;
+}
+
 function versApercus(brut: ModeleBrut): Apercu[] {
   // La galerie renvoie `pages: null` (le détail seul les porte).
   if (brut.pages != null && brut.pages.length > 0) {
     return brut.pages.map((p, i) => ({
       cle: `${p.kind}-${i}`,
       type: p.kind === "cv" ? "cv" : "lettre",
-      libelle: p.kind === "cv" ? "CV" : "Lettre",
+      libelle: p.label || (p.kind === "cv" ? "CV" : "Lettre"),
       miniature: p.signed_thumbnail_url,
       image: p.signed_full_url ?? p.signed_thumbnail_url,
+      styleLettre: p.kind === "cv" ? null : styleDePage(p.style),
     }));
   }
   const lettres = brut.cover_letters ?? [];
@@ -40,13 +48,15 @@ function versApercus(brut: ModeleBrut): Apercu[] {
       libelle: "CV",
       miniature: brut.signed_thumbnail_url,
       image: brut.signed_full_url ?? brut.signed_preview_url ?? brut.signed_thumbnail_url,
+      styleLettre: null,
     },
     ...lettres.map((l) => ({
       cle: `lettre-${l.id}`,
       type: "lettre" as const,
-      libelle: "Lettre",
+      libelle: l.label || "Lettre",
       miniature: l.signed_thumbnail_url,
       image: l.signed_full_url ?? l.signed_preview_url ?? l.signed_thumbnail_url,
+      styleLettre: styleDePage(l.style),
     })),
   ];
 }
@@ -72,7 +82,9 @@ function versModele(brut: ModeleBrut): Modele {
     police: brut.font_family,
     avecPhoto: brut.has_photo,
     apercus,
-    avecLettre: apercus.some((a) => a.type === "lettre"),
+    lettreAssortie:
+      brut.has_letter ??
+      apercus.some((a) => a.type === "lettre" && a.styleLettre === "modele"),
   };
 }
 

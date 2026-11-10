@@ -23,6 +23,15 @@
  * (`PUT /{id}/template`) — l'atelier et Finaliser liront le même. Le texte
  * de la lettre n'est pas touché : seul le rendu change.
  *
+ * ═══ Le style de la lettre (ADR-0036) ═══
+ *
+ * Quand le modèle a une lettre assortie, la pastille « Du modèle · Sobre »
+ * choisit entre elle et la lettre sobre sur page blanche : la feuille se
+ * redessine en direct et le dossier retient le choix
+ * (`PUT /{id}/letter-style`) — l'export de Finaliser le lira. Sans lettre
+ * assortie, rien à choisir : la lettre sobre est servie, la pastille se tait.
+ * Le texte de la lettre et son édition ne changent pas d'un style à l'autre.
+ *
  * ═══ Les avertissements du rendu ═══
  *
  * `too_few_paragraphs`, `subject_not_explicit`… deviennent des conseils
@@ -37,11 +46,16 @@ import { useActionIa } from "@/features/auth/hooks/use-action-ia";
 import { consentementIa } from "@/features/auth/services/consentement-ia";
 import {
   changerModeleDuDossier,
+  changerStyleDeLettreDuDossier,
   ebaucherLettre,
   lireDossier,
   modifierLettre,
   regenererParagraphe,
 } from "@/features/candidatures/api/candidatures.api";
+import {
+  type StyleLettre,
+  styleLettreServi,
+} from "@/features/candidatures/services/style-lettre";
 import {
   dossierMemorise,
   memoriserDossier,
@@ -103,6 +117,11 @@ export interface EcranLettre {
   ouvrirModele: () => void;
   fermerModele: () => void;
   choisirModele: (modeleId: string) => void;
+  /** Le modèle courant a une lettre assortie : le style se choisit. */
+  lettreAssortie: boolean;
+  /** Le style de lettre servi : « modèle » ou « sobre ». */
+  styleLettre: StyleLettre;
+  choisirStyleLettre: (style: StyleLettre) => void;
   ecrireAvecKarria: () => void;
   passer: () => void;
   continuer: () => void;
@@ -124,6 +143,7 @@ interface EntreeDeRendu {
   modeleId: string;
   dossier: Dossier;
   lettre: Lettre;
+  style: StyleLettre | null;
 }
 
 export function useLettre(): EcranLettre {
@@ -151,11 +171,16 @@ export function useLettre(): EcranLettre {
   const [modeles, setModeles] = useState<Modele[]>([]);
   const [possedes, setPossedes] = useState<Set<string>>(new Set());
   const [feuilleModele, setFeuilleModele] = useState(false);
+  // Le style retenu par le dossier (`null` : par défaut) ; le serveur résout.
+  const [styleChoisi, setStyleChoisi] = useState<StyleLettre | null>(
+    () => dossierMemorise(dossierId)?.styleLettre ?? null,
+  );
 
   const feuilleCv = useRef<FeuilleCvHandle | null>(null);
   const lettreRef = useRef<Lettre | null>(null);
   const dossierRef = useRef<Dossier | null>(dossier);
   const modeleRef = useRef<string | null>(null);
+  const styleRef = useRef<StyleLettre | null>(styleChoisi);
   const vivant = useRef(true);
   const sauvegarde = useRef<{
     minuterie: ReturnType<typeof setTimeout> | null;
@@ -164,12 +189,14 @@ export function useLettre(): EcranLettre {
 
   const [file] = useState(() =>
     creerFileDeRendu<EntreeDeRendu, Awaited<ReturnType<typeof rendreLettre>>>({
-      // La lettre suit la couleur principale du dossier (ADR-0034).
+      // La lettre suit la couleur principale du dossier (ADR-0034) et son
+      // style de lettre (ADR-0036).
       rendre: (e) =>
         rendreLettre(
           e.modeleId,
           documentDeLettre(e.dossier, e.lettre, e.dossier.cv),
           e.dossier.couleur,
+          e.style,
         ),
       surResultat: (rendu) => {
         setHtml(rendu.html);
@@ -199,7 +226,7 @@ export function useLettre(): EcranLettre {
       const d = dossierRef.current;
       const m = modeleRef.current;
       if (l === null || d === null || m === null) return;
-      const entree = { modeleId: m, dossier: d, lettre: l };
+      const entree = { modeleId: m, dossier: d, lettre: l, style: styleRef.current };
       if (immediat) file.rendreMaintenant(entree);
       else file.demander(entree);
     },
@@ -231,6 +258,9 @@ export function useLettre(): EcranLettre {
         if (!actif) return;
         poserDossier(lu);
         poserLettre(lu.lettre);
+        // Le dossier retient le style : il survit au changement d'appareil.
+        styleRef.current = lu.styleLettre;
+        setStyleChoisi(lu.styleLettre);
         setModeles(galerie);
         setPossedes(miens);
         modeleRef.current = modeleDuDossier({
@@ -457,6 +487,28 @@ export function useLettre(): EcranLettre {
   const ouvrirModele = useCallback(() => setFeuilleModele(true), []);
   const fermerModele = useCallback(() => setFeuilleModele(false), []);
 
+  // ── Le style de la lettre ──────────────────────────────────────────────
+
+  const choisirStyleLettre = useCallback(
+    (style: StyleLettre) => {
+      const precedent = styleRef.current;
+      if (precedent === style) return;
+      // Seul le rendu change : la lettre (`lettreRef`) n'est pas touchée.
+      styleRef.current = style;
+      setStyleChoisi(style);
+      rendre(true);
+      changerStyleDeLettreDuDossier(dossierId, style)
+        .then((lu) => {
+          if (vivant.current) poserDossier(lu);
+        })
+        .catch((cause: unknown) => {
+          console.warn("[karria] style de lettre non retenu", cause);
+          if (vivant.current) Alert.alert(TEXTES.lettreStyleNonRetenu);
+        });
+    },
+    [dossierId, poserDossier, rendre],
+  );
+
   // ── Les gestes ─────────────────────────────────────────────────────────
 
   const toucher = useCallback((chemin: string) => {
@@ -565,6 +617,9 @@ export function useLettre(): EcranLettre {
     feuilleCv.current = poignee;
   }, []);
 
+  const modele = modeles.find((m) => m.id === modeleId) ?? null;
+  const lettreAssortie = modele?.lettreAssortie ?? false;
+
   return {
     dossier,
     lettre,
@@ -588,13 +643,16 @@ export function useLettre(): EcranLettre {
     garderAncien,
     enregistrement,
     modeleId,
-    modele: modeles.find((m) => m.id === modeleId) ?? null,
+    modele,
     modeles,
     possedes,
     feuilleModele,
     ouvrirModele,
     fermerModele,
     choisirModele,
+    lettreAssortie,
+    styleLettre: styleLettreServi(styleChoisi, lettreAssortie),
+    choisirStyleLettre,
     ecrireAvecKarria,
     passer: continuer,
     continuer,

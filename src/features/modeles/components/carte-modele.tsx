@@ -151,7 +151,7 @@ export function CarteModele({ modele, rang, largeur, possede }: Props) {
                     <Icone nom="photo" couleur={AURA.reflet} taille={11} />
                   </Box>
                 ) : null}
-                {modele.avecLettre ? (
+                {modele.lettreAssortie ? (
                   <HStack className="absolute bottom-2 right-2 items-center gap-1 rounded-full bg-scrim-fort px-1.5 py-0.5">
                     <Icone nom="lettre" couleur={AURA.reflet} taille={10} />
                     <Texte className="font-bold text-[10px] text-on-scrim">LM</Texte>

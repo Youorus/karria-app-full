@@ -10,6 +10,8 @@
  * `candidatures` : l'atelier ne redéfinit pas le dossier, il le pilote.
  */
 
+import type { StyleLettre } from "@/features/candidatures/services/style-lettre";
+
 // ─────────────────────────────────────────────────────────────────────
 // Ce que l'API envoie
 // ─────────────────────────────────────────────────────────────────────
@@ -20,6 +22,8 @@ export interface RenduBrut {
   /** Estimation par mesure ; la vérité est `window.karriaFit.pages` dans la page. */
   pages: number;
   warnings: string[];
+  /** Lettre : le style réellement servi — `template` (assortie) ou `plain` (sobre) (ADR-0036). */
+  letter_style_served?: "template" | "plain" | null;
 }
 
 /** La lettre telle que `documents` la met en page (§ 2 du contrat). */
@@ -69,6 +73,8 @@ export interface ExportBrut {
   ats_safe?: boolean;
   /** La couleur principale du rendu, si la personne en a posé une (ADR-0034). */
   primary_color?: string | null;
+  /** Lettre : le style servi (`template` | `plain`) ; absent ou `null` pour un CV. */
+  letter_style?: "template" | "plain" | null;
   dossier_id?: string | null;
   company_name?: string | null;
   created_at: string;
@@ -108,6 +114,8 @@ export interface Rendu {
   html: string;
   pages: number;
   avertissements: string[];
+  /** Lettre : le style que le serveur a réellement servi ; `null` pour un CV. */
+  styleLettreServi: StyleLettre | null;
 }
 
 export type NiveauAts = "bon" | "moyen" | "faible";
@@ -144,6 +152,8 @@ export interface Export {
   ats: ScoreAts | null;
   /** La couleur principale avec laquelle l'export a été rendu ; `null` : celle du modèle. */
   couleur: string | null;
+  /** Lettre : le style servi ; `null` pour un CV. */
+  styleLettre: StyleLettre | null;
 }
 
 export type StatutEnvoi = "en_file" | "envoye" | "echoue";

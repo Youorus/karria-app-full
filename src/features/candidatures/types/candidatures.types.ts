@@ -37,6 +37,8 @@ import type {
 
 /** `brouillon` tant que l'adaptation court ou qu'une proposition attend ;
  *  `pret` ensuite ; `candidate` dès `applied_at`. Déduit par le serveur. */
+import type { StyleLettre } from "../services/style-lettre";
+
 export type StatutBrut = "brouillon" | "pret" | "candidate";
 export type AdaptationBrute = "en_cours" | "faite" | "echouee";
 export type ErreurAdaptationBrute =
@@ -120,6 +122,8 @@ export interface DossierBrut {
   template_id: string | null;
   /** La couleur principale posée par la personne (`#RRGGBB`), ou `null` (ADR-0034). */
   primary_color?: string | null;
+  /** Le style de lettre retenu : `template` (assortie) ou `plain` (sobre) ; `null` : par défaut (ADR-0036). */
+  letter_style?: "template" | "plain" | null;
   cv: CvDeDossierBrut;
   cv_base_hash: string;
   /** Le CV de base a changé (ou disparu) depuis la copie. */
@@ -141,6 +145,7 @@ export interface CarteDossierBrute {
   offer: OffreFigeeBrute;
   template_id: string | null;
   primary_color?: string | null;
+  letter_style?: "template" | "plain" | null;
   status: StatutBrut;
   adaptation: AdaptationBrute;
   coverage_ratio: number;
@@ -241,6 +246,8 @@ export interface Dossier {
   modeleId: string | null;
   /** La couleur principale posée sur le modèle du dossier ; `null` : celle du modèle. */
   couleur: string | null;
+  /** Le style de lettre retenu (« modèle » ou « sobre ») ; `null` : par défaut. */
+  styleLettre: StyleLettre | null;
   /** La copie adaptée — sans photo : celle du CV de base sert à l'aperçu. */
   cv: Cv;
   empreinteCvDeBase: string;
@@ -261,6 +268,7 @@ export interface CarteDossier {
   offre: OffreFigee;
   modeleId: string | null;
   couleur: string | null;
+  styleLettre: StyleLettre | null;
   statut: StatutDossier;
   adaptation: EtatAdaptation;
   /** De 0 à 1. */

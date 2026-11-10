@@ -442,6 +442,50 @@ describe("Le faux serveur des dossiers", () => {
     expect(nul.corps.primary_color).toBeNull();
   });
 
+  it("retient le style de lettre du dossier ; `null` revient au défaut ; refuse un style inconnu", async () => {
+    const liste = await appeler("GET", "/applications?applied=false");
+    const pret = liste.corps.items.find((c: { status: string }) => c.status === "pret");
+    const avant = (await appeler("GET", `/applications/${pret.id}`)).corps;
+    expect(avant.letter_style).toBeNull();
+
+    const pose = await appeler(
+      "PUT",
+      `/applications/${pret.id}/letter-style`,
+      { letter_style: "plain" },
+      T0 + 60_000,
+    );
+    expect(pose.statut).toBe(200);
+    expect(pose.corps.letter_style).toBe("plain");
+    expect(pose.corps.cv).toEqual(avant.cv);
+    expect(pose.corps.updated_at > avant.updated_at).toBe(true);
+    const encore = await appeler(
+      "PUT",
+      `/applications/${pret.id}/letter-style`,
+      { letter_style: "plain" },
+      T0 + 120_000,
+    );
+    expect(encore.corps.updated_at).toBe(pose.corps.updated_at);
+    const cartes = await appeler("GET", "/applications?applied=false");
+    expect(
+      cartes.corps.items.find((c: { id: string }) => c.id === pret.id).letter_style,
+    ).toBe("plain");
+
+    expect(
+      (
+        await appeler("PUT", `/applications/${pret.id}/letter-style`, {
+          letter_style: "fancy",
+        })
+      ).statut,
+    ).toBe(422);
+    expect(
+      (await appeler("PUT", `/applications/${pret.id}/letter-style`, {})).statut,
+    ).toBe(422);
+    const nul = await appeler("PUT", `/applications/${pret.id}/letter-style`, {
+      letter_style: null,
+    });
+    expect(nul.corps.letter_style).toBeNull();
+  });
+
   it("change le modèle du dossier à tout moment, sans toucher au reste ; refuse un Premium non possédé", async () => {
     const liste = await appeler("GET", "/applications?applied=false");
     const pret = liste.corps.items.find((c: { status: string }) => c.status === "pret");

@@ -51,14 +51,14 @@ Réponse :
 }
 ```
 
-| Champ | Sens |
-| --- | --- |
-| `status` | `search` : une recherche a tourné, le fil est à jour. `clarify` : Karria pose une question. `chat` : une réponse, rien d'autre. |
-| `intent` | ce que Karria a compris : `search`, `refine`, `career_talk`, `app_help`, `small_talk`, `off_topic` |
-| `results_count` | offres placées dans le fil si `status = search`, sinon `null`. **Nouveau** : plus de plafond bas — toutes les offres pertinentes et récentes (jusqu'à plusieurs centaines), paginées par le fil |
-| `criteria` | la recherche en cours après ce tour (voir `Criteria`), ou `null` |
-| `suggestions` | 0 à 4 réponses rapides à montrer sous la bulle ; un toucher **envoie le texte tel quel** comme message |
-| `widenings` **nouveau** | 0 à 3 élargissements calculés sur la base (voir ci-dessous) |
+| Champ                   | Sens                                                                                                                                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `status`                | `search` : une recherche a tourné, le fil est à jour. `clarify` : Karria pose une question. `chat` : une réponse, rien d'autre.                                                                 |
+| `intent`                | ce que Karria a compris : `search`, `refine`, `career_talk`, `app_help`, `small_talk`, `off_topic`                                                                                              |
+| `results_count`         | offres placées dans le fil si `status = search`, sinon `null`. **Nouveau** : plus de plafond bas — toutes les offres pertinentes et récentes (jusqu'à plusieurs centaines), paginées par le fil |
+| `criteria`              | la recherche en cours après ce tour (voir `Criteria`), ou `null`                                                                                                                                |
+| `suggestions`           | 0 à 4 réponses rapides à montrer sous la bulle ; un toucher **envoie le texte tel quel** comme message                                                                                          |
+| `widenings` **nouveau** | 0 à 3 élargissements calculés sur la base (voir ci-dessous)                                                                                                                                     |
 
 ### Les élargissements (nouveau)
 
@@ -71,13 +71,13 @@ par le modèle) et **demande la permission** :
 
 Chaque élargissement :
 
-| Champ | Sens |
-| --- | --- |
-| `id` | stable dans la conversation (`radius-50`, `contract-interim`, `title-commis-de-cuisine`) |
-| `kind` | `radius` (rayon plus grand), `departments` (départements voisins), `whole_france`, `contract_types` (un contrat de plus), `schedule` (accepter l'autre temps / les offres muettes), `job_titles` (un intitulé très proche, tiré du vocabulaire réel des offres) |
-| `label` | la phrase complète, prête à afficher |
-| `gain` | offres **en plus** dans le fil si on accepte |
-| `message` | le texte à envoyer pour accepter — il figure aussi dans `suggestions` |
+| Champ     | Sens                                                                                                                                                                                                                                                            |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`      | stable dans la conversation (`radius-50`, `contract-interim`, `title-commis-de-cuisine`)                                                                                                                                                                        |
+| `kind`    | `radius` (rayon plus grand), `departments` (départements voisins), `whole_france`, `contract_types` (un contrat de plus), `schedule` (accepter l'autre temps / les offres muettes), `job_titles` (un intitulé très proche, tiré du vocabulaire réel des offres) |
+| `label`   | la phrase complète, prête à afficher                                                                                                                                                                                                                            |
+| `gain`    | offres **en plus** dans le fil si on accepte                                                                                                                                                                                                                    |
+| `message` | le texte à envoyer pour accepter — il figure aussi dans `suggestions`                                                                                                                                                                                           |
 
 Pour accepter, l'app envoie `message` comme un message ordinaire
 (`POST /assistant/messages`). Le serveur le reconnaît et applique
@@ -94,7 +94,13 @@ l'interprète alors normalement.
   "summary": "cuisinier · Lyon (30 km) · CDI",
   "job_titles": ["cuisinier", "cuisinière", "cuisinier de restaurant"],
   "keywords": ["cuisine", "restauration", "HACCP"],
-  "location": { "label": "Lyon", "latitude": 45.758, "longitude": 4.835, "radius_km": 30, "department_codes": [] },
+  "location": {
+    "label": "Lyon",
+    "latitude": 45.758,
+    "longitude": 4.835,
+    "radius_km": 30,
+    "department_codes": []
+  },
   "whole_france": false,
   "contract_types": ["cdi"],
   "remote": [],
@@ -110,12 +116,12 @@ l'interprète alors normalement.
 
 ### Erreurs
 
-| Code | `error.code` | Quand |
-| --- | --- | --- |
-| 404 | `conversation_not_found` | `conversation_id` inconnu ou d'une autre personne |
-| 422 | `invalid_input` | `assistant_message_empty` |
-| 429 | `assistant_rate_limited` | 120 tours par jour ; `details.retry_after` en secondes |
-| 503 | `ai_unavailable` / `search_unavailable` | un service ne répond pas ; réessayer |
+| Code | `error.code`                            | Quand                                                  |
+| ---- | --------------------------------------- | ------------------------------------------------------ |
+| 404  | `conversation_not_found`                | `conversation_id` inconnu ou d'une autre personne      |
+| 422  | `invalid_input`                         | `assistant_message_empty`                              |
+| 429  | `assistant_rate_limited`                | 120 tours par jour ; `details.retry_after` en secondes |
+| 503  | `ai_unavailable` / `search_unavailable` | un service ne répond pas ; réessayer                   |
 
 ## La recherche en cours
 
@@ -123,7 +129,7 @@ l'interprète alors normalement.
 - `PUT /search/criteria` → `200 { criteria, results_count }` : poser les
   critères directement depuis l'app (édition sans conversation). Corps :
   `job_titles` (1–12, requis), `keywords`, `location { label, latitude?,
-  longitude?, radius_km?, department_codes? }`, `whole_france`,
+longitude?, radius_km?, department_codes? }`, `whole_france`,
   `contract_types`, `remote`, `schedule`, `max_experience`,
   `salary_min_monthly`. `422 criteria_incomplete` s'il manque un lieu.
 - `DELETE /search/criteria` → `204` : oublier la recherche ; le fil repasse
@@ -133,7 +139,7 @@ l'interprète alors normalement.
 ## Ce que Karria a retenu
 
 - `GET /assistant/memory` → `200 { target_jobs[], locations[], constraints[],
-  preferences[], situation[], summary, updated_at | null }` : les faits
+preferences[], situation[], summary, updated_at | null }` : les faits
   stables que Karria garde pour mieux aider ; vide si rien.
 - `DELETE /assistant/memory` → `204` : tout effacer. À exposer dans les
   réglages (« Ce que Karria sait de moi »).

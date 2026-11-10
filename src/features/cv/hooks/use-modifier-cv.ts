@@ -36,19 +36,46 @@
  *
  * Ouvrir cet écran compte comme une **vérification** de la section après un
  * import (`marquerVerifie`).
+ *
+ * ═══ La photo : la changer, et la rendre plus pro ═══
+ *
+ * Une photo prise ou choisie ne part pas tout de suite : Karria propose
+ * d'abord de la retravailler (`etape: amelioration`) — la même promesse que
+ * dans la création. Oui → `POST /cv/photo` avec `enhance`, puis l'originale
+ * et la retravaillée côte à côte (`comparaison`) ; la retenue s'enregistre
+ * (l'améliorée par son `imageId`, l'originale après un envoi sans
+ * amélioration). Non → l'envoi direct, comme avant.
+ *
+ * La photo **déjà en place** se retravaille aussi, sans la rechoisir
+ * (`POST /cv/me/photo/enhance`) : la comparaison montre la photo du CV et sa
+ * version retravaillée ; garder l'originale ne demande rien au serveur, elle
+ * n'a pas bougé.
+ *
+ * Chaque amélioration passe par l'accord sur l'IA (`useActionIa`) : la
+ * feuille avant le premier geste, et le geste rejoué sur un
+ * `403 ai_consent_required`. Un refus du générateur ou une panne se dit avec
+ * des mots (`services/photo.ts`) et laisse l'originale, qui reste un très
+ * bon choix.
  */
 
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useActionIa } from "@/features/auth/hooks/use-action-ia";
 import { ErreurApi } from "@/lib/http";
 
-import { lireMonCv, modifierSection, televerserPhoto } from "../api/cv.api";
+import {
+  ameliorerPhotoActuelle,
+  lireMonCv,
+  modifierSection,
+  televerserPhoto,
+} from "../api/cv.api";
 import {
   garderBrouillon,
   lireBrouillon,
   oublierBrouillon,
 } from "../services/brouillons-edition";
+import { messageDAmelioration } from "../services/photo";
 import {
   estBloque,
   messagesDe,
@@ -100,6 +127,28 @@ export const TITRES: Record<CleChapitre, string> = {
 
 export const SECTIONS_EN_LISTE: readonly CleChapitre[] = ["experiences", "educations"];
 
+/**
+ * Où en est le parcours de la photo.
+ *
+ * - `repos` : la photo du CV (ou aucune) et les gestes.
+ * - `amelioration` : une nouvelle photo est choisie, pas encore envoyée ;
+ *   Karria propose de la retravailler.
+ * - `comparaison` : l'originale et la retravaillée (`null` si l'amélioration
+ *   a échoué) ; `origine` dit si l'originale est la nouvelle photo (à
+ *   envoyer si on la garde) ou celle déjà sur le CV (rien à faire).
+ */
+export type EtapePhoto =
+  | { nom: "repos" }
+  | { nom: "amelioration"; originale: string }
+  | {
+      nom: "comparaison";
+      origine: "nouvelle" | "actuelle";
+      originale: string;
+      amelioree: string | null;
+      /** L'identifiant serveur de la retravaillée, déjà en attente. */
+      idAmelioree: string | null;
+    };
+
 export interface EditionElement {
   /** `null` : un nouvel élément. */
   index: number | null;
@@ -137,7 +186,14 @@ export interface ModifierCv {
     fermerElement: () => void;
   };
   photo: {
+    etape: EtapePhoto;
     changer: (source: "camera" | "galerie") => void;
+    /** Étape `amelioration` : oui, Karria la retravaille ; non, elle part telle quelle. */
+    ameliorer: (oui: boolean) => void;
+    /** Étape `repos`, avec une photo : la retravailler sans la rechoisir. */
+    ameliorerActuelle: () => void;
+    /** Étape `comparaison` : laquelle on garde. */
+    garder: (choix: "originale" | "amelioree") => void;
     retirer: () => void;
     enCours: boolean;
     probleme: string | null;
@@ -287,7 +343,14 @@ export function useModifierCv(): ModifierCv {
   const [tentative, setTentative] = useState(false);
   const [enEdition, setEnEdition] = useState<EditionElement | null>(null);
   const [photoEnCours, setPhotoEnCours] = useState(false);
+  const [etapePhoto, setEtapePhoto] = useState<EtapePhoto>({ nom: "repos" });
+  /** Ce qui a échoué autour de la photo — amélioration surtout. */
+  const [problemePhoto, setProblemePhoto] = useState<string | null>(null);
   const choixPhoto = useChoixPhoto();
+  const { avecConsentement, rejouerSiConsentementRequis } = useActionIa();
+  // Le rejeu après l'accord passe par une référence : la fonction se cite
+  // elle-même, et React refuse qu'une valeur soit lue avant sa déclaration.
+  const rejouerAmelioration = useRef<(etape: EtapePhoto) => void>(() => undefined);
   const vivant = useRef(true);
 
   useEffect(() => {
@@ -449,6 +512,7 @@ export function useModifierCv(): ModifierCv {
       .then((cv) => {
         if (!vivant.current) return;
         setValeur(valeurDuCv("photo", cv));
+        setEtapePhoto({ nom: "repos" });
         setEnregistrement("fait");
       })
       .catch((cause: unknown) => {
@@ -462,20 +526,14 @@ export function useModifierCv(): ModifierCv {
       });
   }, []);
 
-  const changerPhoto = useCallback(
-    (source: "camera" | "galerie") => {
+  /** Une nouvelle photo part telle quelle, puis s'enregistre. */
+  const envoyerNouvelle = useCallback(
+    (uri: string) => {
       setPhotoEnCours(true);
-      choixPhoto
-        .choisir(source)
-        .then((uri) => {
-          if (uri === null) {
-            setPhotoEnCours(false);
-            return null;
-          }
-          return televerserPhoto(uri, false);
-        })
+      setProblemePhoto(null);
+      televerserPhoto(uri, false)
         .then((envoyee) => {
-          if (envoyee === null || !vivant.current) return;
+          if (!vivant.current) return;
           poserPhoto({ image: envoyee.image, imageId: envoyee.imageId });
         })
         .catch((cause: unknown) => {
@@ -486,7 +544,128 @@ export function useModifierCv(): ModifierCv {
           setEnregistrement("erreur");
         });
     },
-    [choixPhoto, poserPhoto],
+    [poserPhoto],
+  );
+
+  /**
+   * L'amélioration : d'une nouvelle photo (envoi avec `enhance`) ou de celle
+   * déjà sur le CV (`POST /cv/me/photo/enhance`). Les deux mènent à la
+   * comparaison ; un échec y mène aussi, sans retravaillée, avec le mot qui
+   * explique — sauf le 403 d'accord, qui ouvre la feuille et rejoue.
+   */
+  const ameliorerDepuis = useCallback(
+    (depuis: EtapePhoto) => {
+      const origine = depuis.nom === "amelioration" ? "nouvelle" : "actuelle";
+      const originale =
+        depuis.nom === "amelioration"
+          ? depuis.originale
+          : valeur?.section === "photo"
+            ? valeur.valeur.image
+            : null;
+      if (originale === null || depuis.nom === "comparaison") return;
+      setPhotoEnCours(true);
+      setProblemePhoto(null);
+      const appel =
+        origine === "nouvelle"
+          ? televerserPhoto(originale, true)
+          : ameliorerPhotoActuelle();
+      appel
+        .then((r) => {
+          if (!vivant.current) return;
+          setEtapePhoto({
+            nom: "comparaison",
+            origine,
+            originale,
+            amelioree: r.image,
+            idAmelioree: r.imageId,
+          });
+        })
+        .catch((cause: unknown) => {
+          console.warn("[karria] amélioration de la photo en échec", cause);
+          if (!vivant.current) return;
+          if (
+            rejouerSiConsentementRequis(cause, "photo_enhancement", () =>
+              rejouerAmelioration.current(depuis),
+            )
+          ) {
+            return;
+          }
+          setProblemePhoto(messageDAmelioration(cause));
+          // L'originale reste un très bon choix : on la montre, seule.
+          setEtapePhoto({
+            nom: "comparaison",
+            origine,
+            originale,
+            amelioree: null,
+            idAmelioree: null,
+          });
+        })
+        .finally(() => {
+          if (vivant.current) setPhotoEnCours(false);
+        });
+    },
+    [valeur, rejouerSiConsentementRequis],
+  );
+  useEffect(() => {
+    rejouerAmelioration.current = ameliorerDepuis;
+  }, [ameliorerDepuis]);
+
+  const changerPhoto = useCallback(
+    (source: "camera" | "galerie") => {
+      setPhotoEnCours(true);
+      setProblemePhoto(null);
+      choixPhoto
+        .choisir(source)
+        .then((uri) => {
+          if (!vivant.current) return;
+          setPhotoEnCours(false);
+          if (uri !== null) setEtapePhoto({ nom: "amelioration", originale: uri });
+        })
+        .catch((cause: unknown) => {
+          console.warn("[karria] choix de la photo en échec", cause);
+          if (vivant.current) setPhotoEnCours(false);
+        });
+    },
+    [choixPhoto],
+  );
+
+  const ameliorer = useCallback(
+    (oui: boolean) => {
+      if (etapePhoto.nom !== "amelioration") return;
+      if (!oui) {
+        envoyerNouvelle(etapePhoto.originale);
+        return;
+      }
+      const depuis = etapePhoto;
+      avecConsentement("photo_enhancement", () => ameliorerDepuis(depuis));
+    },
+    [etapePhoto, envoyerNouvelle, avecConsentement, ameliorerDepuis],
+  );
+
+  const ameliorerActuelle = useCallback(() => {
+    if (etapePhoto.nom !== "repos" || valeur?.section !== "photo") return;
+    if (valeur.valeur.image === null) return;
+    avecConsentement("photo_enhancement", () => ameliorerDepuis({ nom: "repos" }));
+  }, [etapePhoto, valeur, avecConsentement, ameliorerDepuis]);
+
+  const garder = useCallback(
+    (choix: "originale" | "amelioree") => {
+      if (etapePhoto.nom !== "comparaison") return;
+      setProblemePhoto(null);
+      if (choix === "amelioree") {
+        if (etapePhoto.amelioree === null || etapePhoto.idAmelioree === null) return;
+        setPhotoEnCours(true);
+        poserPhoto({ image: etapePhoto.amelioree, imageId: etapePhoto.idAmelioree });
+        return;
+      }
+      if (etapePhoto.origine === "nouvelle") {
+        envoyerNouvelle(etapePhoto.originale);
+        return;
+      }
+      // La photo du CV n'a pas bougé : rien à enregistrer.
+      setEtapePhoto({ nom: "repos" });
+    },
+    [etapePhoto, poserPhoto, envoyerNouvelle],
   );
 
   return {
@@ -533,13 +712,18 @@ export function useModifierCv(): ModifierCv {
       },
     },
     photo: {
+      etape: etapePhoto,
       changer: changerPhoto,
+      ameliorer,
+      ameliorerActuelle,
+      garder,
       retirer: () => {
         setPhotoEnCours(true);
+        setProblemePhoto(null);
         poserPhoto({ image: null, imageId: null });
       },
       enCours: photoEnCours,
-      probleme: choixPhoto.probleme,
+      probleme: choixPhoto.probleme ?? problemePhoto,
     },
   };
 }

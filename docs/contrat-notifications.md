@@ -19,18 +19,18 @@ Toutes les valeurs sont des **chaînes** (ce qu'Android transmet intact).
 
 ## Les types
 
-| `type`           | `id`        | Canal / catégorie | Pastille | Pile ouverte dans l'app                 | `url`                      |
-| ---------------- | ----------- | ----------------- | -------- | --------------------------------------- | -------------------------- |
-| `offer`          | obligatoire | `offres`          | 1        | fil → détail de l'offre                 | `karria://offre/{id}`      |
-| `offers_feed`    | interdit    | `offres`          | 1        | fil                                     | `karria://offres`          |
-| `search_results` | interdit    | `offres`          | 1        | fil                                     | `karria://offres`          |
-| `assistant`      | interdit    | `offres`          | 1        | fil, rideau Karria ouvert (`?karria=1`) | `karria://offres?karria=1` |
-| `cv_ready`       | interdit    | `documents`       | —        | onglet CV                               | `karria://cv`              |
-| `cv_export`      | facultatif  | `documents`       | —        | onglet CV                               | `karria://cv`              |
-| `template`       | obligatoire | `documents`       | —        | galerie → modèle                        | `karria://modele/{id}`     |
-| `templates`      | interdit    | `documents`       | —        | galerie                                 | `karria://modeles`         |
-| `account`        | interdit    | `compte`          | —        | profil → paramètres                     | `karria://parametres`      |
-| `support`        | interdit    | `compte`          | —        | profil → « Parler à l'équipe »          | `karria://equipe`          |
+| `type`           | `id`        | Canal / catégorie | Pastille | Pile ouverte dans l'app                                                     | `url`                                       |
+| ---------------- | ----------- | ----------------- | -------- | --------------------------------------------------------------------------- | ------------------------------------------- |
+| `offer`          | obligatoire | `offres`          | 1        | fil → détail de l'offre                                                     | `karria://offre/{id}`                       |
+| `offers_feed`    | interdit    | `offres`          | 1        | fil                                                                         | `karria://offres`                           |
+| `search_results` | interdit    | `offres`          | 1        | fil                                                                         | `karria://offres`                           |
+| `assistant`      | interdit    | `offres`          | 1        | fil, rideau Karria ouvert (`?karria=1`)                                     | `karria://offres?karria=1`                  |
+| `cv_ready`       | interdit    | `documents`       | —        | onglet CV                                                                   | `karria://cv`                               |
+| `cv_export`      | facultatif  | `documents`       | —        | onglet CV                                                                   | `karria://cv`                               |
+| `template`       | obligatoire | `documents`       | —        | galerie → modèle                                                            | `karria://modele/{id}`                      |
+| `templates`      | interdit    | `documents`       | —        | galerie                                                                     | `karria://modeles`                          |
+| `account`        | interdit    | `compte`          | —        | profil → paramètres                                                         | `karria://parametres`                       |
+| `support`        | interdit    | `compte`          | —        | profil → « Parler à l'équipe »                                              | `karria://equipe`                           |
 | `purchase`       | facultatif  | `compte`          | —        | sans `id` : profil (soutien) ; avec `id` (modèle acheté) : galerie → modèle | `karria://profil` ou `karria://modele/{id}` |
 
 Le message Expo porte en plus `channelId` et `categoryId` (même valeur que

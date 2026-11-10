@@ -47,14 +47,14 @@ Exige la session (`Authorization: Bearer <access_token>`). Corps JSON :
 
 `reason`, parmi :
 
-| Code                     | Ce que la personne a choisi                  |
-| ------------------------ | -------------------------------------------- |
-| `found_job`              | « J'ai trouvé un emploi »                    |
+| Code                     | Ce que la personne a choisi                        |
+| ------------------------ | -------------------------------------------------- |
+| `found_job`              | « J'ai trouvé un emploi »                          |
 | `no_matching_offers`     | « Je ne trouve pas d'offres qui me correspondent » |
-| `not_useful`             | « L'app ne m'est pas utile »                 |
-| `too_many_notifications` | « Trop de notifications »                    |
-| `privacy`                | « Je suis inquiet pour mes données »         |
-| `other`                  | « Autre »                                    |
+| `not_useful`             | « L'app ne m'est pas utile »                       |
+| `too_many_notifications` | « Trop de notifications »                          |
+| `privacy`                | « Je suis inquiet pour mes données »               |
+| `other`                  | « Autre »                                          |
 
 `details` : un texte libre, facultatif. L'app l'envoie **nettoyé** (espaces
 de bord retirés, chaîne vide → `null`) ; le serveur applique la même règle
