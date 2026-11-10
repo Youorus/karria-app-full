@@ -15,6 +15,12 @@ pas dans l'**édition** (`/cv/modifier/photo`, où mène l'avatar de `cv-rempli.
 n'existait qu'à l'envoi (`POST /cv/photo`, `enhance=true`) : retravailler la photo **déjà en place**
 sans la rechoisir demandait une route de plus — ajoutée, même session, `karria_api_v2/docs/REPRISE.md`.
 
+### 2026-11-10, nuit — mise en production (Fable, coordination)
+
+- `main` = `8eca351` (portrait IA en édition, couleur v2, lettre du modèle ou sobre) poussé ; l'API correspondante est en production (migration 21, `cover_letters` servis, `PUT /applications/{id}/letter-style`, `POST /cv/me/photo/enhance`). Build Release installé et lancé sur l'iPhone de Marc à 01:41 (entitlement associated-domains retiré localement, comme le 05).
+- Galerie de prod : 9 modèles publiés dont Galerie Monochrome avec lettre appariée ; tous les autres servent la lettre sobre.
+- Non vu sur appareil : écran Lettre (capsule « Du modèle · Sobre »), feuille couleur v2, portrait IA depuis l'onglet CV.
+
 ### Ce qui est livré (`npm run check` vert, 642 tests ; `npx expo export --platform ios` produit un paquet)
 
 - **`services/photo.ts`** (pur, testé, 4 cas) : `TEXTES_PHOTO` — la promesse (celle de la création,
