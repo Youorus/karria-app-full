@@ -5,6 +5,11 @@
 
 **Dernière mise à jour : 2026-11-06**
 
+## 2026-11-13, 17 h — couleur d'origine par défaut
+
+- La couleur choisie dans l'atelier libre reste dans le brouillon de **ce** CV ; elle n'est plus envoyée au choix de modèle (`retenirChoix`) et n'est plus relue comme défaut (`choisi?.couleur`) ni dans l'atelier ni à Finaliser : un nouveau CV part toujours de la couleur d'origine du modèle. Côté prod, la couleur retenue des comptes de Marc a été remise à NULL.
+- Incident vu par Marc (seconde page invisible dans l'éditeur) : script de rendu en direct cassé côté API entre 15 h 55 et 17 h ; corrigé (`12310c4`).
+
 ## 2026-11-13, soir — deux pages permises, ligne des pages dans la barre
 
 - Marc : la bannière au-dessus du CV n'avait pas de sens ; deux pages sont permises si la seconde est propre. Donc : plus d'alerte sur la feuille ; une **ligne dans la barre basse** (`LignePages` dans `barre-atelier.tsx`) « Ton CV fait 2 pages · Tenir sur une page » qui ouvre la feuille ; la feuille s'intitule « Ton CV fait deux pages », dit que c'est permis, offre « Garder deux pages », puis les propositions à masquer.

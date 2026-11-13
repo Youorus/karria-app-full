@@ -244,7 +244,7 @@ describe("L'atelier : changer de modèle ne perd rien", () => {
     jest.spyOn(Alert, "alert").mockImplementation(() => {});
   });
 
-  it("libre : la couleur se pose, se voit au rendu, survit au modèle, part au choix à « Garder »", async () => {
+  it("libre : la couleur se pose, se voit au rendu, survit au modèle, reste à ce CV", async () => {
     const { result } = renderHook(() => useAtelier(true));
     await waitFor(() => expect(result.current.chargement).toBe(false));
     expect(result.current.couleur).toBeNull();
@@ -260,11 +260,12 @@ describe("L'atelier : changer de modèle ne perd rien", () => {
     // Le CV n'a pas bougé, le brouillon porte la couleur.
     expect(result.current.peutAnnuler).toBe(false);
     expect(lireBrouillonAtelier("libre")?.couleur).toBe("#7B1E2B");
-    // Rien ne part tant que la feuille est ouverte ; « Garder » envoie une fois.
+    // Sans dossier, la couleur reste dans le brouillon de ce CV : « Garder »
+    // n'en fait pas la couleur par défaut des CV suivants (Marc, 13/11).
     expect(mockChoisir).not.toHaveBeenCalled();
     act(() => result.current.garderCouleur());
     expect(result.current.feuille).toBeNull();
-    expect(mockChoisir).toHaveBeenCalledWith(LIBRE, "#7B1E2B");
+    expect(mockChoisir).not.toHaveBeenCalled();
 
     // Changer de modèle garde la couleur choisie.
     act(() => result.current.choisirModele(ACHETE));

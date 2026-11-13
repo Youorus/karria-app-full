@@ -113,11 +113,7 @@ import { useAnnonceEmplacement } from "@/features/publicite/hooks/use-annonce-em
 import { ErreurApi } from "@/lib/http";
 import { useNavigationUnique } from "@/lib/navigation";
 
-import {
-  choisirModele as retenirChoix,
-  lireModeleChoisi,
-  rendreCv,
-} from "../api/documents.api";
+import { lireModeleChoisi, rendreCv } from "../api/documents.api";
 import type { FeuilleCvHandle } from "../components/feuille-cv";
 import {
   brouillonPrime,
@@ -570,10 +566,10 @@ export function useAtelier(libre = false): Atelier {
    *  brouillon, le prochain « Garder » la renverra. */
   const retenirCouleurSurLeServeur = useCallback(
     (c: string | null) => {
+      // Sans dossier, la couleur reste dans le brouillon de ce CV : on ne
+      // l'impose pas aux CV suivants (le choix du modèle, lui, se retient).
       const envoi = libre
-        ? modeleRef.current === null
-          ? Promise.resolve()
-          : retenirChoix(modeleRef.current, c)
+        ? Promise.resolve()
         : changerCouleurDuDossier(dossierId, c).then((lu) => {
             if (vivant.current) poserDossier(lu);
           });
@@ -636,7 +632,10 @@ export function useAtelier(libre = false): Atelier {
         const demandeC = couleurDemandee.current;
         couleurDemandee.current = null;
         const duBrouillon = reprise ? brouillon.couleur : undefined;
-        const c = demandeC ?? duBrouillon ?? choisi?.couleur ?? null;
+        // Par défaut, la couleur d'**origine** du modèle (Marc, 13/11) : la
+        // couleur choisie ne vaut que pour ce CV (brouillon) ou ce dossier,
+        // jamais pour les suivants.
+        const c = demandeC ?? duBrouillon ?? null;
         couleurRef.current = c;
         setCouleur(c);
         if (reprise && brouillon.dernierChemin !== null) {

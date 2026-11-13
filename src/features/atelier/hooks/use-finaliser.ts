@@ -240,8 +240,8 @@ export function useFinaliser(libre = false): EcranFinaliser {
     modeleRef.current = modeleId;
     setCvLibre(cv);
     // La couleur : celle du brouillon repris, sinon celle du choix par défaut.
-    const duBrouillon = reprise ? brouillon.couleur : undefined;
-    const couleur = duBrouillon ?? choisi?.couleur ?? null;
+    // La couleur de ce CV seulement (brouillon) ; sinon celle d'origine du modèle.
+    const couleur = (reprise ? brouillon.couleur : null) ?? null;
     const exporte = await exporterCvLibre({ cv, modeleId, atsSafe, couleur });
     if (!vivant.current) return;
     setExportCv(exporte);
