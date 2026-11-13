@@ -3,11 +3,14 @@
  *
  * ═══ Une proposition par surface ═══
  *
- * Avant l'abonnement : une seule surface touchable, dorée et calme — le
- * mini-fil où l'annonce s'efface, le titre, le prix et la promesse « sans
- * engagement » — qui ouvre la feuille (`feuille-sans-pub.tsx`). Pas de
- * bouton ici : la surface **est** l'invitation, et le seul bouton bleu de
- * ce parcours vit dans la feuille, là où l'on décide.
+ * Avant l'abonnement : la carte vedette de la section, construite comme
+ * l'entrée d'un bon écran d'abonnement (refonte du 2026-11-13, Marc :
+ * « qui appelle le plus de conversion possible ») — l'étiquette dorée
+ * « Karria sans pub », un titre qui dit le bénéfice, le mini-fil où
+ * l'annonce s'efface, le prix en grand ramené au jour, et **un bouton d'or
+ * plein** qui ouvre la feuille (`feuille-sans-pub.tsx`). Avant, la carte
+ * entière était touchable sans bouton : on ne voyait pas qu'il fallait
+ * appuyer. Toute la carte reste touchable, le bouton dit quoi faire.
  *
  * Pendant le paiement, la même surface dit où l'on en est (« Ouverture… »,
  * « On attend la confirmation… ») : on ne perd pas sa place.
@@ -19,17 +22,19 @@
 
 import { Pressable } from "react-native";
 
+import { BoutonAction } from "@/components/bouton-action";
 import { Icone } from "@/components/icone";
 import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { Spinner } from "@/components/ui/spinner";
 import { VStack } from "@/components/ui/vstack";
-import { PREMIUM_TEXTE } from "@/theme";
+import { euros } from "@/lib/monnaie";
+import { PREMIUM_TEXTE, SUR_PREMIUM } from "@/theme";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import type { Soutien } from "../hooks/use-soutien";
-import { etatSansPub, prixParMois, TEXTES } from "../services/presentation";
+import { etatSansPub, prixParJour, TEXTES } from "../services/presentation";
 import { MiniFil } from "./mini-fil";
 
 interface Props {
@@ -91,42 +96,70 @@ export function SurfaceSansPub({ soutien, onVoir }: Props) {
 
   // ── L'invitation, ou l'attente du paiement en cours ──
   const enCours = phase !== "repos" && !soutien.cafeEnCours;
-  const prix = prixParMois(catalogue.sansPub.prixCentimes);
+  const centimes = catalogue.sansPub.prixCentimes;
   return (
     <Pressable
       onPress={onVoir}
       disabled={enCours}
-      className="gap-4 rounded-carte border border-border-premium bg-surface-premium p-5 active:opacity-80"
-      accessibilityRole="button"
-      accessibilityLabel={`${TEXTES.sansPubTitre} ${prix}. ${TEXTES.sansPubPromesse}`}
-      accessibilityHint={TEXTES.sansPubVoir}
-      accessibilityState={{ disabled: enCours, busy: enCours }}
+      className="gap-5 overflow-hidden rounded-carte border border-border-premium bg-surface-premium p-5 active:opacity-90"
+      // La carte entière répond au doigt ; au lecteur d'écran, on lit ses
+      // textes un à un puis le bouton, qui seul porte l'action.
+      accessible={false}
     >
-      <Box className="px-2 pt-1">
-        <MiniFil />
-      </Box>
-      <VStack className="gap-1">
-        <Texte className="font-display text-title-sm text-foreground">
+      <VStack className="gap-2">
+        <HStack className="items-center gap-1.5 self-start rounded-full bg-card px-2.5 py-1">
+          <Icone nom="couronne" couleur={or} taille={11} graisse="bold" />
+          <Texte className="text-caption font-bold uppercase tracking-wide text-premium-texte">
+            {TEXTES.sansPubEtiquette}
+          </Texte>
+        </HStack>
+        <Texte
+          accessibilityRole="header"
+          className="font-display text-title leading-8 tracking-tight text-foreground"
+        >
           {TEXTES.sansPubTitre}
         </Texte>
-        {enCours ? (
-          <HStack className="items-center gap-2 pt-1">
-            <Spinner size="small" />
-            <Texte className="flex-1 text-footnote text-muted-foreground">
-              {phase === "confirmation" ? TEXTES.attente : TEXTES.ouverture}
-            </Texte>
-          </HStack>
-        ) : (
-          <HStack className="items-center gap-2">
-            <Texte className="flex-1 text-footnote leading-5 text-muted-foreground">
-              <Texte className="font-bold text-premium-texte">{prix}</Texte>
-              {" · "}
-              {TEXTES.sansPubPromesse}
-            </Texte>
-            <Icone nom="suivant" couleur={or} taille={13} graisse="bold" />
-          </HStack>
-        )}
+        <Texte className="text-footnote leading-5 text-muted-foreground">
+          {TEXTES.sansPubAccroche}
+        </Texte>
       </VStack>
+
+      <Box className="px-1">
+        <MiniFil />
+      </Box>
+
+      <HStack className="items-end justify-between gap-3">
+        <VStack className="gap-0.5">
+          <HStack className="items-baseline gap-1">
+            <Texte className="font-display text-title text-foreground">
+              {euros(centimes)}
+            </Texte>
+            <Texte className="text-footnote text-muted-foreground">/ mois</Texte>
+          </HStack>
+          <Texte className="text-caption text-muted-foreground">
+            {prixParJour(centimes)}
+          </Texte>
+        </VStack>
+        <Texte className="pb-0.5 text-right text-caption font-bold text-premium-texte">
+          {TEXTES.garanties[0]}
+        </Texte>
+      </HStack>
+
+      <BoutonAction
+        libelle={TEXTES.sansPubBouton}
+        ton="premium"
+        enCours={enCours}
+        libelleEnCours={phase === "confirmation" ? TEXTES.attente : TEXTES.ouverture}
+        iconeFin={
+          <Icone
+            nom="suivant"
+            couleur={SUR_PREMIUM[couleurs.mode]}
+            taille={13}
+            graisse="bold"
+          />
+        }
+        onPress={onVoir}
+      />
     </Pressable>
   );
 }

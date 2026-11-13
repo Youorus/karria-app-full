@@ -31,21 +31,32 @@ export const TEXTES = {
   // ── La section du profil ──
   sectionTitre: "Soutenir Karria",
   sectionPhrase:
-    "Une petite équipe, une app gratuite grâce à quelques annonces. Si Karria t'aide, voici deux façons de nous aider.",
+    "Karria est gratuite grâce à quelques annonces. Si elle t'aide, voici deux façons de nous le rendre.",
   sectionSansPaiement:
     "Une petite équipe, une app gratuite grâce à quelques annonces. Merci d'être là.",
 
   // ── Sans pub ──
-  sansPubTitre: "Karria, sans aucune annonce.",
-  sansPubPhrase: "Le même Karria, en plus calme.",
-  sansPubBenefices: [
-    "Ton fil, sans aucune annonce",
-    "Une petite équipe soutenue directement",
-    "Tu arrêtes quand tu veux, en un geste",
+  /** La petite étiquette dorée, au-dessus du titre. */
+  sansPubEtiquette: "Karria sans pub",
+  sansPubTitre: "Ton fil, sans aucune annonce.",
+  /** Sous le titre de l'entrée du profil. */
+  sansPubAccroche: "Rien ne s'intercale plus entre toi et tes offres.",
+  /** Sous le titre de la feuille. */
+  sansPubPhrase: "Le même Karria, en plus calme. Tu gardes tout, on retire les annonces.",
+  /** Le comparatif de la feuille : ce que chaque formule contient. */
+  comparatifColonnes: { gratuit: "Gratuit", sansPub: "Sans pub" },
+  comparatif: [
+    { libelle: "Toutes les offres, l'atelier CV, les candidatures", gratuit: true },
+    { libelle: "Aucune annonce dans ton fil", gratuit: false },
+    { libelle: "Une petite équipe soutenue directement", gratuit: false },
   ],
+  sansPubFormule: "Mensuel",
   sansPubPromesse: "Sans engagement, résiliable à tout moment.",
-  sansPubVoir: "Voir l'offre",
+  garanties: ["Sans engagement", "Arrêt en un geste", "Paiement Stripe"],
+  sansPubMentions:
+    "Renouvelé chaque mois. Tu l'arrêtes quand tu veux depuis ton profil. Paiement sécurisé par Stripe, dans ton navigateur.",
   sansPubBouton: "Passer sans pub",
+  pasMaintenant: "Pas maintenant",
   sansPubActifTitre: "Tu es sans pub",
   sansPubActifMerci: "Merci. Ton fil est à toi, et l'équipe te doit un café.",
   sansPubGerer: "Gérer mon abonnement",
@@ -104,6 +115,29 @@ export function prixMensuel(centimes: number): string {
 /** « 4,99 € par mois », pour une phrase. */
 export function prixParMois(centimes: number): string {
   return `${euros(centimes)} par mois`;
+}
+
+/** Le bouton de la feuille : « S'abonner pour 4,99 € / mois ». */
+export function libelleAbonnement(centimes: number): string {
+  return `S'abonner pour ${prixMensuel(centimes)}`;
+}
+
+/**
+ * Le prix ramené au jour, sur trente jours : « moins de 0,17 € par jour ».
+ * Arrondi au centime supérieur, d'où « moins de » ; « soit » quand le
+ * compte tombe juste. Une vérité arithmétique, pas une promotion.
+ */
+export function prixParJour(centimes: number): string {
+  const exact = centimes % 30 === 0;
+  const parJour = Math.ceil(centimes / 30);
+  return `${exact ? "soit" : "moins de"} ${euros(parJour)} par jour`;
+}
+
+/** « Tu nous as déjà offert trois cafés. Merci ! » — rien sous un café. */
+export function cafesDejaOfferts(nombre: number): string | null {
+  if (nombre <= 0) return null;
+  const quantite = nombre === 1 ? "un café" : `${nombre} cafés`;
+  return `Tu nous as déjà offert ${quantite}. Merci !`;
 }
 
 /** « Offrir deux cafés · 4,99 € ». */

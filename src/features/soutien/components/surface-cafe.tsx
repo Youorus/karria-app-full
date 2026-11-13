@@ -38,7 +38,13 @@ import { CHALEUR, SUR_CHALEUR } from "@/theme";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import type { Soutien } from "../hooks/use-soutien";
-import { libelleDOffre, motCafe, nomDesTasses, TEXTES } from "../services/presentation";
+import {
+  cafesDejaOfferts,
+  libelleDOffre,
+  motCafe,
+  nomDesTasses,
+  TEXTES,
+} from "../services/presentation";
 import type { OffreDeCafe } from "../types/soutien.types";
 
 function Tuile({
@@ -122,6 +128,8 @@ export function SurfaceCafe({ soutien }: { soutien: Soutien }) {
   }
 
   const enCours = phase !== "repos" && soutien.cafeEnCours;
+  // Un fait du serveur, pas une incitation inventée : ce que tu as déjà offert.
+  const deja = cafesDejaOfferts(soutien.facturation?.cafes.nombre ?? 0);
   return (
     <VStack className="gap-4 rounded-carte border border-border-chaleur bg-surface-chaleur p-5">
       <HStack className="items-center gap-2.5">
@@ -136,6 +144,12 @@ export function SurfaceCafe({ soutien }: { soutien: Soutien }) {
       <Texte className="text-footnote leading-5 text-muted-foreground">
         {TEXTES.cafeDetail}
       </Texte>
+      {deja !== null ? (
+        <HStack className="items-center gap-2 self-start rounded-full bg-card px-3 py-1.5">
+          <Icone nom="coeurPlein" couleur={chaleur} taille={12} />
+          <Texte className="text-caption font-bold text-chaleur">{deja}</Texte>
+        </HStack>
+      ) : null}
 
       <HStack className="gap-2 py-1" accessibilityRole="radiogroup">
         {catalogue.cafes.map((offre) => (

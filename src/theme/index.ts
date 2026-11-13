@@ -60,6 +60,9 @@ export const PREMIUM = { light: "#d4a63a", dark: "#f2c46d" } as const;
 /** `--color-premium-texte` : l'icône posée dans la pastille Premium. */
 export const PREMIUM_TEXTE = { light: "#8a6414", dark: "#f2c46d" } as const;
 
+/** `--color-premium-foreground` : l'icône posée sur l'or plein (le bouton « sans pub »). */
+export const SUR_PREMIUM = { light: "#1f1606", dark: "#1f1606" } as const;
+
 /** `--color-chaleur` : l'icône du café et du mot de l'équipe. */
 export const CHALEUR = { light: "#9a5b2e", dark: "#e0a872" } as const;
 

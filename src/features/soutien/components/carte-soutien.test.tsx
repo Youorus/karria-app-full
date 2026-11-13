@@ -68,15 +68,16 @@ function soutien(partiel: Partial<Soutien> = {}): Soutien {
 }
 
 describe("CarteSoutien", () => {
-  it("présente deux surfaces : l'entrée sans pub avec son prix, et le café", () => {
+  it("présente deux surfaces : l'entrée sans pub avec son prix et son bouton, et le café", () => {
     render(<CarteSoutien soutien={soutien()} />);
 
     expect(screen.getByRole("header", { name: "Soutenir Karria" })).toBeTruthy();
     expect(
-      screen.getByRole("button", {
-        name: /Karria, sans aucune annonce\. 4,99 € par mois\. Sans engagement/,
-      }),
+      screen.getByRole("header", { name: "Ton fil, sans aucune annonce." }),
     ).toBeTruthy();
+    expect(screen.getAllByText("4,99 €").length).toBeGreaterThan(0);
+    expect(screen.getByText("moins de 0,17 € par jour")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Passer sans pub" })).toBeTruthy();
     expect(screen.getByRole("header", { name: "Nous offrir un café" })).toBeTruthy();
     expect(screen.queryByText(/☕/)).toBeNull();
   });
@@ -96,12 +97,16 @@ describe("CarteSoutien", () => {
 
   it("ouvre la feuille de l'offre depuis l'entrée, et la feuille ferme sur « Fermer »", () => {
     render(<CarteSoutien soutien={soutien()} />);
-    expect(screen.queryByRole("button", { name: "Passer sans pub" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "S'abonner pour 4,99 € / mois" }),
+    ).toBeNull();
 
-    fireEvent.press(screen.getByRole("button", { name: /Karria, sans aucune annonce/ }));
+    fireEvent.press(screen.getByRole("button", { name: "Passer sans pub" }));
 
-    expect(screen.getByRole("button", { name: "Passer sans pub" })).toBeTruthy();
-    expect(screen.getByText("Ton fil, sans aucune annonce")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "S'abonner pour 4,99 € / mois" }),
+    ).toBeTruthy();
+    expect(screen.getByText("Aucune annonce dans ton fil")).toBeTruthy();
     expect(screen.getByText("4,99 € / mois")).toBeTruthy();
     expect(screen.getAllByText(/Paiement sécurisé par Stripe/).length).toBeGreaterThan(0);
   });
@@ -123,7 +128,7 @@ describe("CarteSoutien", () => {
 
     expect(screen.getByRole("header", { name: "Tu es sans pub" })).toBeTruthy();
     expect(screen.getByText(/Prochain renouvellement le 28 novembre 2026/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /sans aucune annonce/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Passer sans pub" })).toBeNull();
     fireEvent.press(screen.getByRole("button", { name: "Gérer mon abonnement" }));
     expect(s.gerer).toHaveBeenCalledTimes(1);
   });
@@ -142,8 +147,8 @@ describe("CarteSoutien", () => {
     render(<CarteSoutien soutien={soutien({ phase: "confirmation" })} />);
     expect(screen.getByText("On attend la confirmation du paiement…")).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: /sans aucune annonce/ }).props.accessibilityState
-        .disabled,
+      screen.getByRole("button", { name: "On attend la confirmation du paiement…" }).props
+        .accessibilityState.disabled,
     ).toBe(true);
   });
 
@@ -151,6 +156,17 @@ describe("CarteSoutien", () => {
     render(<CarteSoutien soutien={soutien({ actif: false })} />);
     expect(screen.getByRole("header", { name: "Soutenir Karria" })).toBeTruthy();
     expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("rappelle les cafés déjà offerts, un fait du serveur", () => {
+    render(
+      <CarteSoutien
+        soutien={soutien({
+          facturation: { ...SANS_ABONNEMENT, cafes: { nombre: 3, dernierLe: null } },
+        })}
+      />,
+    );
+    expect(screen.getByText("Tu nous as déjà offert 3 cafés. Merci !")).toBeTruthy();
   });
 
   it("affiche l'erreur du hook avec « Compris »", () => {
@@ -168,13 +184,22 @@ describe("FeuilleSansPub", () => {
     const fermer = jest.fn();
     render(<FeuilleSansPub visible soutien={s} onFermer={fermer} />);
 
-    fireEvent.press(screen.getByRole("button", { name: "Passer sans pub" }));
+    fireEvent.press(screen.getByRole("button", { name: "S'abonner pour 4,99 € / mois" }));
 
     expect(fermer).toHaveBeenCalledTimes(1);
     expect(s.passerSansPub).not.toHaveBeenCalled();
     // La feuille native prévient quand elle a disparu : c'est là que ça part.
     fireEvent(screen.UNSAFE_getByType(Modal), "dismiss");
     expect(s.passerSansPub).toHaveBeenCalledTimes(1);
+  });
+
+  it("« Pas maintenant » referme sans rien lancer", () => {
+    const s = soutien();
+    const fermer = jest.fn();
+    render(<FeuilleSansPub visible soutien={s} onFermer={fermer} />);
+    fireEvent.press(screen.getByRole("button", { name: "Pas maintenant" }));
+    expect(fermer).toHaveBeenCalledTimes(1);
+    expect(s.passerSansPub).not.toHaveBeenCalled();
   });
 
   it("« Fermer » referme sans rien lancer", () => {

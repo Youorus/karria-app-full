@@ -8,8 +8,8 @@
  * Stripe dans une seule enveloppe : « tout bourré en un » (Marc). Ici, un
  * titre de section et une phrase, puis :
  *
- * - **« Karria sans pub »** (`surface-sans-pub.tsx`), dorée : une entrée
- *   compacte et désirable qui ouvre la feuille plein format
+ * - **« Karria sans pub »** (`surface-sans-pub.tsx`), dorée : la carte
+ *   vedette, avec son prix et son bouton d'or, qui ouvre la feuille
  *   (`feuille-sans-pub.tsx`) ; ou, quand on l'est, l'état « Tu es sans pub » ;
  * - **« Nous offrir un café »** (`surface-cafe.tsx`), crème et caramel : un
  *   geste à part, ludique, en deux touchers.
@@ -61,7 +61,7 @@ export function CarteSoutien({ soutien }: { soutien: Soutien }) {
     return (
       <VStack className="gap-4">
         <Box className="h-6 w-40 rounded-full bg-remplissage-doux" />
-        <Box className="h-44 w-full rounded-carte bg-surface-premium" />
+        <Box className="h-80 w-full rounded-carte bg-surface-premium" />
         <Box className="h-56 w-full rounded-carte bg-surface-chaleur" />
       </VStack>
     );

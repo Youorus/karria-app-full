@@ -69,6 +69,7 @@
     --color-onglet-inactif: #00000061;
     /* L'or de la V1 : modèles Pro, étoiles des avis. */
     --color-premium: #d4a63a;
+    --color-premium-foreground: #1f1606; /* ce qui se pose sur l'or plein : le bouton « sans pub » */
     --color-salaire: #e8f5e9;
     --color-salaire-foreground: #1b5e20;
     --color-nouveau: #f97316;
@@ -176,6 +177,7 @@
     --color-onglet-actif: #ffffff24;
     --color-onglet-inactif: #ffffff6b;
     --color-premium: #f2c46d;
+    --color-premium-foreground: #1f1606; /* ce qui se pose sur l'or plein : le bouton « sans pub » */
     --color-salaire: #e8f5e9;
     --color-salaire-foreground: #1b5e20;
     --color-nouveau: #f97316;

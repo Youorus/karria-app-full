@@ -5,6 +5,15 @@
 
 **Dernière mise à jour : 2026-11-06**
 
+## 2026-11-13 — « Soutenir Karria » refondu pour convertir
+
+- Carte « Karria sans pub » du profil : étiquette dorée, titre-bénéfice, mini-fil, prix en grand ramené au jour, bouton d'or plein (ton `premium` ajouté à `BoutonAction`, jeton `--color-premium-foreground`).
+- Feuille d'offre : démonstration animée (l'annonce pâlit et se barre), comparatif Gratuit / Sans pub, formule cochée, trois garanties, bouton fixe « S'abonner pour 4,99 € / mois », « Pas maintenant », mentions.
+- Café : rappel « Tu nous as déjà offert N cafés » quand le serveur en compte.
+- Aucun faux compte à rebours, fausse réduction ni chiffre inventé.
+- Vu sur simulateur iPhone 17 (mode sombre) ; pas encore vu sur l'iPhone de Marc.
+- Prod : CV complet de démonstration écrit pour mtakoumba@gmail.com (pour tester les modèles) ; l'image de l'API avait perdu son tag sur le serveur, re-taguée `karria-api-ujqvaj:latest`.
+
 ## Session du 2026-11-06 — « Rendre ma photo professionnelle » depuis l'onglet CV (Fable) — BRANCHE `feat/portrait`, NON POUSSÉE
 
 **Demande de Marc** : « Au niveau de l'onglet CV, quand l'utilisateur change son avatar, lui donner

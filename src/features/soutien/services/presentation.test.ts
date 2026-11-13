@@ -8,6 +8,9 @@ import { describe, expect, it } from "@jest/globals";
 import { versCatalogue, versFacturation } from "../api/soutien.api";
 import type { CatalogueBrut, FacturationBrute } from "../types/soutien.types";
 import {
+  cafesDejaOfferts,
+  libelleAbonnement,
+  prixParJour,
   etatSansPub,
   libelleDOffre,
   motCafe,
@@ -94,10 +97,20 @@ describe("Les mots", () => {
   });
 
   it("promet trois bénéfices lisibles, sans engagement, et la rassurance Stripe", () => {
-    expect(TEXTES.sansPubBenefices).toHaveLength(3);
+    expect(TEXTES.comparatif).toHaveLength(3);
+    expect(TEXTES.garanties).toHaveLength(3);
     expect(TEXTES.sansPubPromesse).toMatch(/sans engagement/i);
     expect(TEXTES.sansPubPromesse).toMatch(/résiliable à tout moment/i);
     expect(TEXTES.stripe).toMatch(/Stripe/);
+  });
+
+  it("ramène le prix au jour sans l'embellir, et rappelle les cafés offerts", () => {
+    expect(prixParJour(499)).toBe("moins de 0,17 € par jour");
+    expect(prixParJour(300)).toBe("soit 0,10 € par jour");
+    expect(libelleAbonnement(499)).toBe("S'abonner pour 4,99 € / mois");
+    expect(cafesDejaOfferts(0)).toBeNull();
+    expect(cafesDejaOfferts(1)).toBe("Tu nous as déjà offert un café. Merci !");
+    expect(cafesDejaOfferts(4)).toBe("Tu nous as déjà offert 4 cafés. Merci !");
   });
 
   it("dit l'état de l'abonnement et quoi faire", () => {

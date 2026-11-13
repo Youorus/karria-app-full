@@ -53,7 +53,7 @@ import { HStack } from "@/components/ui/hstack";
 import { Spinner } from "@/components/ui/spinner";
 import { Texte } from "@/components/texte";
 
-type Ton = "principal" | "secondaire" | "discret" | "destructif" | "chaleur";
+type Ton = "principal" | "secondaire" | "discret" | "destructif" | "chaleur" | "premium";
 
 const FOND: Record<Ton, string> = {
   principal: "bg-primary",
@@ -61,6 +61,7 @@ const FOND: Record<Ton, string> = {
   discret: "",
   destructif: "bg-destructive",
   chaleur: "bg-chaleur",
+  premium: "bg-premium",
 };
 
 const TEXTE: Record<Ton, string> = {
@@ -69,6 +70,7 @@ const TEXTE: Record<Ton, string> = {
   discret: "text-primary",
   destructif: "text-destructive-foreground",
   chaleur: "text-chaleur-foreground",
+  premium: "text-premium-foreground",
 };
 
 export interface BoutonActionProps extends Omit<PressableProps, "children" | "style"> {

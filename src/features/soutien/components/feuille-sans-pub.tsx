@@ -3,11 +3,22 @@
  *
  * ═══ Ce qu'on attend d'un bon écran d'abonnement ═══
  *
- * Une hiérarchie nette, lue de haut en bas sans effort : le mini-fil en
- * grand (l'annonce qui s'efface), un titre qui dit la promesse, trois
- * bénéfices lisibles, le prix et « sans engagement », **un seul** bouton
- * bleu, et la rassurance Stripe en bas. Rien d'autre : pas de comparatif,
- * pas de compte à rebours, pas de badge.
+ * Refonte du 2026-11-13, sur le modèle des écrans d'abonnement qui
+ * convertissent le mieux, lus de haut en bas sans effort :
+ *
+ * 1. **La démonstration** : le mini-fil en grand, sur l'or, où l'annonce
+ *    pâlit et se barre sous les yeux à l'ouverture ;
+ * 2. **la promesse** : un titre-bénéfice, une phrase qui rassure (« tu
+ *    gardes tout ») ;
+ * 3. **le comparatif** Gratuit / Sans pub : il montre qu'on ne perd rien
+ *    en restant gratuit, et exactement ce que l'on gagne ;
+ * 4. **la formule**, cochée, prix en grand et ramené au jour ;
+ * 5. **trois garanties** courtes, puis, en pied fixe, **un seul** bouton
+ *    d'or qui dit le prix, « Pas maintenant », et les mentions.
+ *
+ * Ce qu'on s'interdit, parce que ça se retourne contre la confiance : un
+ * faux compte à rebours, une fausse réduction, un chiffre d'utilisateurs
+ * inventé, une croix de fermeture cachée.
  *
  * ═══ La feuille native du système ═══
  *
@@ -36,11 +47,16 @@ import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
 import { BORDS_FEUILLE_NATIVE } from "@/lib/feuille-native";
-import { PREMIUM_TEXTE } from "@/theme";
+import { PREMIUM_TEXTE, SUR_PREMIUM } from "@/theme";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import type { Soutien } from "../hooks/use-soutien";
-import { prixMensuel, TEXTES } from "../services/presentation";
+import {
+  libelleAbonnement,
+  prixMensuel,
+  prixParJour,
+  TEXTES,
+} from "../services/presentation";
 import { MiniFil } from "./mini-fil";
 
 interface Props {
@@ -79,6 +95,7 @@ export function FeuilleSansPub({ visible, soutien, onFermer }: Props) {
   };
 
   if (catalogue === null) return null;
+  const centimes = catalogue.sansPub.prixCentimes;
 
   return (
     <Modal
@@ -104,13 +121,21 @@ export function FeuilleSansPub({ visible, soutien, onFermer }: Props) {
           </HStack>
 
           <ScrollView
-            contentContainerClassName="gap-8 px-6 pb-8 pt-2"
+            contentContainerClassName="gap-7 px-6 pb-8 pt-2"
             showsVerticalScrollIndicator={false}
           >
-            <Box className="px-3">
-              <MiniFil grande />
-            </Box>
+            {/* 1. La démonstration */}
+            <VStack className="gap-4 rounded-carte border border-border-premium bg-surface-premium px-5 pb-6 pt-5">
+              <HStack className="items-center gap-1.5 self-center rounded-full bg-card px-3 py-1">
+                <Icone nom="couronne" couleur={or} taille={12} graisse="bold" />
+                <Texte className="text-caption font-bold uppercase tracking-wide text-premium-texte">
+                  {TEXTES.sansPubEtiquette}
+                </Texte>
+              </HStack>
+              <MiniFil grande anime={visible} />
+            </VStack>
 
+            {/* 2. La promesse */}
             <VStack className="gap-2">
               <Texte
                 accessibilityRole="header"
@@ -123,41 +148,124 @@ export function FeuilleSansPub({ visible, soutien, onFermer }: Props) {
               </Texte>
             </VStack>
 
-            <VStack accessibilityRole="list">
-              {TEXTES.sansPubBenefices.map((benefice, i) => (
+            {/* 3. Le comparatif */}
+            <VStack className="rounded-carte border border-border-subtle bg-card">
+              <HStack className="items-center px-4 pb-2 pt-3">
+                <Box className="flex-1" />
+                <Texte className="w-16 text-center text-caption font-bold text-muted-foreground">
+                  {TEXTES.comparatifColonnes.gratuit}
+                </Texte>
+                <Texte className="w-16 text-center text-caption font-bold text-premium-texte">
+                  {TEXTES.comparatifColonnes.sansPub}
+                </Texte>
+              </HStack>
+              {TEXTES.comparatif.map((ligne) => (
                 <HStack
-                  key={benefice}
-                  className={`items-center gap-3 py-3 ${i > 0 ? "border-t border-border-subtle" : ""}`}
+                  key={ligne.libelle}
+                  className="items-center border-t border-border-subtle px-4 py-3"
+                  accessible
+                  accessibilityLabel={`${ligne.libelle} : ${
+                    ligne.gratuit ? "inclus dans les deux" : "seulement sans pub"
+                  }`}
                 >
-                  <Icone nom="coche" couleur={or} taille={14} graisse="bold" />
-                  <Texte className="flex-1 text-body text-foreground">{benefice}</Texte>
+                  <Texte className="flex-1 pr-2 text-footnote leading-5 text-foreground">
+                    {ligne.libelle}
+                  </Texte>
+                  <Box className="w-16 items-center">
+                    {ligne.gratuit ? (
+                      <Icone
+                        nom="coche"
+                        couleur={couleurs.estompe}
+                        taille={13}
+                        graisse="bold"
+                      />
+                    ) : (
+                      <Box className="h-0.5 w-3 rounded-full bg-track" />
+                    )}
+                  </Box>
+                  <Box className="w-16 items-center">
+                    <Box className="h-6 w-6 items-center justify-center rounded-full bg-premium">
+                      <Icone
+                        nom="coche"
+                        couleur={SUR_PREMIUM[couleurs.mode]}
+                        taille={11}
+                        graisse="bold"
+                      />
+                    </Box>
+                  </Box>
                 </HStack>
               ))}
             </VStack>
 
-            <VStack className="gap-1">
-              <Texte className="font-display text-title text-foreground">
-                {prixMensuel(catalogue.sansPub.prixCentimes)}
-              </Texte>
-              <Texte className="text-footnote text-muted-foreground">
-                {TEXTES.sansPubPromesse}
-              </Texte>
-            </VStack>
+            {/* 4. La formule */}
+            <HStack
+              className="items-center gap-3 rounded-carte border-2 border-premium bg-surface-premium px-4 py-4"
+              accessible
+              accessibilityLabel={`${TEXTES.sansPubFormule}, ${prixMensuel(centimes)}, ${prixParJour(centimes)}. ${TEXTES.sansPubPromesse}`}
+            >
+              <Box className="h-6 w-6 items-center justify-center rounded-full bg-premium">
+                <Icone
+                  nom="coche"
+                  couleur={SUR_PREMIUM[couleurs.mode]}
+                  taille={11}
+                  graisse="bold"
+                />
+              </Box>
+              <VStack className="flex-1 gap-0.5">
+                <Texte className="font-bold text-body text-foreground">
+                  {TEXTES.sansPubFormule}
+                </Texte>
+                <Texte className="text-caption text-muted-foreground">
+                  {TEXTES.garanties[0]}
+                </Texte>
+              </VStack>
+              <VStack className="items-end gap-0.5">
+                <Texte className="font-display text-title-sm text-foreground">
+                  {prixMensuel(centimes)}
+                </Texte>
+                <Texte className="text-caption text-muted-foreground">
+                  {prixParJour(centimes)}
+                </Texte>
+              </VStack>
+            </HStack>
+
+            {/* 5. Les garanties */}
+            <HStack className="justify-between gap-2">
+              {TEXTES.garanties.map((garantie, i) => (
+                <VStack key={garantie} className="flex-1 items-center gap-1.5">
+                  <Icone
+                    nom={(["calendrier", "eclair", "cadenas"] as const)[i] ?? "coche"}
+                    couleur={or}
+                    taille={18}
+                  />
+                  <Texte className="text-center text-caption leading-4 text-muted-foreground">
+                    {garantie}
+                  </Texte>
+                </VStack>
+              ))}
+            </HStack>
           </ScrollView>
 
-          <VStack className="gap-3 px-6 pb-2 pt-3">
+          <VStack className="gap-2 border-t border-border-subtle px-6 pb-2 pt-4">
             <BoutonAction
-              libelle={TEXTES.sansPubBouton}
-              ton="principal"
+              libelle={libelleAbonnement(centimes)}
+              ton="premium"
               desactive={lance}
               onPress={passer}
             />
-            <HStack className="items-center justify-center gap-1.5">
-              <Icone nom="bouclier" couleur={couleurs.estompe} taille={12} />
-              <Texte className="text-center text-caption text-foreground-faint">
-                {TEXTES.stripe}
+            <Pressable
+              onPress={onFermer}
+              className="min-h-touch items-center justify-center"
+              accessibilityRole="button"
+              accessibilityLabel={TEXTES.pasMaintenant}
+            >
+              <Texte className="font-bold text-footnote text-muted-foreground">
+                {TEXTES.pasMaintenant}
               </Texte>
-            </HStack>
+            </Pressable>
+            <Texte className="px-2 text-center text-caption leading-4 text-foreground-faint">
+              {TEXTES.sansPubMentions}
+            </Texte>
           </VStack>
         </SafeAreaView>
       </Box>
