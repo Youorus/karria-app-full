@@ -19,6 +19,8 @@
  * de question ; « Voir mes CV » sous le document ramène à la liste.
  */
 
+import { Image } from "expo-image";
+import { useState } from "react";
 import { Pressable, ScrollView } from "react-native";
 import Animated, { FadeIn, FadeInDown, useReducedMotion } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -39,12 +41,17 @@ import { CarteAnnonce } from "@/features/publicite/components/carte-annonce";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import { BoutonFormat } from "../components/bouton-format";
-import { CadranAts } from "../components/cadran-ats";
+import { CarteOptimisation, LigneOptimisee } from "../components/carte-optimisation";
 import { FeuilleEnvoi } from "../components/feuille-envoi";
 import { PastilleCouleur } from "../components/pastille-couleur";
 import { PastilleModele } from "../components/pastille-modele";
+import { VerdictAts } from "../components/verdict-ats";
 import { TEXTES, useFinaliser, type Document, type Format } from "../hooks/use-finaliser";
-import type { Export } from "../types/atelier.types";
+import { libellePoints, phraseResserre } from "../services/presentation";
+import type { ControleAts, Export } from "../types/atelier.types";
+
+const LARGEUR_APERCU = 64;
+const HAUTEUR_APERCU = Math.round(LARGEUR_APERCU * 1.414);
 
 function CarteDocument({
   document,
@@ -53,6 +60,7 @@ function CarteDocument({
   exporte,
   telechargement,
   onTelecharger,
+  onVoir,
 }: {
   document: Document;
   titre: string;
@@ -60,22 +68,62 @@ function CarteDocument({
   exporte: Export | null;
   telechargement: { document: Document; format: Format } | null;
   onTelecharger: (format: Format) => void;
+  /** « Voir mon CV » : l'aperçu plein écran, quand les pages en image existent. */
+  onVoir: () => void;
 }) {
   const couleurs = useCouleurs();
+  const apercu = exporte?.apercus[0] ?? null;
+  const voir = document === "cv" ? TEXTES.voirMonCv : TEXTES.voirMaLettre;
   return (
     <HStack className="items-center gap-3 rounded-carte border border-border-subtle bg-card p-4">
-      <Box className="h-12 w-10 items-center justify-center rounded-[6px] border border-border-champ bg-background">
-        <Icone
-          nom={document === "cv" ? "cv" : "lettre"}
-          couleur={couleurs.estompe}
-          taille={16}
-        />
-      </Box>
+      <Pressable
+        onPress={onVoir}
+        disabled={apercu === null}
+        accessibilityRole="imagebutton"
+        accessibilityLabel={voir}
+        className="active:opacity-80"
+      >
+        {apercu !== null ? (
+          <Box
+            className="overflow-hidden rounded-[4px] border border-border-champ"
+            style={{ backgroundColor: "#ffffff" }}
+          >
+            <Image
+              source={{ uri: apercu, cacheKey: `export-${exporte?.id ?? ""}-0` }}
+              cachePolicy="memory-disk"
+              style={{ width: LARGEUR_APERCU, height: HAUTEUR_APERCU }}
+              contentFit="cover"
+              contentPosition="top"
+              transition={200}
+              accessible={false}
+            />
+          </Box>
+        ) : (
+          <Box className="h-12 w-10 items-center justify-center rounded-[6px] border border-border-champ bg-background">
+            <Icone
+              nom={document === "cv" ? "cv" : "lettre"}
+              couleur={couleurs.estompe}
+              taille={16}
+            />
+          </Box>
+        )}
+      </Pressable>
       <VStack className="flex-1 gap-0.5">
         <Texte className="font-bold text-body text-foreground">{titre}</Texte>
         <Texte className="text-footnote text-muted-foreground" numberOfLines={1}>
           {exporte === null ? "Pas encore généré" : detail}
         </Texte>
+        {apercu !== null ? (
+          <Pressable
+            onPress={onVoir}
+            className="min-h-touch flex-row items-center gap-1 self-start"
+            accessibilityRole="button"
+            accessibilityLabel={voir}
+          >
+            <Texte className="font-bold text-footnote text-primary">{voir}</Texte>
+            <Icone nom="suivant" couleur={couleurs.primaire} taille={11} graisse="bold" />
+          </Pressable>
+        ) : null}
       </VStack>
       {exporte !== null ? (
         <HStack className="gap-2">
@@ -105,6 +153,96 @@ function CarteDocument({
   );
 }
 
+/**
+ * « Ce qui ferait la différence », replié par défaut : utile, mais fatigant
+ * à lire d'emblée (Marc, 2026-11-13). Un toucher l'ouvre.
+ */
+function PointsRepliables({
+  points,
+  onCorriger,
+}: {
+  points: ControleAts[];
+  onCorriger: (controle: ControleAts) => void;
+}) {
+  const couleurs = useCouleurs();
+  const [ouvert, setOuvert] = useState(false);
+  return (
+    <VStack className="rounded-carte border border-border-subtle bg-card">
+      <Pressable
+        onPress={() => setOuvert((o) => !o)}
+        className="min-h-touch flex-row items-center gap-3 px-4 py-3"
+        accessibilityRole="button"
+        accessibilityState={{ expanded: ouvert }}
+        accessibilityLabel={libellePoints(points.length)}
+      >
+        <Icone nom="tendance" couleur={couleurs.estompe} taille={15} />
+        <Texte className="flex-1 font-bold text-footnote text-foreground">
+          {libellePoints(points.length)}
+        </Texte>
+        <Box style={{ transform: [{ rotate: ouvert ? "-90deg" : "90deg" }] }}>
+          <Icone nom="suivant" couleur={couleurs.estompe} taille={12} graisse="bold" />
+        </Box>
+      </Pressable>
+      {ouvert
+        ? points.map((p) => (
+            <VStack
+              key={p.cle}
+              className="gap-1.5 border-t border-border-subtle px-4 py-3"
+            >
+              <Texte className="font-bold text-footnote text-foreground">
+                {p.libelle}
+              </Texte>
+              <Texte className="text-footnote leading-5 text-muted-foreground">
+                {p.conseil}
+              </Texte>
+              <Pressable
+                onPress={() => onCorriger(p)}
+                className="min-h-touch flex-row items-center gap-1 self-start"
+                accessibilityRole="button"
+              >
+                <Texte className="font-bold text-footnote text-primary">
+                  {TEXTES.jeCorrige}
+                </Texte>
+                <Icone
+                  nom="suivant"
+                  couleur={couleurs.primaire}
+                  taille={12}
+                  graisse="bold"
+                />
+              </Pressable>
+            </VStack>
+          ))
+        : null}
+    </VStack>
+  );
+}
+
+/** Le CV a été resserré pour tenir sur une page : on le dit, et on mène à l'atelier. */
+function NoteResserre({ phrase, onAjuster }: { phrase: string; onAjuster: () => void }) {
+  const couleurs = useCouleurs();
+  return (
+    <VStack className="gap-2 rounded-carte border border-border-subtle bg-card px-4 py-3">
+      <HStack className="items-center gap-2">
+        <Icone nom="info" couleur={couleurs.estompe} taille={14} />
+        <Texte className="flex-1 font-bold text-footnote text-foreground">
+          {TEXTES.resserreTitre}
+        </Texte>
+      </HStack>
+      <Texte className="text-footnote leading-5 text-muted-foreground">{phrase}</Texte>
+      <Pressable
+        onPress={onAjuster}
+        className="min-h-touch flex-row items-center gap-1 self-start"
+        accessibilityRole="button"
+      >
+        <Texte className="font-bold text-footnote text-primary">
+          {TEXTES.resserreAjuster}
+        </Texte>
+        <Icone nom="suivant" couleur={couleurs.primaire} taille={12} graisse="bold" />
+      </Pressable>
+    </VStack>
+  );
+}
+
 export function EcranFinaliser({ libre = false }: { libre?: boolean }) {
   const couleurs = useCouleurs();
   const reduit = useReducedMotion();
@@ -112,6 +250,7 @@ export function EcranFinaliser({ libre = false }: { libre?: boolean }) {
   const entree = (rang: number) =>
     reduit ? undefined : FadeInDown.duration(380).delay(80 + rang * 70);
   const attente = f.generation || f.optimisation;
+  const resserre = phraseResserre(f.resserre);
 
   return (
     <Box style={{ flex: 1 }} className="bg-background">
@@ -159,54 +298,35 @@ export function EcranFinaliser({ libre = false }: { libre?: boolean }) {
             contentContainerStyle={{ paddingBottom: HAUTEUR_PIED_FLOTTANT }}
             showsVerticalScrollIndicator={false}
           >
-            {f.score !== null && f.phrase !== null ? (
+            {f.score !== null ? (
               <Animated.View entering={entree(0)}>
-                <CadranAts score={f.score} phrase={f.phrase} />
+                <VerdictAts score={f.score} />
+              </Animated.View>
+            ) : null}
+
+            {f.score !== null ? (
+              <Animated.View entering={entree(1)}>
+                {f.exportCv.atsSafe ? (
+                  <LigneOptimisee />
+                ) : f.score.conseilAtsSafe ? (
+                  <CarteOptimisation
+                    gain={f.gain}
+                    enCours={f.optimisation}
+                    onOptimiser={f.optimiser}
+                  />
+                ) : null}
+              </Animated.View>
+            ) : null}
+
+            {resserre !== null ? (
+              <Animated.View entering={entree(1)}>
+                <NoteResserre phrase={resserre} onAjuster={f.changerDeModele} />
               </Animated.View>
             ) : null}
 
             {f.points.length > 0 ? (
-              <Animated.View entering={entree(1)}>
-                <VStack className="gap-3">
-                  <Texte className="font-display text-callout text-foreground">
-                    {TEXTES.atsPoints}
-                  </Texte>
-                  {f.points.map((p) => (
-                    <VStack
-                      key={p.cle}
-                      className="gap-2 rounded-carte border border-border-subtle bg-card p-4"
-                    >
-                      <Texte className="font-bold text-body text-foreground">
-                        {p.libelle}
-                      </Texte>
-                      <Texte className="text-footnote leading-5 text-muted-foreground">
-                        {p.conseil}
-                      </Texte>
-                      <Pressable
-                        onPress={() => f.corriger(p)}
-                        className="min-h-touch flex-row items-center gap-1 self-start"
-                        accessibilityRole="button"
-                      >
-                        <Texte className="font-bold text-footnote text-primary">
-                          {TEXTES.jeCorrige}
-                        </Texte>
-                        <Icone
-                          nom="suivant"
-                          couleur={couleurs.primaire}
-                          taille={12}
-                          graisse="bold"
-                        />
-                      </Pressable>
-                    </VStack>
-                  ))}
-                  {f.score?.conseilAtsSafe ? (
-                    <BoutonAction
-                      libelle={TEXTES.optimiser}
-                      ton="secondaire"
-                      onPress={f.optimiser}
-                    />
-                  ) : null}
-                </VStack>
+              <Animated.View entering={entree(2)}>
+                <PointsRepliables points={f.points} onCorriger={f.corriger} />
               </Animated.View>
             ) : null}
 
@@ -232,6 +352,7 @@ export function EcranFinaliser({ libre = false }: { libre?: boolean }) {
                   exporte={f.exportCv}
                   telechargement={f.telechargement}
                   onTelecharger={(format) => f.telecharger("cv", format)}
+                  onVoir={() => f.voirApercu("cv")}
                 />
                 <HStack className="items-center gap-2">
                   <PastilleModele
@@ -256,6 +377,7 @@ export function EcranFinaliser({ libre = false }: { libre?: boolean }) {
                     exporte={f.exportLettre}
                     telechargement={f.telechargement}
                     onTelecharger={(format) => f.telecharger("lettre", format)}
+                    onVoir={() => f.voirApercu("lettre")}
                   />
                 ) : null}
                 {f.erreur !== null ? (

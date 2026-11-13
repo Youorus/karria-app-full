@@ -21,6 +21,7 @@ import { dateCourte } from "@/features/candidatures/services/presentation";
 import type { Export } from "../types/atelier.types";
 
 export const TEXTES_MES_CV = {
+  titreApercu: "Mon CV",
   titre: "Mes CV",
   nouveau: "Nouveau CV",
   retour: "Mon CV",

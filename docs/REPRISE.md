@@ -5,6 +5,16 @@
 
 **Dernière mise à jour : 2026-11-06**
 
+## 2026-11-13, soir — Finaliser : verdict ATS, optimisation, aperçus, retour
+
+- **Verdict ATS** (`components/verdict-ats.tsx`) : carte teintée selon le niveau, étiquette « Validé ATS / Presque validé / À optimiser », chiffre en très grand avec « % », phrase « Karria a rendu ton CV compatible à 87 % avec les logiciels de tri. », sigle expliqué en petit. L'ancien cadran (`cadran-ats.tsx`) n'est plus utilisé.
+- **Carte « Karria peut faire encore mieux »** (`carte-optimisation.tsx`) : juste sous le verdict, gain estimé (`gainAtsSafe`), seul bouton bleu « Optimiser pour les ATS » ; après optimisation, ligne « Version optimisée pour les ATS ». C'est l'endroit prévu pour convertir plus tard.
+- **« Ce qui ferait la différence »** replié par défaut (`PointsRepliables` dans `ecran-finaliser.tsx`).
+- **Retour** : « Je corrige », changer de modèle / couleur **empilent** l'atelier (`pousser` + `retour=finaliser`) au lieu de remplacer Finaliser ; dans l'atelier, « Finaliser » redescend (`router.back()`) et Finaliser régénère si le brouillon a bougé (`versionDesBrouillons` / `marquerBrouillonsModifies`). La flèche retour de l'atelier revient à Finaliser avec son analyse.
+- **Aperçus** : `Export.apercus` (pages en image du serveur, `preview_urls`), vignette réelle dans Finaliser et Mes CV, « Voir mon CV » → écran plein écran `/apercu-export` (`ecran-apercu-export.tsx`, feuilletage, « Ouvrir le PDF »). Mes CV ouvre l'aperçu avant le lecteur.
+- **Une page** : `Export.resserre` (`fit.condensed`) → note « Resserré pour tenir sur une page » avec la phrase (`phraseResserre`) et « Ajuster dans l'atelier ».
+- Vu sur simulateur (verdict + carte) ; le parcours complet (export réel, retour) reste à essayer sur l'iPhone avec un vrai compte.
+
 ## 2026-11-13, après-midi — conversion du sans pub, formule annuelle
 
 - Carte sans pub du profil neutre avec liseré d'or : l'or plein est réservé au bouton d'achat (contraste avec l'entourage).

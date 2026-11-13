@@ -97,7 +97,23 @@ export function lireBrouillonAtelier(dossierId: string): BrouillonAtelier | null
   }
 }
 
+/**
+ * Un compteur de version des brouillons, en mémoire : Finaliser le relit au
+ * retour de l'atelier et ne régénère les documents que s'il a bougé.
+ */
+let version = 0;
+
+export function versionDesBrouillons(): number {
+  return version;
+}
+
+/** L'atelier le dit quand on y a travaillé et qu'on revient à Finaliser. */
+export function marquerBrouillonsModifies(): void {
+  version += 1;
+}
+
 export function ecrireBrouillonAtelier(brouillon: BrouillonAtelier): void {
+  version += 1;
   try {
     const d = repertoire();
     if (!d.exists) d.create({ intermediates: true, idempotent: true });

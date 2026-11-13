@@ -58,6 +58,7 @@ import { messageDEnvoi, nomDeFichier } from "../services/presentation";
 import { telechargerEtPartager, type Format } from "../services/telechargement";
 import { oublierDocument } from "../services/lecteur";
 import type { Export } from "../types/atelier.types";
+import { memoriserApercu } from "../services/apercus";
 import { useOuvrirLecteur } from "./use-ouvrir-lecteur";
 
 export type ElementMesCv =
@@ -184,6 +185,22 @@ export function useMesCv(): EcranMesCv {
   const ouvrir = useCallback(
     (exporte: Export) => {
       const lien = exporte.pdf ?? exporte.docx;
+      // Les pages en image d'abord, comme dans la galerie ; le lecteur du
+      // PDF reste à un geste. Un export ancien, sans images, ouvre le lecteur.
+      const apercu = memoriserApercu({
+        id: exporte.id,
+        genre: "cv",
+        titre: TEXTES_MES_CV.titreApercu,
+        pages: exporte.apercus,
+        pdf: exporte.pdf,
+        modele: exporte.modele?.libelle ?? null,
+        complement: nom === "" ? null : nom,
+        retour: TEXTES_MES_CV.titre,
+      });
+      if (apercu !== null) {
+        pousser({ pathname: "/apercu-export", params: { id: apercu } });
+        return;
+      }
       if (lien === null) {
         Alert.alert(TEXTES_MES_CV.apercuIndisponible);
         return;
@@ -197,7 +214,7 @@ export function useMesCv(): EcranMesCv {
         retour: TEXTES_MES_CV.titre,
       });
     },
-    [ouvrirLecteur, nom],
+    [ouvrirLecteur, nom, pousser],
   );
 
   const telecharger = useCallback(

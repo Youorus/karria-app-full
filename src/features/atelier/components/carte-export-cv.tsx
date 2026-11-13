@@ -43,7 +43,35 @@ import { BoutonFormat } from "./bouton-format";
 const LARGEUR_VIGNETTE = 56;
 const HAUTEUR_VIGNETTE = Math.round(LARGEUR_VIGNETTE / 0.72);
 
-function Vignette({ modele }: { modele: Modele | null }) {
+function Vignette({
+  modele,
+  apercu,
+  id,
+}: {
+  modele: Modele | null;
+  apercu: string | null;
+  id: string;
+}) {
+  // La vraie première page de **ce** CV quand le serveur l'a rendue ; sinon
+  // la vignette du modèle, comme avant.
+  if (apercu !== null) {
+    return (
+      <Box
+        className="overflow-hidden rounded-[4px] border border-border-champ"
+        style={{ backgroundColor: "#ffffff" }}
+      >
+        <Image
+          source={{ uri: apercu, cacheKey: `export-${id}-0` }}
+          cachePolicy="memory-disk"
+          style={{ width: LARGEUR_VIGNETTE, height: HAUTEUR_VIGNETTE }}
+          contentFit="cover"
+          contentPosition="top"
+          transition={200}
+          accessible={false}
+        />
+      </Box>
+    );
+  }
   if (modele === null || modele.miniature === null) {
     return (
       <Box
@@ -149,7 +177,7 @@ export function CarteExportCv({
           accessibilityRole="button"
           accessibilityLabel={`${TEXTES_MES_CV.ouvrir} le CV, modèle ${libelle}`}
         >
-          <Vignette modele={modele} />
+          <Vignette modele={modele} apercu={exporte.apercus[0] ?? null} id={exporte.id} />
           <VStack className="flex-1 gap-0.5">
             <HStack className="items-center gap-2">
               {exporte.couleur !== null ? (

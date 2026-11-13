@@ -89,6 +89,13 @@ export function versExport(b: ExportBrut): Export {
     creeLe: b.created_at,
     pdf: b.pdf_url ?? null,
     docx: b.docx_url ?? null,
+    apercus: (b.preview_urls ?? []).filter((u): u is string => typeof u === "string"),
+    atsSafe: b.ats_safe === true,
+    resserre: Object.fromEntries(
+      Object.entries(b.fit?.condensed ?? {}).filter(
+        (e): e is [string, number] => typeof e[1] === "number" && e[1] > 0,
+      ),
+    ),
     ats: versScoreAts(b.ats),
     couleur: b.primary_color ?? null,
     styleLettre: versStyleLettre(b.letter_style),

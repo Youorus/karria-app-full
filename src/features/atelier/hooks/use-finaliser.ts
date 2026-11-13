@@ -44,7 +44,7 @@
  * objets, deux impressions : on ne réutilise pas la première.
  */
 
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { lireMoi } from "@/features/auth/api/auth.api";
@@ -72,15 +72,18 @@ import {
   exporterLettre,
   lireModeleChoisi,
 } from "../api/documents.api";
+import { memoriserApercu } from "../services/apercus";
 import {
   brouillonPrime,
   CLE_BROUILLON_LIBRE,
   lireBrouillonAtelier,
+  versionDesBrouillons,
 } from "../services/brouillon-atelier";
 import { documentDeLettre } from "../services/lettre";
 import { modeleDuDossier } from "../services/modele";
 import {
   correctionDe,
+  gainAtsSafe,
   messageDEnvoi,
   messageDExport,
   nomDeFichier,
@@ -120,6 +123,12 @@ export interface EcranFinaliser {
   telechargement: Telechargement | null;
   telecharger: (document: Document, format: Format) => void;
   corriger: (controle: ControleAts) => void;
+  /** Les points que la version optimisée ferait gagner (0 sans score). */
+  gain: number;
+  /** Ce que le serveur a replié pour tenir sur une page ; vide sinon. */
+  resserre: Record<string, number>;
+  /** « Voir mon CV » / « Voir ma lettre » : l'aperçu plein écran. */
+  voirApercu: (document: Document) => void;
   /** Revoir le CV dans un autre modèle : l'atelier, la feuille du modèle ouverte. */
   changerDeModele: () => void;
   /** Changer la couleur principale : l'atelier, la feuille « Quelle couleur ? » ouverte. */
@@ -151,7 +160,7 @@ export function useFinaliser(libre = false): EcranFinaliser {
   const params = useLocalSearchParams<{ dossierId?: string }>();
   const dossierId = libre ? CLE_BROUILLON_LIBRE : (params.dossierId ?? "");
   const router = useRouter();
-  const { pousser, remplacer } = useNavigationUnique();
+  const { pousser } = useNavigationUnique();
   // L'export porte le score ATS, expliqué par un modèle : le serveur exige
   // l'accord sur l'IA (`403 ai_consent_required`). Sans lui, la feuille
   // s'ouvre et la génération repart après « J'accepte et je continue ».
@@ -416,29 +425,68 @@ export function useFinaliser(libre = false): EcranFinaliser {
             ? "contact.email"
             : "summary"
           : geste.geste;
-      if (libre) remplacer({ pathname: "/atelier/libre", params: { cible } });
-      else remplacer({ pathname: "/atelier/[dossierId]", params: { dossierId, cible } });
+      // L'atelier monte **au-dessus** : Finaliser reste dans la pile avec son
+      // analyse, et « Finaliser » dans l'atelier y redescend (`retour`).
+      if (libre)
+        pousser({ pathname: "/atelier/libre", params: { cible, retour: "finaliser" } });
+      else
+        pousser({
+          pathname: "/atelier/[dossierId]",
+          params: { dossierId, cible, retour: "finaliser" },
+        });
     },
-    [optimiser, remplacer, dossierId, libre],
+    [optimiser, pousser, dossierId, libre],
   );
 
-  const changerDeModele = useCallback(() => {
-    if (libre) remplacer({ pathname: "/atelier/libre", params: { cible: "modele" } });
-    else
-      remplacer({
-        pathname: "/atelier/[dossierId]",
-        params: { dossierId, cible: "modele" },
-      });
-  }, [remplacer, dossierId, libre]);
+  const ouvrirAtelier = useCallback(
+    (cible: "modele" | "couleur") => {
+      if (libre)
+        pousser({ pathname: "/atelier/libre", params: { cible, retour: "finaliser" } });
+      else
+        pousser({
+          pathname: "/atelier/[dossierId]",
+          params: { dossierId, cible, retour: "finaliser" },
+        });
+    },
+    [pousser, dossierId, libre],
+  );
+  const changerDeModele = useCallback(() => ouvrirAtelier("modele"), [ouvrirAtelier]);
+  const changerDeCouleur = useCallback(() => ouvrirAtelier("couleur"), [ouvrirAtelier]);
 
-  const changerDeCouleur = useCallback(() => {
-    if (libre) remplacer({ pathname: "/atelier/libre", params: { cible: "couleur" } });
-    else
-      remplacer({
-        pathname: "/atelier/[dossierId]",
-        params: { dossierId, cible: "couleur" },
+  // ── Le retour de l'atelier ─────────────────────────────────────────────
+  // Finaliser reste dans la pile pendant qu'on corrige ; au retour, si le
+  // brouillon a bougé, les documents se refont — sinon l'analyse reste.
+  const versionVue = useRef(versionDesBrouillons());
+  useFocusEffect(
+    useCallback(() => {
+      const version = versionDesBrouillons();
+      if (version === versionVue.current) return;
+      versionVue.current = version;
+      reessayer();
+    }, [reessayer]),
+  );
+
+  // ── « Voir mon CV » : l'aperçu plein écran ──────────────────────────────
+  const voirApercu = useCallback(
+    (document: Document) => {
+      const exporte = document === "cv" ? exportCv : exportLettre;
+      if (exporte === null) return;
+      const cv = libre ? cvLibre : (dossier?.cv ?? null);
+      const nom = `${cv?.identite?.prenom ?? ""} ${cv?.identite?.nom ?? ""}`.trim();
+      const id = memoriserApercu({
+        id: exporte.id,
+        genre: exporte.genre,
+        titre: document === "cv" ? "Mon CV" : "Ma lettre de motivation",
+        pages: exporte.apercus,
+        pdf: exporte.pdf,
+        modele: exporte.modele?.libelle ?? null,
+        complement: document === "cv" ? nom || null : (dossier?.offre.entreprise ?? null),
+        retour: "Finaliser",
       });
-  }, [remplacer, dossierId, libre]);
+      if (id !== null) pousser({ pathname: "/apercu-export", params: { id } });
+    },
+    [exportCv, exportLettre, dossier, cvLibre, libre, pousser],
+  );
 
   const score = exportCv?.ats ?? null;
   const couleurOrigine =
@@ -455,6 +503,9 @@ export function useFinaliser(libre = false): EcranFinaliser {
     score,
     phrase: score === null ? null : phraseAts(score.niveau),
     points: score === null ? [] : pointsAAmeliorer(score),
+    gain: score === null ? 0 : gainAtsSafe(score),
+    resserre: exportCv?.resserre ?? {},
+    voirApercu,
     annonce,
     annonceScore,
     telechargement,

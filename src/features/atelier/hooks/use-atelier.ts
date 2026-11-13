@@ -123,6 +123,7 @@ import {
   brouillonPrime,
   CLE_BROUILLON_LIBRE,
   ecrireBrouillonAtelier,
+  marquerBrouillonsModifies,
   lireBrouillonAtelier,
 } from "../services/brouillon-atelier";
 import {
@@ -322,8 +323,12 @@ export function useAtelier(libre = false): Atelier {
     cible?: string;
     modele?: string;
     couleur?: string;
+    /** « finaliser » : on vient de Finaliser (« Je corrige », changer de
+     *  modèle ou de couleur) ; « Finaliser » y redescend au lieu d'empiler. */
+    retour?: string;
   }>();
   const cibleDemandee = params.cible;
+  const revenirAFinaliser = params.retour === "finaliser";
   /** Le modèle que l'adresse demande (galerie « Utiliser ce modèle », Mes CV
    *  « Voir avec un autre modèle ») ; retenu s'il est utilisable. */
   const modeleDemande = useRef<string | null>(params.modele ?? null);
@@ -1101,10 +1106,17 @@ export function useAtelier(libre = false): Atelier {
 
   const allerAFinaliser = useCallback(() => {
     void sauverMaintenant();
+    // Venu de Finaliser : on y redescend, et il régénère puisque le brouillon
+    // a bougé — l'analyse d'avant n'est pas perdue en chemin, elle se refait.
+    if (revenirAFinaliser && router.canGoBack()) {
+      marquerBrouillonsModifies();
+      router.back();
+      return;
+    }
     if (libre) pousserRoute("/atelier/libre/finaliser");
     else
       pousserRoute({ pathname: "/atelier/[dossierId]/finaliser", params: { dossierId } });
-  }, [sauverMaintenant, pousserRoute, dossierId, libre]);
+  }, [sauverMaintenant, pousserRoute, dossierId, libre, revenirAFinaliser, router]);
 
   return {
     libre,

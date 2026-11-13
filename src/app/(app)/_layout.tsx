@@ -129,6 +129,12 @@ export default function LayoutApp() {
           name="lecture-document"
           options={{ animation: "fade_from_bottom", animationDuration: 240 }}
         />
+        {/* L'aperçu plein écran d'un export (ses pages en image) : même
+            mouvement que le lecteur, par-dessus Finaliser ou Mes CV. */}
+        <Stack.Screen
+          name="apercu-export"
+          options={{ animation: "fade", animationDuration: 220 }}
+        />
         <Stack.Screen
           name="atelier/libre/index"
           options={{ animation: "fade_from_bottom", animationDuration: 280 }}

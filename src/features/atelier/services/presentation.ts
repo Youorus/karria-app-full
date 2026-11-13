@@ -157,7 +157,27 @@ export const TEXTES = {
     "Les logiciels de tri de candidatures ont du mal à lire ton CV tel quel. Les points ci-dessous font la différence.",
   atsPoints: "Ce qui ferait la différence",
   jeCorrige: "Je corrige",
-  optimiser: "Optimiser pour les logiciels de tri",
+  optimiser: "Optimiser pour les ATS",
+  // Le verdict ATS (refonte du 2026-11-13) : une grande indication, lisible
+  // d'un coup d'œil, qui dit **compatibilité** et non « score ».
+  atsVerdictSur: "Compatibilité ATS",
+  atsVerdictValide: "Validé ATS",
+  atsVerdictPresque: "Presque validé",
+  atsVerdictAOptimiser: "À optimiser",
+  atsVerdictSous:
+    "ATS : les logiciels de tri de candidatures qu'utilisent la grande majorité des grandes entreprises.",
+  // La carte d'optimisation : impossible à rater, là où l'on convertira plus tard.
+  optimiserTitre: "Karria peut faire encore mieux",
+  optimiserBouton: "Optimiser pour les ATS",
+  optimiseBadge: "Version optimisée pour les ATS",
+  atsPointsReplier: "Masquer",
+  // Le CV resserré pour une page (serveur, `fit.condensed`).
+  resserreTitre: "Resserré pour tenir sur une page",
+  resserreAjuster: "Ajuster dans l'atelier",
+  // L'aperçu de l'export.
+  voirMonCv: "Voir mon CV",
+  voirMaLettre: "Voir ma lettre",
+  apercuOuvrirPdf: "Ouvrir le PDF",
   exportIntrouvable: "Les documents n'ont pas pu être générés. Réessaie dans un instant.",
   accordIaPourLeScore:
     "Le score ATS est expliqué par l'IA de Karria : dis-nous d'abord si tu es d'accord.",
@@ -171,6 +191,73 @@ export function phraseAts(niveau: NiveauAts): string {
   if (niveau === "bon") return TEXTES.atsPhrase;
   if (niveau === "moyen") return TEXTES.atsPhraseMoyen;
   return TEXTES.atsPhraseFaible;
+}
+
+/** « Karria a rendu ton CV compatible à 97 % avec les logiciels de tri. » */
+export function titreVerdictAts(score: ScoreAts): string {
+  if (score.niveau === "bon") {
+    return `Karria a rendu ton CV compatible à ${score.score} % avec les logiciels de tri.`;
+  }
+  if (score.niveau === "moyen") {
+    return `Ton CV est compatible à ${score.score} % avec les logiciels de tri.`;
+  }
+  return `Ton CV n'est compatible qu'à ${score.score} % avec les logiciels de tri.`;
+}
+
+/** L'étiquette du verdict : « Validé ATS », « Presque validé », « À optimiser ». */
+export function etiquetteVerdictAts(niveau: NiveauAts): string {
+  if (niveau === "bon") return TEXTES.atsVerdictValide;
+  if (niveau === "moyen") return TEXTES.atsVerdictPresque;
+  return TEXTES.atsVerdictAOptimiser;
+}
+
+/**
+ * Les points que la variante optimisée ferait gagner : ce qui manque sur les
+ * contrôles qu'elle corrige (polices, couche de texte). Au moins 1 quand le
+ * serveur la conseille, pour ne jamais promettre « +0 ».
+ */
+export function gainAtsSafe(score: ScoreAts): number {
+  const manque = score.controles
+    .filter((c) => c.cle === "fonts" || c.cle === "text_layer")
+    .reduce((somme, c) => somme + Math.max(0, c.maxPoints - c.points), 0);
+  return Math.max(1, Math.round(manque));
+}
+
+/** « Une version optimisée pour les ATS : jusqu'à +6 points, même modèle, mêmes informations. » */
+export function phraseOptimisation(gain: number): string {
+  return `Une version optimisée pour les logiciels de tri : jusqu'à +${gain} point${gain > 1 ? "s" : ""}, même modèle, mêmes informations.`;
+}
+
+/** « Voir ce qui ferait la différence (3) ». */
+export function libellePoints(nombre: number): string {
+  return `${TEXTES.atsPoints} (${nombre})`;
+}
+
+const RESSERRE: Record<string, (n: number) => string> = {
+  missions: (n) => `${n} mission${n > 1 ? "s" : ""}`,
+  skills: (n) => `${n} compétence${n > 1 ? "s" : ""}`,
+  languages: (n) => `${n} langue${n > 1 ? "s" : ""}`,
+  interests: (n) => `${n} centre${n > 1 ? "s" : ""} d'intérêt`,
+  projects: (n) => `${n} projet${n > 1 ? "s" : ""}`,
+  projects_detail: () => "le détail des projets",
+  educations_detail: () => "le détail des formations",
+  summary: () => "la fin de l'à-propos",
+};
+
+/**
+ * « Karria a replié 3 missions et le détail des formations pour tenir sur une
+ * page. Tout reste dans ton CV. » — `null` quand rien n'a été resserré.
+ */
+export function phraseResserre(resserre: Record<string, number>): string | null {
+  const parts = Object.entries(resserre)
+    .filter(([cle, n]) => n > 0 && RESSERRE[cle] !== undefined)
+    .map(([cle, n]) => RESSERRE[cle]?.(n) ?? "");
+  if (parts.length === 0) return null;
+  const liste =
+    parts.length === 1
+      ? parts[0]
+      : `${parts.slice(0, -1).join(", ")} et ${parts[parts.length - 1]}`;
+  return `Karria a replié ${liste} pour tenir sur une page. Tout reste dans ton CV.`;
 }
 
 /** Les contrôles où il reste des points à prendre, les plus payants d'abord — trois au plus. */

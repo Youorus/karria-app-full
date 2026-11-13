@@ -189,7 +189,7 @@ tant que ni le CV ni la version du modèle ne changent.
 ```json
 {
   "pages": [{ "signed_url": "https://…/page-1.png?…", "width": 1240, "height": 1754 }],
-  "fit": { "spacing": 0.8, "font_scale": 1.0, "pages": 1 }
+  "fit": { "spacing": 0.8, "font_scale": 1.0, "pages": 1, "condensed": {} }
 }
 ```
 
@@ -223,8 +223,9 @@ Réponse (synchrone, 1 à 3 s) :
   "offer_id": null,
   "created_at": "2026-10-24T10:00:00Z",
   "pdf_url": "https://…/cv.pdf?…",
+  "preview_urls": ["https://…/apercu-1.png?…"], // les pages en image, dans l'ordre ; vide sur un export ancien
   "docx_url": "https://…/cv.docx?…",
-  "fit": { "spacing": 0.8, "font_scale": 1.0, "pages": 1 },
+  "fit": { "spacing": 0.8, "font_scale": 1.0, "pages": 1, "condensed": { "missions": 2 } }, // condensed : ce qui a été replié pour tenir sur une page
   "ats": {
     "score": 86,
     "level": "good",

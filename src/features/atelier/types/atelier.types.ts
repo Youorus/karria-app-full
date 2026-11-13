@@ -80,7 +80,15 @@ export interface ExportBrut {
   created_at: string;
   pdf_url?: string | null;
   docx_url?: string | null;
-  fit?: { spacing: number; font_scale: number; pages: number } | null;
+  fit?: {
+    spacing: number;
+    font_scale: number;
+    pages: number;
+    /** Ce que l'export a replié pour tenir sur une page (`missions`, `skills`…). */
+    condensed?: Record<string, number> | null;
+  } | null;
+  /** Les pages du document en image (PNG signés), dans l'ordre. */
+  preview_urls?: string[] | null;
   /** Toujours là sur le vrai serveur ; toléré absent (un export de dossier d'avance). */
   ats?: AtsBrut;
 }
@@ -148,6 +156,14 @@ export interface Export {
   /** URL signée (1 h), ou `null` si le format n'a pas été demandé. */
   pdf: string | null;
   docx: string | null;
+  /** Les pages du document en image, signées, dans l'ordre ; vide sur un export ancien. */
+  apercus: string[];
+  /** Rendu dans la variante optimisée pour les logiciels de tri. */
+  atsSafe: boolean;
+  /** Ce que le serveur a replié pour tenir sur une page, par nature et en nombre
+   *  (`missions`, `skills`, `languages`, `interests`, `projects`,
+   *  `projects_detail`, `educations_detail`, `summary`) ; vide sinon. */
+  resserre: Record<string, number>;
   /** `null` sur une lettre, ou quand le serveur n'a pas noté. */
   ats: ScoreAts | null;
   /** La couleur principale avec laquelle l'export a été rendu ; `null` : celle du modèle. */
