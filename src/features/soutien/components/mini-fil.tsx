@@ -38,30 +38,46 @@ import { useCouleurs } from "@/theme/use-couleurs";
 
 import { TEXTES } from "../services/presentation";
 
-function Lignes({ grande }: { grande: boolean }) {
+/** Les offres du dessin : génériques, mais lues comme de vraies cartes. */
+const OFFRES = [
+  { initiales: "AT", titre: "Chef·fe de projet digital", lieu: "Lyon · CDI" },
+  { initiales: "NV", titre: "Développeur·se React Native", lieu: "Paris · CDI" },
+] as const;
+
+function Tuile({ initiales, grande }: { initiales: string; grande: boolean }) {
   return (
-    <VStack className="flex-1 gap-1.5">
-      <Box className={`rounded-full bg-track ${grande ? "h-2.5 w-36" : "h-1.5 w-24"}`} />
-      <Box
-        className={`rounded-full bg-remplissage-doux ${grande ? "h-2.5 w-20" : "h-1.5 w-14"}`}
-      />
-    </VStack>
+    <Box
+      className={`items-center justify-center rounded-pastille bg-surface-primary ${
+        grande ? "h-9 w-9" : "h-7 w-7"
+      }`}
+    >
+      <Texte className="font-bold text-caption text-primary">{initiales}</Texte>
+    </Box>
   );
 }
 
-function Offre({ grande }: { grande: boolean }) {
+function Offre({ rang, grande }: { rang: 0 | 1; grande: boolean }) {
   const or = PREMIUM_TEXTE[useCouleurs().mode];
+  const offre = OFFRES[rang];
   return (
     <HStack
       className={`items-center gap-2.5 rounded-tuile border border-border-subtle bg-card ${
-        grande ? "px-4 py-3" : "px-3 py-2"
+        grande ? "px-3.5 py-3" : "px-3 py-2"
       }`}
     >
-      <Box
-        className={`rounded-pastille bg-surface-primary ${grande ? "h-8 w-8" : "h-5 w-5"}`}
-      />
-      <Lignes grande={grande} />
-      <Icone nom="coche" couleur={or} taille={grande ? 13 : 10} graisse="bold" />
+      <Tuile initiales={offre.initiales} grande={grande} />
+      <VStack className="flex-1">
+        <Texte
+          className={`font-bold text-foreground ${grande ? "text-footnote" : "text-caption"}`}
+          numberOfLines={1}
+        >
+          {offre.titre}
+        </Texte>
+        <Texte className="text-caption text-muted-foreground" numberOfLines={1}>
+          {offre.lieu}
+        </Texte>
+      </VStack>
+      <Icone nom="coche" couleur={or} taille={grande ? 13 : 11} graisse="bold" />
     </HStack>
   );
 }
@@ -96,11 +112,21 @@ function Annonce({ grande, anime }: { grande: boolean; anime: boolean }) {
     <Animated.View style={carte}>
       <HStack
         className={`items-center gap-2.5 rounded-tuile border border-dashed border-border-champ bg-remplissage-doux ${
-          grande ? "px-4 py-3" : "px-3 py-2"
+          grande ? "px-3.5 py-3" : "px-3 py-2"
         }`}
       >
-        <Box className={`rounded-pastille bg-track ${grande ? "h-8 w-8" : "h-5 w-5"}`} />
-        <Lignes grande={grande} />
+        <Box className={`rounded-pastille bg-track ${grande ? "h-9 w-9" : "h-7 w-7"}`} />
+        <VStack className="flex-1">
+          <Texte
+            className={`font-bold text-foreground-faint ${grande ? "text-footnote" : "text-caption"}`}
+            numberOfLines={1}
+          >
+            {TEXTES.annoncePub}
+          </Texte>
+          <Texte className="text-caption text-foreground-faint" numberOfLines={1}>
+            {TEXTES.annonceSousTitre}
+          </Texte>
+        </VStack>
         <Box>
           <Texte className="text-caption font-bold uppercase tracking-wide text-foreground-faint">
             {TEXTES.annonce}
@@ -135,9 +161,9 @@ export function MiniFil({
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
-      <Offre grande={grande} />
+      <Offre rang={0} grande={grande} />
       <Annonce grande={grande} anime={anime} />
-      <Offre grande={grande} />
+      <Offre rang={1} grande={grande} />
     </VStack>
   );
 }

@@ -30,6 +30,7 @@ const CATALOGUE: Catalogue = {
     { tasses: 3, prixCentimes: 799 },
     { tasses: 5, prixCentimes: 1299 },
   ],
+  sansPubAnnuel: null,
   modeles: new Map(),
   actif: true,
 };
@@ -78,13 +79,16 @@ describe("CarteSoutien", () => {
     expect(screen.getAllByText("4,99 €").length).toBeGreaterThan(0);
     expect(screen.getByText("moins de 0,17 € par jour")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Passer sans pub" })).toBeTruthy();
-    expect(screen.getByRole("header", { name: "Nous offrir un café" })).toBeTruthy();
+    // Le café est secondaire : une ligne repliée, sans tuiles visibles.
+    expect(screen.getByRole("button", { name: "Nous offrir un café" })).toBeTruthy();
+    expect(screen.queryByRole("radiogroup")).toBeNull();
     expect(screen.queryByText(/☕/)).toBeNull();
   });
 
-  it("laisse choisir sa tasse et offre le café choisi", () => {
+  it("déplie le café, laisse choisir sa tasse et offre le café choisi", () => {
     const s = soutien();
     render(<CarteSoutien soutien={s} />);
+    fireEvent.press(screen.getByRole("button", { name: "Nous offrir un café" }));
 
     const deux = screen.getByRole("radio", { name: "Deux cafés, 4,99 €" });
     expect(deux.props.accessibilityState.checked).toBe(true);
@@ -169,12 +173,68 @@ describe("CarteSoutien", () => {
     expect(screen.getByText("Tu nous as déjà offert 3 cafés. Merci !")).toBeTruthy();
   });
 
+  it("ouvre l'offre d'emblée quand on arrive depuis « Masquer les annonces »", () => {
+    const vu = jest.fn();
+    render(<CarteSoutien soutien={soutien()} ouvrirOffre onOffreOuverte={vu} />);
+    expect(
+      screen.getByRole("button", { name: "S'abonner pour 4,99 € / mois" }),
+    ).toBeTruthy();
+    expect(vu).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByRole("button", { name: "Pas maintenant" }));
+    expect(vu).toHaveBeenCalledTimes(1);
+  });
+
+  it("n'ouvre pas l'offre à qui est déjà sans pub", () => {
+    const vu = jest.fn();
+    render(
+      <CarteSoutien
+        soutien={soutien({
+          facturation: {
+            ...SANS_ABONNEMENT,
+            sansPub: { ...SANS_ABONNEMENT.sansPub, actif: true, statut: "actif" },
+          },
+        })}
+        ouvrirOffre
+        onOffreOuverte={vu}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "S'abonner pour 4,99 € / mois" }),
+    ).toBeNull();
+    expect(vu).not.toHaveBeenCalled();
+  });
+
   it("affiche l'erreur du hook avec « Compris »", () => {
     const s = soutien({ erreur: "La page de paiement n'a pas pu s'ouvrir." });
     render(<CarteSoutien soutien={s} />);
     expect(screen.getByRole("alert")).toHaveTextContent(/n'a pas pu s'ouvrir/);
     fireEvent.press(screen.getByRole("button", { name: "Compris" }));
     expect(s.effacerErreur).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("FeuilleSansPub, avec la formule annuelle", () => {
+  const avecAnnuel = () =>
+    soutien({ catalogue: { ...CATALOGUE, sansPubAnnuel: { prixCentimes: 4990 } } });
+
+  it("coche l'annuel d'office, avec ses deux mois offerts", () => {
+    render(<FeuilleSansPub visible soutien={avecAnnuel()} onFermer={jest.fn()} />);
+    const annuel = screen.getByRole("radio", {
+      name: /^Annuel, 2 mois offerts, 49,90 € \/ an/,
+    });
+    expect(annuel.props.accessibilityState.checked).toBe(true);
+    expect(
+      screen.getByRole("button", { name: "S'abonner pour 49,90 € / an" }),
+    ).toBeTruthy();
+  });
+
+  it("lance la formule choisie", () => {
+    const s = avecAnnuel();
+    render(<FeuilleSansPub visible soutien={s} onFermer={jest.fn()} />);
+    fireEvent.press(screen.getByRole("radio", { name: /^Mensuel/ }));
+    fireEvent.press(screen.getByRole("button", { name: "S'abonner pour 4,99 € / mois" }));
+    fireEvent(screen.UNSAFE_getByType(Modal), "dismiss");
+    expect(s.passerSansPub).toHaveBeenCalledWith("mensuel");
   });
 });
 

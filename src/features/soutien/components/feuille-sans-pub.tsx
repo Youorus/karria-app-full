@@ -52,12 +52,77 @@ import { useCouleurs } from "@/theme/use-couleurs";
 
 import type { Soutien } from "../hooks/use-soutien";
 import {
-  libelleAbonnement,
+  annuelParMois,
+  libelleAbonnementFormule,
+  moisOfferts,
+  prixAnnuel,
   prixMensuel,
   prixParJour,
   TEXTES,
 } from "../services/presentation";
+import type { Formule } from "../types/soutien.types";
 import { MiniFil } from "./mini-fil";
+
+/** Une formule à cocher : titre, pastille éventuelle, prix et prix ramené. */
+function CarteFormule({
+  choisie,
+  onPress,
+  titre,
+  pastille,
+  prix,
+  detail,
+}: {
+  choisie: boolean;
+  onPress: () => void;
+  titre: string;
+  pastille: string | null;
+  prix: string;
+  detail: string;
+}) {
+  const couleurs = useCouleurs();
+  return (
+    <Pressable
+      onPress={onPress}
+      className={`flex-row items-center gap-3 rounded-carte px-4 py-4 ${
+        choisie
+          ? "border-2 border-premium bg-surface-premium"
+          : "border-[1.5px] border-border-champ bg-card"
+      }`}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: choisie, selected: choisie }}
+      accessibilityLabel={`${titre}${pastille ? `, ${pastille}` : ""}, ${prix}, ${detail}`}
+    >
+      <Box
+        className={`h-6 w-6 items-center justify-center rounded-full ${
+          choisie ? "bg-premium" : "border-[1.5px] border-border-champ"
+        }`}
+      >
+        {choisie ? (
+          <Icone
+            nom="coche"
+            couleur={SUR_PREMIUM[couleurs.mode]}
+            taille={11}
+            graisse="bold"
+          />
+        ) : null}
+      </Box>
+      <VStack className="flex-1 gap-1">
+        <HStack className="flex-wrap items-center gap-2">
+          <Texte className="font-bold text-body text-foreground">{titre}</Texte>
+          {pastille !== null ? (
+            <Box className="rounded-full bg-premium px-2 py-0.5">
+              <Texte className="font-bold text-caption text-premium-foreground">
+                {pastille}
+              </Texte>
+            </Box>
+          ) : null}
+        </HStack>
+        <Texte className="text-caption text-muted-foreground">{detail}</Texte>
+      </VStack>
+      <Texte className="font-display text-title-sm text-foreground">{prix}</Texte>
+    </Pressable>
+  );
+}
 
 interface Props {
   visible: boolean;
@@ -73,6 +138,10 @@ export function FeuilleSansPub({ visible, soutien, onFermer }: Props) {
   const aLancer = useRef(false);
   // Un appui, pas deux : le bouton se grise jusqu'à la fermeture.
   const [lance, setLance] = useState(false);
+  // L'annuel d'office quand il existe : l'ancre qui rend le mensuel lisible.
+  const [formule, setFormule] = useState<Formule>("annuel");
+  const formuleEffective: Formule =
+    catalogue?.sansPubAnnuel == null ? "mensuel" : formule;
 
   const passer = () => {
     if (lance) return;
@@ -82,7 +151,7 @@ export function FeuilleSansPub({ visible, soutien, onFermer }: Props) {
       onFermer();
     } else {
       onFermer();
-      soutien.passerSansPub();
+      soutien.passerSansPub(formuleEffective);
     }
   };
 
@@ -90,12 +159,13 @@ export function FeuilleSansPub({ visible, soutien, onFermer }: Props) {
     setLance(false);
     if (aLancer.current) {
       aLancer.current = false;
-      soutien.passerSansPub();
+      soutien.passerSansPub(formuleEffective);
     }
   };
 
   if (catalogue === null) return null;
-  const centimes = catalogue.sansPub.prixCentimes;
+  const mensuel = catalogue.sansPub.prixCentimes;
+  const annuel = catalogue.sansPubAnnuel?.prixCentimes ?? null;
 
   return (
     <Modal
@@ -197,37 +267,30 @@ export function FeuilleSansPub({ visible, soutien, onFermer }: Props) {
               ))}
             </VStack>
 
-            {/* 4. La formule */}
-            <HStack
-              className="items-center gap-3 rounded-carte border-2 border-premium bg-surface-premium px-4 py-4"
-              accessible
-              accessibilityLabel={`${TEXTES.sansPubFormule}, ${prixMensuel(centimes)}, ${prixParJour(centimes)}. ${TEXTES.sansPubPromesse}`}
-            >
-              <Box className="h-6 w-6 items-center justify-center rounded-full bg-premium">
-                <Icone
-                  nom="coche"
-                  couleur={SUR_PREMIUM[couleurs.mode]}
-                  taille={11}
-                  graisse="bold"
+            {/* 4. La formule : l'annuel en tête, coché d'office, quand il existe */}
+            <VStack className="gap-3" accessibilityRole="radiogroup">
+              {annuel !== null ? (
+                <CarteFormule
+                  choisie={formuleEffective === "annuel"}
+                  onPress={() => setFormule("annuel")}
+                  titre={TEXTES.formuleAnnuel}
+                  pastille={moisOfferts(mensuel, annuel)}
+                  prix={prixAnnuel(annuel)}
+                  detail={annuelParMois(annuel)}
                 />
-              </Box>
-              <VStack className="flex-1 gap-0.5">
-                <Texte className="font-bold text-body text-foreground">
-                  {TEXTES.sansPubFormule}
-                </Texte>
-                <Texte className="text-caption text-muted-foreground">
-                  {TEXTES.garanties[0]}
-                </Texte>
-              </VStack>
-              <VStack className="items-end gap-0.5">
-                <Texte className="font-display text-title-sm text-foreground">
-                  {prixMensuel(centimes)}
-                </Texte>
-                <Texte className="text-caption text-muted-foreground">
-                  {prixParJour(centimes)}
-                </Texte>
-              </VStack>
-            </HStack>
+              ) : null}
+              <CarteFormule
+                choisie={formuleEffective === "mensuel"}
+                onPress={() => setFormule("mensuel")}
+                titre={TEXTES.sansPubFormule}
+                pastille={null}
+                prix={prixMensuel(mensuel)}
+                detail={prixParJour(mensuel)}
+              />
+              <Texte className="text-center text-caption text-muted-foreground">
+                {TEXTES.sansPubPromesse}
+              </Texte>
+            </VStack>
 
             {/* 5. Les garanties */}
             <HStack className="justify-between gap-2">
@@ -248,7 +311,7 @@ export function FeuilleSansPub({ visible, soutien, onFermer }: Props) {
 
           <VStack className="gap-2 border-t border-border-subtle px-6 pb-2 pt-4">
             <BoutonAction
-              libelle={libelleAbonnement(centimes)}
+              libelle={libelleAbonnementFormule(formuleEffective, mensuel, annuel)}
               ton="premium"
               desactive={lance}
               onPress={passer}

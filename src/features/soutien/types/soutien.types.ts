@@ -28,12 +28,14 @@ export interface PrixBrut {
   label: string;
   amount_cents: number;
   currency: string;
-  interval?: "month" | null;
+  interval?: "month" | "year" | null;
 }
 
 export interface CatalogueBrut {
   currency: string;
   ad_free: PrixBrut;
+  /** Absent d'un serveur plus ancien : l'app ne propose alors que le mensuel. */
+  ad_free_yearly?: PrixBrut;
   coffees: (PrixBrut & { count: number })[];
   templates: { template_id: string; label: string; amount_cents: number }[];
   enabled: { ios: boolean; android: boolean };
@@ -74,8 +76,13 @@ export interface OffreDeCafe {
   prixCentimes: number;
 }
 
+/** La formule sans pub choisie dans la feuille. */
+export type Formule = "mensuel" | "annuel";
+
 export interface Catalogue {
   sansPub: { libelle: string; prixCentimes: number };
+  /** L'annuel, quand le serveur le vend ; `null` sinon. */
+  sansPubAnnuel: { prixCentimes: number } | null;
   cafes: OffreDeCafe[];
   /** Les modèles Premium en vente, par identifiant → prix en centimes. */
   modeles: Map<string, number>;

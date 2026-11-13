@@ -52,10 +52,27 @@ function Intro({ phrase }: { phrase: string }) {
   );
 }
 
-export function CarteSoutien({ soutien }: { soutien: Soutien }) {
+interface Props {
+  soutien: Soutien;
+  /** Arrivé depuis « Masquer les annonces » : ouvre l'offre d'emblée. */
+  ouvrirOffre?: boolean;
+  /** Prévenu quand la feuille ouverte d'emblée se referme, pour oublier la demande. */
+  onOffreOuverte?: () => void;
+}
+
+export function CarteSoutien({ soutien, ouvrirOffre = false, onOffreOuverte }: Props) {
   // L'ouverture de la feuille : un état de vue, rien de plus.
   const [feuille, setFeuille] = useState(false);
   const { catalogue, actif, erreur } = soutien;
+  const dejaSansPub = soutien.facturation?.sansPub.actif ?? false;
+
+  // Arrivé depuis une annonce : la feuille est ouverte d'emblée, tant que
+  // la demande n'est pas refermée (qui l'oublie alors côté route).
+  const demandee = ouvrirOffre && catalogue !== null && actif && !dejaSansPub;
+  const fermer = () => {
+    setFeuille(false);
+    if (ouvrirOffre) onOffreOuverte?.();
+  };
 
   if (catalogue === null) {
     return (
@@ -83,11 +100,7 @@ export function CarteSoutien({ soutien }: { soutien: Soutien }) {
           libelleAction="Compris"
         />
       ) : null}
-      <FeuilleSansPub
-        visible={feuille}
-        soutien={soutien}
-        onFermer={() => setFeuille(false)}
-      />
+      <FeuilleSansPub visible={feuille || demandee} soutien={soutien} onFermer={fermer} />
     </VStack>
   );
 }

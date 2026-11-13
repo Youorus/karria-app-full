@@ -34,6 +34,13 @@ Les prix sont ceux du serveur, en **centimes TTC** : l'app n'en écrit aucun.
     "currency": "eur",
     "interval": "month"
   },
+  "ad_free_yearly": {
+    "lookup_key": "karria_ad_free_yearly",
+    "label": "Karria sans pub (annuel)",
+    "amount_cents": 4990,
+    "currency": "eur",
+    "interval": "year"
+  },
   "coffees": [
     {
       "count": 1,
@@ -91,6 +98,7 @@ premier plan, et au focus du profil.
 ```jsonc
 {
   "payment_type": "ad_free", // | "coffee" | "template"
+  "plan": "yearly", // ad_free : "monthly" (défaut) ou "yearly"
   "coffee_count": 2, // coffee : 1, 2, 3 ou 5
   "template_id": "6f1c…", // template
   "return_url": "karria://paiement/retour", // ou https://karria.fr/…

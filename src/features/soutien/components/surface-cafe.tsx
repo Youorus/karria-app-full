@@ -1,6 +1,14 @@
 /**
  * « Nous offrir un café » : un geste chaleureux, à part de l'abonnement.
  *
+ * ═══ Secondaire, et replié (refonte du 2026-11-13) ═══
+ *
+ * Deux offres de même poids se disputent l'attention et ralentissent la
+ * décision (loi de Hick). Le café est donc une **ligne neutre** sous la
+ * carte sans pub : la tasse, le titre, « dès 2,99 € », un chevron. Un
+ * toucher la déplie sur les tuiles et le bouton caramel ; elle reste
+ * dépliée pendant un paiement.
+ *
  * ═══ Choisir sa tasse doit être un plaisir ═══
  *
  * Quatre tuiles, une par palier du serveur (1, 2, 3, 5) : un grand chiffre,
@@ -18,7 +26,7 @@
  * temps de lire. Mouvement réduit : tout est là d'un coup.
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Pressable } from "react-native";
 import Animated, {
   FadeIn,
@@ -31,6 +39,7 @@ import Animated, {
 import { BoutonAction } from "@/components/bouton-action";
 import { Icone } from "@/components/icone";
 import { Texte } from "@/components/texte";
+import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
 import { euros } from "@/lib/monnaie";
@@ -71,7 +80,9 @@ function Tuile({
       <Pressable
         onPress={onPress}
         className={`h-[88px] items-center justify-center rounded-tuile border-[1.5px] ${
-          choisie ? "border-chaleur bg-card" : "border-transparent bg-remplissage-doux"
+          choisie
+            ? "border-chaleur bg-surface-chaleur"
+            : "border-transparent bg-remplissage-doux"
         }`}
         accessibilityRole="radio"
         accessibilityState={{ selected: choisie, checked: choisie }}
@@ -101,12 +112,14 @@ export function SurfaceCafe({ soutien }: { soutien: Soutien }) {
   const reduit = useReducedMotion();
   const chaleur = CHALEUR[couleurs.mode];
   const { catalogue, choix, offreChoisie, phase } = soutien;
+  // Replié par défaut : le café est le geste secondaire de la section.
+  const [ouvert, setOuvert] = useState(false);
   if (catalogue === null) return null;
 
   if (soutien.merci) {
     return (
       <Animated.View entering={reduit ? undefined : FadeIn.duration(320)}>
-        <VStack className="items-center gap-3 rounded-carte border border-border-chaleur bg-surface-chaleur px-5 py-7">
+        <VStack className="items-center gap-3 rounded-carte border border-border-subtle bg-card px-5 py-7">
           <Icone nom="coeurPlein" couleur={chaleur} taille={30} />
           <Texte
             accessibilityRole="header"
@@ -130,48 +143,75 @@ export function SurfaceCafe({ soutien }: { soutien: Soutien }) {
   const enCours = phase !== "repos" && soutien.cafeEnCours;
   // Un fait du serveur, pas une incitation inventée : ce que tu as déjà offert.
   const deja = cafesDejaOfferts(soutien.facturation?.cafes.nombre ?? 0);
+  const deplie = ouvert || enCours;
+  const moinsCher = catalogue.cafes.reduce<number | null>(
+    (min, c) => (min === null || c.prixCentimes < min ? c.prixCentimes : min),
+    null,
+  );
+
   return (
-    <VStack className="gap-4 rounded-carte border border-border-chaleur bg-surface-chaleur p-5">
-      <HStack className="items-center gap-2.5">
-        <Icone nom="tasse" couleur={chaleur} taille={18} />
-        <Texte
-          accessibilityRole="header"
-          className="flex-1 font-display text-title-sm text-foreground"
-        >
-          {TEXTES.cafeTitre}
-        </Texte>
-      </HStack>
-      <Texte className="text-footnote leading-5 text-muted-foreground">
-        {TEXTES.cafeDetail}
-      </Texte>
-      {deja !== null ? (
-        <HStack className="items-center gap-2 self-start rounded-full bg-card px-3 py-1.5">
-          <Icone nom="coeurPlein" couleur={chaleur} taille={12} />
-          <Texte className="text-caption font-bold text-chaleur">{deja}</Texte>
-        </HStack>
+    <VStack className="rounded-carte border border-border-subtle bg-card">
+      <Pressable
+        onPress={() => setOuvert((v) => !v)}
+        disabled={enCours}
+        className="min-h-touch flex-row items-center gap-3 px-5 py-4 active:opacity-80"
+        accessibilityRole="button"
+        accessibilityLabel={TEXTES.cafeTitre}
+        accessibilityHint={moinsCher === null ? undefined : `Dès ${euros(moinsCher)}`}
+        accessibilityState={{ expanded: deplie }}
+      >
+        <Box className="h-9 w-9 items-center justify-center rounded-full bg-surface-chaleur">
+          <Icone nom="tasse" couleur={chaleur} taille={16} />
+        </Box>
+        <VStack className="flex-1">
+          <Texte className="font-bold text-body text-foreground">
+            {TEXTES.cafeTitre}
+          </Texte>
+          <Texte className="text-caption text-muted-foreground" numberOfLines={1}>
+            {deja ??
+              (moinsCher === null
+                ? TEXTES.cafeCourt
+                : `${TEXTES.cafeCourt}, dès ${euros(moinsCher)}`)}
+          </Texte>
+        </VStack>
+        <Box style={{ transform: [{ rotate: deplie ? "-90deg" : "90deg" }] }}>
+          <Icone nom="suivant" couleur={couleurs.estompe} taille={12} graisse="bold" />
+        </Box>
+      </Pressable>
+
+      {deplie ? (
+        <Animated.View entering={reduit ? undefined : FadeIn.duration(220)}>
+          <VStack className="gap-4 border-t border-border-subtle px-5 pb-5 pt-4">
+            <Texte className="text-footnote leading-5 text-muted-foreground">
+              {TEXTES.cafeDetail}
+            </Texte>
+            <HStack className="gap-2 py-1" accessibilityRole="radiogroup">
+              {catalogue.cafes.map((offre) => (
+                <Tuile
+                  key={offre.tasses}
+                  offre={offre}
+                  choisie={offre.tasses === choix}
+                  reduit={reduit}
+                  onPress={() => soutien.choisir(offre.tasses)}
+                />
+              ))}
+            </HStack>
+            <BoutonAction
+              libelle={libelleDOffre(offreChoisie)}
+              ton="chaleur"
+              icone={
+                <Icone nom="tasse" couleur={SUR_CHALEUR[couleurs.mode]} taille={16} />
+              }
+              enCours={enCours}
+              libelleEnCours={
+                phase === "confirmation" ? TEXTES.attente : TEXTES.ouverture
+              }
+              desactive={phase !== "repos" || offreChoisie === null}
+              onPress={soutien.offrir}
+            />
+          </VStack>
+        </Animated.View>
       ) : null}
-
-      <HStack className="gap-2 py-1" accessibilityRole="radiogroup">
-        {catalogue.cafes.map((offre) => (
-          <Tuile
-            key={offre.tasses}
-            offre={offre}
-            choisie={offre.tasses === choix}
-            reduit={reduit}
-            onPress={() => soutien.choisir(offre.tasses)}
-          />
-        ))}
-      </HStack>
-
-      <BoutonAction
-        libelle={libelleDOffre(offreChoisie)}
-        ton="chaleur"
-        icone={<Icone nom="tasse" couleur={SUR_CHALEUR[couleurs.mode]} taille={16} />}
-        enCours={enCours}
-        libelleEnCours={phase === "confirmation" ? TEXTES.attente : TEXTES.ouverture}
-        desactive={phase !== "repos" || offreChoisie === null}
-        onPress={soutien.offrir}
-      />
     </VStack>
   );
 }

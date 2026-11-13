@@ -34,6 +34,8 @@
  * là d'un coup.
  */
 
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback } from "react";
 import { ScrollView } from "react-native";
 import Animated, { FadeInDown, useReducedMotion } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -66,6 +68,14 @@ export function EcranProfil() {
     nouvelleVersion,
     mettreAJour,
   } = useProfil();
+
+  // « Masquer les annonces », sous une annonce, arrive ici avec `offre`.
+  const { offre } = useLocalSearchParams<{ offre?: string }>();
+  const router = useRouter();
+  const oublierOffre = useCallback(
+    () => router.setParams({ offre: undefined }),
+    [router],
+  );
 
   const entree = (rang: number) =>
     reduit ? undefined : FadeInDown.duration(380).delay(80 + rang * 70);
@@ -105,7 +115,11 @@ export function EcranProfil() {
             </Animated.View>
 
             <Animated.View entering={entree(2)}>
-              <CarteSoutien soutien={soutien} />
+              <CarteSoutien
+                soutien={soutien}
+                ouvrirOffre={offre === "sans-pub"}
+                onOffreOuverte={oublierOffre}
+              />
             </Animated.View>
           </ScrollView>
         )}

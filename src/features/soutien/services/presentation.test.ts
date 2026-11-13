@@ -8,6 +8,9 @@ import { describe, expect, it } from "@jest/globals";
 import { versCatalogue, versFacturation } from "../api/soutien.api";
 import type { CatalogueBrut, FacturationBrute } from "../types/soutien.types";
 import {
+  annuelParMois,
+  moisOfferts,
+  prixAnnuel,
   cafesDejaOfferts,
   libelleAbonnement,
   prixParJour,
@@ -62,6 +65,24 @@ describe("Le catalogue", () => {
     expect(ios.actif).toBe(false);
     expect(versCatalogue(CATALOGUE, "android").actif).toBe(true);
   });
+
+  it("lit l'annuel quand le serveur le vend, et s'en passe sinon", () => {
+    expect(versCatalogue(CATALOGUE, "ios").sansPubAnnuel).toBeNull();
+    const avec = versCatalogue(
+      {
+        ...CATALOGUE,
+        ad_free_yearly: {
+          lookup_key: "karria_ad_free_yearly",
+          label: "Karria sans pub (annuel)",
+          amount_cents: 4990,
+          currency: "eur",
+          interval: "year",
+        },
+      },
+      "ios",
+    );
+    expect(avec.sansPubAnnuel).toEqual({ prixCentimes: 4990 });
+  });
 });
 
 describe("La facturation", () => {
@@ -108,6 +129,10 @@ describe("Les mots", () => {
     expect(prixParJour(499)).toBe("moins de 0,17 € par jour");
     expect(prixParJour(300)).toBe("soit 0,10 € par jour");
     expect(libelleAbonnement(499)).toBe("S'abonner pour 4,99 € / mois");
+    expect(prixAnnuel(4990)).toBe("49,90 € / an");
+    expect(annuelParMois(4990)).toBe("moins de 4,16 € par mois");
+    expect(moisOfferts(499, 4990)).toBe("2 mois offerts");
+    expect(moisOfferts(499, 5988)).toBeNull();
     expect(cafesDejaOfferts(0)).toBeNull();
     expect(cafesDejaOfferts(1)).toBe("Tu nous as déjà offert un café. Merci !");
     expect(cafesDejaOfferts(4)).toBe("Tu nous as déjà offert 4 cafés. Merci !");

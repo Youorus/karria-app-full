@@ -62,6 +62,7 @@ import { attendreLaLivraison } from "../services/attente";
 import { TEXTES } from "../services/presentation";
 import type {
   Catalogue,
+  Formule,
   Facturation,
   OffreDeCafe,
   SessionPaiement,
@@ -91,7 +92,7 @@ export interface Soutien {
   merci: boolean;
   erreur: string | null;
   choisir: (tasses: Tasses) => void;
-  passerSansPub: () => void;
+  passerSansPub: (formule?: Formule) => void;
   offrir: () => void;
   gerer: () => void;
   recommencer: () => void;
@@ -226,13 +227,16 @@ export function useSoutien(actif = true): Soutien {
     [relireFacturation],
   );
 
-  const passerSansPub = useCallback(() => {
-    void payer(
-      ouvrirAbonnement,
-      (statut, lue) => statut.livre || lue?.sansPub.actif === true,
-      () => undefined,
-    );
-  }, [payer]);
+  const passerSansPub = useCallback(
+    (formule: Formule = "mensuel") => {
+      void payer(
+        () => ouvrirAbonnement(formule),
+        (statut, lue) => statut.livre || lue?.sansPub.actif === true,
+        () => undefined,
+      );
+    },
+    [payer],
+  );
 
   const offrir = useCallback(() => {
     if (offreChoisie === null) return;

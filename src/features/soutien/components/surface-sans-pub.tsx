@@ -12,6 +12,14 @@
  * entière était touchable sans bouton : on ne voyait pas qu'il fallait
  * appuyer. Toute la carte reste touchable, le bouton dit quoi faire.
  *
+ * ═══ L'or est réservé au bouton ═══
+ *
+ * La carte est neutre, cernée d'un liseré d'or : l'or plein n'apparaît
+ * qu'une fois, sur le bouton d'achat. Un bouton doré sur une carte dorée
+ * se fondait ; c'est le contraste avec l'entourage, pas la teinte, qui
+ * fait qu'on le voit (effet d'isolement). C'est aussi la seule zone
+ * colorée de la section : le café reste neutre et secondaire.
+ *
  * Pendant le paiement, la même surface dit où l'on en est (« Ouverture… »,
  * « On attend la confirmation… ») : on ne perd pas sa place.
  *
@@ -101,13 +109,13 @@ export function SurfaceSansPub({ soutien, onVoir }: Props) {
     <Pressable
       onPress={onVoir}
       disabled={enCours}
-      className="gap-5 overflow-hidden rounded-carte border border-border-premium bg-surface-premium p-5 active:opacity-90"
+      className="gap-5 overflow-hidden rounded-carte border-[1.5px] border-premium bg-card p-5 active:opacity-90"
       // La carte entière répond au doigt ; au lecteur d'écran, on lit ses
       // textes un à un puis le bouton, qui seul porte l'action.
       accessible={false}
     >
       <VStack className="gap-2">
-        <HStack className="items-center gap-1.5 self-start rounded-full bg-card px-2.5 py-1">
+        <HStack className="items-center gap-1.5 self-start rounded-full bg-surface-premium px-2.5 py-1">
           <Icone nom="couronne" couleur={or} taille={11} graisse="bold" />
           <Texte className="text-caption font-bold uppercase tracking-wide text-premium-texte">
             {TEXTES.sansPubEtiquette}

@@ -5,6 +5,15 @@
 
 **Dernière mise à jour : 2026-11-06**
 
+## 2026-11-13, après-midi — conversion du sans pub, formule annuelle
+
+- Carte sans pub du profil neutre avec liseré d'or : l'or plein est réservé au bouton d'achat (contraste avec l'entourage).
+- Café replié en une ligne neutre « Nous offrir un café, dès 2,99 € », qui se déplie au toucher.
+- Mini-fil réaliste : deux vraies cartes d'offre et une annonce « Sponsorisé » qui se barre.
+- « Masquer les annonces » sous chaque annonce native (hors `NativeAdView`, règle AdMob) : ouvre la feuille dans le profil (`/profil?offre=sans-pub`), seulement si le paiement est ouvert sur la plateforme.
+- Formule annuelle : 49,90 € / an, cochée d'office, pastille « 2 mois offerts » calculée depuis les prix du serveur ; `plan` envoyé à `checkout-session`. Contrat mis à jour.
+- Vu sur simulateur iPhone 17 (sombre). Le CV complet de démonstration est sur le compte Apple de Marc (0a5ec797…), sauvegarde de l'ancien dans `/root/cv-backups` sur le serveur.
+
 ## 2026-11-13 — « Soutenir Karria » refondu pour convertir
 
 - Carte « Karria sans pub » du profil : étiquette dorée, titre-bénéfice, mini-fil, prix en grand ramené au jour, bouton d'or plein (ton `premium` ajouté à `BoutonAction`, jeton `--color-premium-foreground`).

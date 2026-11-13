@@ -23,6 +23,7 @@
 import { http } from "@/lib/http";
 
 import type {
+  Formule,
   Catalogue,
   CatalogueBrut,
   Facturation,
@@ -66,6 +67,10 @@ function versDate(iso: string | null): Date | null {
 export function versCatalogue(brut: CatalogueBrut, plateforme: string): Catalogue {
   return {
     sansPub: { libelle: brut.ad_free.label, prixCentimes: brut.ad_free.amount_cents },
+    sansPubAnnuel:
+      brut.ad_free_yearly === undefined
+        ? null
+        : { prixCentimes: brut.ad_free_yearly.amount_cents },
     cafes: brut.coffees
       .filter((c) => estTasses(c.count))
       .map((c) => ({ tasses: c.count as Tasses, prixCentimes: c.amount_cents })),
@@ -112,10 +117,13 @@ export async function lireFacturation(plateforme: string): Promise<Facturation> 
 }
 
 /** Ouvre la souscription « sans pub ». Refus : `subscription_already_active` (409). */
-export async function ouvrirAbonnement(): Promise<SessionPaiement> {
+export async function ouvrirAbonnement(
+  formule: Formule = "mensuel",
+): Promise<SessionPaiement> {
   return versSession(
     await http.post<SessionPaiementBrute>("/payments/checkout-session", {
       payment_type: "ad_free",
+      plan: formule === "annuel" ? "yearly" : "monthly",
       return_url: RETOUR,
     }),
   );

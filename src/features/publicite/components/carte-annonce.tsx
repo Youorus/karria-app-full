@@ -20,6 +20,8 @@
  */
 
 import { Image } from "expo-image";
+import { useRouter } from "expo-router";
+import { Pressable } from "react-native";
 import {
   NativeAdView,
   NativeAsset,
@@ -32,6 +34,8 @@ import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
+import { TEXTES as TEXTES_SOUTIEN } from "@/features/soutien/services/presentation";
+import { useOffreSansPubDisponible } from "@/features/soutien/services/offre-disponible";
 
 interface Props {
   annonce: NativeAd;
@@ -45,6 +49,30 @@ function initiales(nom: string): string {
       .slice(0, 2)
       .map((mot) => mot[0]?.toUpperCase() ?? "")
       .join("") || "A"
+  );
+}
+
+/**
+ * « Masquer les annonces », **sous** la carte et hors de `NativeAdView` :
+ * rien de ce qui nous appartient ne se pose sur l'annonce, comme le veut
+ * AdMob. Il ouvre l'offre sans pub dans le profil.
+ */
+function MasquerLesAnnonces() {
+  const router = useRouter();
+  const disponible = useOffreSansPubDisponible();
+  if (!disponible) return null;
+  return (
+    <Pressable
+      onPress={() => router.push({ pathname: "/profil", params: { offre: "sans-pub" } })}
+      className="min-h-touch items-end justify-center self-end px-2"
+      accessibilityRole="button"
+      accessibilityLabel={TEXTES_SOUTIEN.masquerAnnonces}
+      hitSlop={6}
+    >
+      <Texte className="font-bold text-caption text-premium-texte">
+        {TEXTES_SOUTIEN.masquerAnnonces}
+      </Texte>
+    </Pressable>
   );
 }
 
@@ -123,6 +151,7 @@ export function CarteAnnonce({ annonce }: Props) {
           ) : null}
         </VStack>
       </NativeAdView>
+      <MasquerLesAnnonces />
     </Animated.View>
   );
 }

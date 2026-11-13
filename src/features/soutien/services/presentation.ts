@@ -25,7 +25,7 @@
 
 import { euros } from "@/lib/monnaie";
 
-import type { Facturation, OffreDeCafe, Tasses } from "../types/soutien.types";
+import type { Facturation, Formule, OffreDeCafe, Tasses } from "../types/soutien.types";
 
 export const TEXTES = {
   // ── La section du profil ──
@@ -51,20 +51,28 @@ export const TEXTES = {
     { libelle: "Une petite équipe soutenue directement", gratuit: false },
   ],
   sansPubFormule: "Mensuel",
+  formuleAnnuel: "Annuel",
   sansPubPromesse: "Sans engagement, résiliable à tout moment.",
   garanties: ["Sans engagement", "Arrêt en un geste", "Paiement Stripe"],
   sansPubMentions:
     "Renouvelé chaque mois. Tu l'arrêtes quand tu veux depuis ton profil. Paiement sécurisé par Stripe, dans ton navigateur.",
   sansPubBouton: "Passer sans pub",
   pasMaintenant: "Pas maintenant",
+  /** Sous chaque annonce du fil : l'accès à l'offre, au moment de la gêne. */
+  masquerAnnonces: "Masquer les annonces",
   sansPubActifTitre: "Tu es sans pub",
   sansPubActifMerci: "Merci. Ton fil est à toi, et l'équipe te doit un café.",
   sansPubGerer: "Gérer mon abonnement",
   /** Au-dessus du mini-fil : la rangée qui s'efface. */
-  annonce: "Annonce",
+  annonce: "Sponsorisé",
+  /** L'annonce du dessin : générique, sans marque. */
+  annoncePub: "L’appli dont tout le monde parle",
+  annonceSousTitre: "Publicité",
 
   // ── Le café ──
   cafeTitre: "Nous offrir un café",
+  /** Sous le titre replié. */
+  cafeCourt: "Un merci, sans abonnement",
   cafeDetail: "Un merci qui compte. Ça ne débloque rien — ça nous donne de l'élan.",
   merciTitre: "Merci, vraiment.",
   merciTexte:
@@ -120,6 +128,40 @@ export function prixParMois(centimes: number): string {
 /** Le bouton de la feuille : « S'abonner pour 4,99 € / mois ». */
 export function libelleAbonnement(centimes: number): string {
   return `S'abonner pour ${prixMensuel(centimes)}`;
+}
+
+/** « 49,90 € / an ». */
+export function prixAnnuel(centimes: number): string {
+  return `${euros(centimes)} / an`;
+}
+
+/** L'annuel ramené au mois : « moins de 4,16 € par mois ». */
+export function annuelParMois(centimes: number): string {
+  const exact = centimes % 12 === 0;
+  return `${exact ? "soit" : "moins de"} ${euros(Math.ceil(centimes / 12))} par mois`;
+}
+
+/**
+ * « 2 mois offerts » : ce que l'annuel épargne, compté en mois de mensuel
+ * entiers. `null` quand il n'épargne pas au moins un mois : on n'annonce
+ * pas une économie qui n'existe pas.
+ */
+export function moisOfferts(mensuel: number, annuel: number): string | null {
+  if (mensuel <= 0) return null;
+  const mois = Math.floor((mensuel * 12 - annuel) / mensuel + 1e-9);
+  if (mois < 1) return null;
+  return `${mois} mois offert${mois > 1 ? "s" : ""}`;
+}
+
+/** Le bouton de la feuille, selon la formule choisie. */
+export function libelleAbonnementFormule(
+  formule: Formule,
+  mensuel: number,
+  annuel: number | null,
+): string {
+  return formule === "annuel" && annuel !== null
+    ? `S'abonner pour ${prixAnnuel(annuel)}`
+    : libelleAbonnement(mensuel);
 }
 
 /**
