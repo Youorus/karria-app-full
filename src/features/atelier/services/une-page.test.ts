@@ -102,8 +102,8 @@ describe("propositionsUnePage", () => {
 
 describe("les phrases", () => {
   it("dit de combien de pages ça dépasse", () => {
-    expect(phraseDepassement(2)).toMatch(/d'une page/);
-    expect(phraseDepassement(3)).toMatch(/de 2 pages/);
+    expect(phraseDepassement(2)).toBe("Ton CV fait 2 pages");
+    expect(phraseDepassement(3)).toBe("Ton CV fait 3 pages");
   });
 
   it("conseille selon qu'il y a des propositions ou non", () => {

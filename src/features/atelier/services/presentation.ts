@@ -107,11 +107,11 @@ export const TEXTES = {
   montrer: "Montrer",
   masques: "Masqués dans ce CV",
   // Tenir sur une page (2026-11-13).
-  unePageTitre: "Tenir sur une page",
+  unePageTitre: "Ton CV fait deux pages",
   unePagePhrase:
-    "Un CV se lit sur une page. Masque ce qui compte le moins : tout reste dans ton CV.",
+    "C'est permis : la seconde page est mise en page proprement. Si tu préfères une page, masque ce qui compte le moins — tout reste dans ton CV.",
   unePageTient: "Tient sur une page",
-  unePageAlerte: "Dépasse d'une page",
+  unePageGarder: "Garder deux pages",
   unePageAgir: "Tenir sur une page",
   // L'intitulé.
   intituleTitre: "Poste visé",

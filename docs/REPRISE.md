@@ -5,6 +5,11 @@
 
 **Dernière mise à jour : 2026-11-06**
 
+## 2026-11-13, soir — deux pages permises, ligne des pages dans la barre
+
+- Marc : la bannière au-dessus du CV n'avait pas de sens ; deux pages sont permises si la seconde est propre. Donc : plus d'alerte sur la feuille ; une **ligne dans la barre basse** (`LignePages` dans `barre-atelier.tsx`) « Ton CV fait 2 pages · Tenir sur une page » qui ouvre la feuille ; la feuille s'intitule « Ton CV fait deux pages », dit que c'est permis, offre « Garder deux pages », puis les propositions à masquer.
+- Seconde page propre côté API (`fit_script`) : aucun bloc coupé, marge haute 16 mm, ornements prolongés — vérifié en rendu local (Galerie Monochrome + CV de Marc, 2 pages). Le simulateur n'autorise pas les touchers (AppleScript refusé) : la barre et la feuille ont été vues par aperçus ; le parcours complet reste à essayer sur l'iPhone.
+
 ## 2026-11-13, fin d'après-midi — tenir sur une page dans l'atelier, Finaliser allégé
 
 - Atelier : quand la feuille déborde (`a.pages > 1`, compté par la WebView), une **alerte** « Dépasse d'une page · Tenir sur une page » au-dessus de la page (plus le petit « 2 pages » gris) ouvre `feuille-une-page.tsx` : état en direct (« 2 pages » ambre / « Tient sur une page » vert), propositions classées (`services/une-page.ts` : centres d'intérêt > 3, compétences > 8, langues > 3, formations puis expériences les plus anciennes), « Masquer » immédiat via `miseEnAvant.masquer`, « Montrer » pour revenir. Le trait de coupure du rendu porte « Page 2 » (API).

@@ -34,6 +34,7 @@ import { SUR_PRIMAIRE } from "@/theme";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import { TEXTES } from "../services/presentation";
+import { phraseDepassement } from "../services/une-page";
 
 export type GesteAtelier =
   "modifier" | "karria" | "mise-en-avant" | "intitule" | "finaliser";
@@ -45,6 +46,10 @@ interface Props {
   desactivee?: boolean;
   /** Faux : pas de geste « Karria » (atelier libre, sans dossier). */
   avecKarria?: boolean;
+  /** Le nombre de pages de la feuille ; au-delà d'une, la barre le dit. */
+  pages?: number;
+  /** « Tenir sur une page » : ouvre la feuille qui le propose. */
+  onPages?: () => void;
 }
 
 const RESSORT = { duration: 150, dampingRatio: 1 } as const;
@@ -94,15 +99,44 @@ function Geste({
   );
 }
 
+/**
+ * La ligne des pages, **dans** la barre — là où l'on lit, pas sur le CV
+ * (Marc, 13/11) : « Ton CV fait 2 pages · Tenir sur une page ». Deux pages
+ * sont permises ; la ligne informe et propose, elle n'alerte pas.
+ */
+function LignePages({ pages, onPress }: { pages: number; onPress: () => void }) {
+  const couleurs = useCouleurs();
+  return (
+    <Pressable
+      onPress={onPress}
+      className="mx-1 mb-1 min-h-touch flex-row items-center gap-2 rounded-full bg-remplissage px-4"
+      accessibilityRole="button"
+      accessibilityLabel={`${phraseDepassement(pages)}. ${TEXTES.unePageAgir}`}
+    >
+      <Icone nom="cv" couleur={couleurs.estompe} taille={14} />
+      <Texte className="flex-1 text-footnote text-foreground" numberOfLines={1}>
+        {phraseDepassement(pages)}
+      </Texte>
+      <Texte className="font-bold text-footnote text-primary">{TEXTES.unePageAgir}</Texte>
+      <Icone nom="suivant" couleur={couleurs.primaire} taille={11} graisse="bold" />
+    </Pressable>
+  );
+}
+
 export function BarreAtelier({
   enAttente,
   onGeste,
   desactivee = false,
   avecKarria = true,
+  pages = 1,
+  onPages,
 }: Props) {
   const couleurs = useCouleurs();
   return (
     <PiedFlottant>
+      {pages > 1 && onPages !== undefined && !desactivee ? (
+        <LignePages pages={pages} onPress={onPages} />
+      ) : null}
       <HStack className="items-center">
         <Geste
           icone="crayon"

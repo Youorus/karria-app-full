@@ -13,6 +13,7 @@
 
 import { Pressable } from "react-native";
 
+import { BoutonAction } from "@/components/bouton-action";
 import { Icone } from "@/components/icone";
 import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
@@ -71,6 +72,13 @@ export function FeuilleUnePage({ visible, cv, pages, miseEnAvant, onFermer }: Pr
       onFermer={onFermer}
     >
       <Etat pages={pages} />
+      {pages > 1 ? (
+        <BoutonAction
+          libelle={TEXTES.unePageGarder}
+          ton="secondaire"
+          onPress={onFermer}
+        />
+      ) : null}
       <Texte className="text-footnote leading-5 text-muted-foreground">
         {phraseConseil(propositions.length)}
       </Texte>

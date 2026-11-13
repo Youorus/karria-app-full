@@ -99,18 +99,15 @@ export function propositionsUnePage(cv: Cv): Proposition[] {
   return out;
 }
 
-/** « Ton CV dépasse d'une page » / « de deux pages ». */
+/** « Ton CV fait 2 pages » : un fait, pas un reproche. */
 export function phraseDepassement(pages: number): string {
-  const enTrop = Math.max(1, pages - 1);
-  return enTrop === 1
-    ? "Ton CV dépasse d'une page : la seconde ne sera pas propre."
-    : `Ton CV dépasse de ${enTrop} pages : les suivantes ne seront pas propres.`;
+  return `Ton CV fait ${pages} pages`;
 }
 
 /** « Masque 2 éléments pour tenir sur une page. » — une estimation honnête. */
 export function phraseConseil(propositions: number): string {
   if (propositions === 0) {
-    return "Rien à proposer ici : raccourcis une mission ou l'à-propos dans « Je modifie ».";
+    return "Rien à masquer ici : raccourcis une mission ou l'à-propos dans « Je modifie », ou garde deux pages.";
   }
-  return "Masque un ou deux éléments ci-dessous : la page derrière te dit quand ça tient.";
+  return "Masque un ou deux éléments : la page derrière te dit quand ça tient.";
 }

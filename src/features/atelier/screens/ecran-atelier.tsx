@@ -54,7 +54,6 @@ import { useAtelier } from "../hooks/use-atelier";
 import { useChoixModele } from "../hooks/use-choix-modele";
 import { cleDeCible } from "../hooks/use-edition-element";
 import { TEXTES } from "../services/presentation";
-import { phraseDepassement } from "../services/une-page";
 
 function BoutonRond({
   icone,
@@ -83,34 +82,6 @@ function BoutonRond({
       <Box className={retourne ? "-scale-x-100" : ""}>
         <Icone nom={icone} couleur={couleurs.texte} taille={16} graisse="semibold" />
       </Box>
-    </Pressable>
-  );
-}
-
-/**
- * Le dépassement, dit en clair au-dessus de la feuille : « Dépasse d'une
- * page · Tenir sur une page ». Un toucher ouvre la feuille qui le règle.
- * Avant, un petit « 2 pages » gris que personne ne voyait (Marc, 13/11).
- */
-function AlerteUnePage({ pages, onPress }: { pages: number; onPress: () => void }) {
-  const couleurs = useCouleurs();
-  return (
-    <Pressable
-      onPress={onPress}
-      className="absolute left-4 right-4 top-14 flex-row items-center gap-2.5 rounded-carte border border-warning bg-surface-warning px-4 py-3 shadow-sm"
-      accessibilityRole="button"
-      accessibilityLabel={`${phraseDepassement(pages)} ${TEXTES.unePageAgir}`}
-    >
-      <Icone nom="alerte" couleur={couleurs.avertissement} taille={16} />
-      <VStack className="flex-1">
-        <Texte className="font-bold text-footnote text-foreground">
-          {TEXTES.unePageAlerte}
-        </Texte>
-        <Texte className="text-caption text-muted-foreground" numberOfLines={1}>
-          {phraseDepassement(pages)}
-        </Texte>
-      </VStack>
-      <Texte className="font-bold text-footnote text-primary">{TEXTES.unePageAgir}</Texte>
     </Pressable>
   );
 }
@@ -271,12 +242,6 @@ export function EcranAtelier({ libre = false }: { libre?: boolean }) {
                 </HStack>
               </HStack>
             )}
-            {a.erreurRendu === null && a.pages > 1 ? (
-              <AlerteUnePage
-                pages={a.pages}
-                onPress={() => a.ouvrir({ type: "une-page" })}
-              />
-            ) : null}
           </Box>
         )}
       </SafeAreaView>
@@ -285,6 +250,8 @@ export function EcranAtelier({ libre = false }: { libre?: boolean }) {
         <BarreAtelier
           enAttente={a.enAttente}
           avecKarria={!a.libre}
+          pages={a.erreurRendu === null ? a.pages : 1}
+          onPages={() => a.ouvrir({ type: "une-page" })}
           onGeste={(geste) => {
             // « Finaliser » passe d'abord par la lettre (« Et ta lettre ? »),
             // qui mène à Finaliser ; on ne saute pas une étape du dossier.
