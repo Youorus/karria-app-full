@@ -44,6 +44,7 @@ import { FeuilleCv } from "../components/feuille-cv";
 import { FeuilleIntitule } from "../components/feuille-intitule";
 import { FeuilleKarria } from "../components/feuille-karria";
 import { FeuilleMiseEnAvant } from "../components/feuille-mise-en-avant";
+import { FeuilleUnePage } from "../components/feuille-une-page";
 import { FeuilleModele } from "../components/feuille-modele";
 import { FeuilleModifier } from "../components/feuille-modifier";
 import { NoteKarria } from "../components/note-karria";
@@ -53,6 +54,7 @@ import { useAtelier } from "../hooks/use-atelier";
 import { useChoixModele } from "../hooks/use-choix-modele";
 import { cleDeCible } from "../hooks/use-edition-element";
 import { TEXTES } from "../services/presentation";
+import { phraseDepassement } from "../services/une-page";
 
 function BoutonRond({
   icone,
@@ -81,6 +83,34 @@ function BoutonRond({
       <Box className={retourne ? "-scale-x-100" : ""}>
         <Icone nom={icone} couleur={couleurs.texte} taille={16} graisse="semibold" />
       </Box>
+    </Pressable>
+  );
+}
+
+/**
+ * Le dépassement, dit en clair au-dessus de la feuille : « Dépasse d'une
+ * page · Tenir sur une page ». Un toucher ouvre la feuille qui le règle.
+ * Avant, un petit « 2 pages » gris que personne ne voyait (Marc, 13/11).
+ */
+function AlerteUnePage({ pages, onPress }: { pages: number; onPress: () => void }) {
+  const couleurs = useCouleurs();
+  return (
+    <Pressable
+      onPress={onPress}
+      className="absolute left-4 right-4 top-14 flex-row items-center gap-2.5 rounded-carte border border-warning bg-surface-warning px-4 py-3 shadow-sm"
+      accessibilityRole="button"
+      accessibilityLabel={`${phraseDepassement(pages)} ${TEXTES.unePageAgir}`}
+    >
+      <Icone nom="alerte" couleur={couleurs.avertissement} taille={16} />
+      <VStack className="flex-1">
+        <Texte className="font-bold text-footnote text-foreground">
+          {TEXTES.unePageAlerte}
+        </Texte>
+        <Texte className="text-caption text-muted-foreground" numberOfLines={1}>
+          {phraseDepassement(pages)}
+        </Texte>
+      </VStack>
+      <Texte className="font-bold text-footnote text-primary">{TEXTES.unePageAgir}</Texte>
     </Pressable>
   );
 }
@@ -239,13 +269,14 @@ export function EcranAtelier({ libre = false }: { libre?: boolean }) {
                     onPress={() => a.ouvrir({ type: "couleur" })}
                   />
                 </HStack>
-                {a.pages > 1 ? (
-                  <Box className="rounded-full bg-scrim-fort px-2.5 py-1">
-                    <Texte className="text-caption text-on-scrim">{a.pages} pages</Texte>
-                  </Box>
-                ) : null}
               </HStack>
             )}
+            {a.erreurRendu === null && a.pages > 1 ? (
+              <AlerteUnePage
+                pages={a.pages}
+                onPress={() => a.ouvrir({ type: "une-page" })}
+              />
+            ) : null}
           </Box>
         )}
       </SafeAreaView>
@@ -290,6 +321,13 @@ export function EcranAtelier({ libre = false }: { libre?: boolean }) {
       <FeuilleMiseEnAvant
         visible={a.feuille?.type === "mise-en-avant"}
         cv={a.cv}
+        miseEnAvant={a.miseEnAvant}
+        onFermer={a.fermer}
+      />
+      <FeuilleUnePage
+        visible={a.feuille?.type === "une-page"}
+        cv={a.cv}
+        pages={a.pages}
         miseEnAvant={a.miseEnAvant}
         onFermer={a.fermer}
       />

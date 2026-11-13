@@ -5,6 +5,12 @@
 
 **Dernière mise à jour : 2026-11-06**
 
+## 2026-11-13, fin d'après-midi — tenir sur une page dans l'atelier, Finaliser allégé
+
+- Atelier : quand la feuille déborde (`a.pages > 1`, compté par la WebView), une **alerte** « Dépasse d'une page · Tenir sur une page » au-dessus de la page (plus le petit « 2 pages » gris) ouvre `feuille-une-page.tsx` : état en direct (« 2 pages » ambre / « Tient sur une page » vert), propositions classées (`services/une-page.ts` : centres d'intérêt > 3, compétences > 8, langues > 3, formations puis expériences les plus anciennes), « Masquer » immédiat via `miseEnAvant.masquer`, « Montrer » pour revenir. Le trait de coupure du rendu porte « Page 2 » (API).
+- Finaliser : « Ce qui ferait la différence » gardé mais **sans « Je corrige »** (c'est le bouton Optimiser qui agit) ; pastilles modèle/couleur et bouton « Voir mes CV » retirés ; la vignette du CV (avec loupe) ouvre l'aperçu plein écran, sans lien texte.
+- Vu sur simulateur : la feuille « Tenir sur une page » (aperçu temporaire). Non vu : l'alerte posée sur la vraie feuille, le retour « Finaliser » depuis l'atelier empilé.
+
 ## 2026-11-13, soir — Finaliser : verdict ATS, optimisation, aperçus, retour
 
 - **Verdict ATS** (`components/verdict-ats.tsx`) : carte teintée selon le niveau, étiquette « Validé ATS / Presque validé / À optimiser », chiffre en très grand avec « % », phrase « Karria a rendu ton CV compatible à 87 % avec les logiciels de tri. », sigle expliqué en petit. L'ancien cadran (`cadran-ats.tsx`) n'est plus utilisé.

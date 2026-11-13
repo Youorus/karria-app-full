@@ -163,6 +163,7 @@ export type FeuilleOuverte =
   | { type: "modifier"; cible: Cible | null }
   | { type: "karria" }
   | { type: "mise-en-avant" }
+  | { type: "une-page" }
   | { type: "intitule" }
   | { type: "modele" }
   | { type: "couleur" };
@@ -298,6 +299,7 @@ function feuilleDemandeePar(cible: string | undefined): FeuilleOuverte | null {
   if (
     cible === "karria" ||
     cible === "mise-en-avant" ||
+    cible === "une-page" ||
     cible === "modele" ||
     cible === "couleur"
   )

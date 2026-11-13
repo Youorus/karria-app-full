@@ -43,8 +43,6 @@ import { useCouleurs } from "@/theme/use-couleurs";
 import { BoutonFormat } from "../components/bouton-format";
 import { CarteOptimisation, LigneOptimisee } from "../components/carte-optimisation";
 import { FeuilleEnvoi } from "../components/feuille-envoi";
-import { PastilleCouleur } from "../components/pastille-couleur";
-import { PastilleModele } from "../components/pastille-modele";
 import { VerdictAts } from "../components/verdict-ats";
 import { TEXTES, useFinaliser, type Document, type Format } from "../hooks/use-finaliser";
 import { libellePoints, phraseResserre } from "../services/presentation";
@@ -88,6 +86,9 @@ function CarteDocument({
             className="overflow-hidden rounded-[4px] border border-border-champ"
             style={{ backgroundColor: "#ffffff" }}
           >
+            <Box className="absolute bottom-1 right-1 z-10 h-5 w-5 items-center justify-center rounded-full bg-scrim-fort">
+              <Icone nom="agrandir" couleur="#ffffff" taille={9} />
+            </Box>
             <Image
               source={{ uri: apercu, cacheKey: `export-${exporte?.id ?? ""}-0` }}
               cachePolicy="memory-disk"
@@ -113,17 +114,6 @@ function CarteDocument({
         <Texte className="text-footnote text-muted-foreground" numberOfLines={1}>
           {exporte === null ? "Pas encore généré" : detail}
         </Texte>
-        {apercu !== null ? (
-          <Pressable
-            onPress={onVoir}
-            className="min-h-touch flex-row items-center gap-1 self-start"
-            accessibilityRole="button"
-            accessibilityLabel={voir}
-          >
-            <Texte className="font-bold text-footnote text-primary">{voir}</Texte>
-            <Icone nom="suivant" couleur={couleurs.primaire} taille={11} graisse="bold" />
-          </Pressable>
-        ) : null}
       </VStack>
       {exporte !== null ? (
         <HStack className="gap-2">
@@ -157,13 +147,7 @@ function CarteDocument({
  * « Ce qui ferait la différence », replié par défaut : utile, mais fatigant
  * à lire d'emblée (Marc, 2026-11-13). Un toucher l'ouvre.
  */
-function PointsRepliables({
-  points,
-  onCorriger,
-}: {
-  points: ControleAts[];
-  onCorriger: (controle: ControleAts) => void;
-}) {
+function PointsRepliables({ points }: { points: ControleAts[] }) {
   const couleurs = useCouleurs();
   const [ouvert, setOuvert] = useState(false);
   return (
@@ -185,31 +169,13 @@ function PointsRepliables({
       </Pressable>
       {ouvert
         ? points.map((p) => (
-            <VStack
-              key={p.cle}
-              className="gap-1.5 border-t border-border-subtle px-4 py-3"
-            >
+            <VStack key={p.cle} className="gap-1 border-t border-border-subtle px-4 py-3">
               <Texte className="font-bold text-footnote text-foreground">
                 {p.libelle}
               </Texte>
               <Texte className="text-footnote leading-5 text-muted-foreground">
                 {p.conseil}
               </Texte>
-              <Pressable
-                onPress={() => onCorriger(p)}
-                className="min-h-touch flex-row items-center gap-1 self-start"
-                accessibilityRole="button"
-              >
-                <Texte className="font-bold text-footnote text-primary">
-                  {TEXTES.jeCorrige}
-                </Texte>
-                <Icone
-                  nom="suivant"
-                  couleur={couleurs.primaire}
-                  taille={12}
-                  graisse="bold"
-                />
-              </Pressable>
             </VStack>
           ))
         : null}
@@ -326,7 +292,7 @@ export function EcranFinaliser({ libre = false }: { libre?: boolean }) {
 
             {f.points.length > 0 ? (
               <Animated.View entering={entree(2)}>
-                <PointsRepliables points={f.points} onCorriger={f.corriger} />
+                <PointsRepliables points={f.points} />
               </Animated.View>
             ) : null}
 
@@ -354,17 +320,6 @@ export function EcranFinaliser({ libre = false }: { libre?: boolean }) {
                   onTelecharger={(format) => f.telecharger("cv", format)}
                   onVoir={() => f.voirApercu("cv")}
                 />
-                <HStack className="items-center gap-2">
-                  <PastilleModele
-                    libelle={f.exportCv.modele?.libelle ?? null}
-                    onPress={f.changerDeModele}
-                  />
-                  <PastilleCouleur
-                    couleur={f.exportCv.couleur ?? f.couleurOrigine}
-                    posee={f.exportCv.couleur !== null}
-                    onPress={f.changerDeCouleur}
-                  />
-                </HStack>
                 {!f.libre && f.dossier?.lettre !== null ? (
                   <CarteDocument
                     document="lettre"
@@ -400,13 +355,6 @@ export function EcranFinaliser({ libre = false }: { libre?: boolean }) {
                       {TEXTES.envoye} à {f.envoi.fait}
                     </Texte>
                   </HStack>
-                ) : null}
-                {f.libre ? (
-                  <BoutonAction
-                    libelle={TEXTES.voirMesCv}
-                    ton="secondaire"
-                    onPress={f.terminer}
-                  />
                 ) : null}
               </VStack>
             </Animated.View>
