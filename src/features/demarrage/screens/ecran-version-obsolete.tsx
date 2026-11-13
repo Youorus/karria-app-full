@@ -14,6 +14,7 @@
  * aucun écran ne peut passer au-dessus.
  */
 
+import { Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Aura } from "@/components/aura";
@@ -24,11 +25,18 @@ import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
 import { VStack } from "@/components/ui/vstack";
 
+import { libelleDeVersion, type Version } from "../services/version";
+
 interface Props {
+  /** La réponse du serveur : le numéro de la nouvelle version, et où l'obtenir. */
+  version: Version | null;
   onMettreAJour: () => void;
 }
 
-export function EcranVersionObsolete({ onMettreAJour }: Props) {
+export function EcranVersionObsolete({ version, onMettreAJour }: Props) {
+  const numero = version === null ? null : libelleDeVersion(version);
+  const magasin = version?.urlStore ?? null;
+  const nomDuMagasin = Platform.OS === "ios" ? "l'App Store" : "Google Play";
   return (
     // `flex: 1` en style : le conteneur racine d'un écran, seule exception
     // admise à la règle §3.2.
@@ -41,19 +49,35 @@ export function EcranVersionObsolete({ onMettreAJour }: Props) {
               <SymboleKarria taille={44} teinte="reflet" />
             </OrbeVivante>
             <VStack className="items-center gap-3">
+              {numero !== null ? (
+                <Box className="rounded-full bg-surface-primary px-3 py-1">
+                  <Texte className="text-caption font-bold uppercase tracking-wide text-primary">
+                    {numero}
+                  </Texte>
+                </Box>
+              ) : null}
               <Texte
                 accessibilityRole="header"
                 className="text-center font-display text-title-lg tracking-tight text-foreground"
               >
-                Une nouvelle version de Karria t&apos;attend
+                Une nouvelle version de Karria est sortie
               </Texte>
               <Texte className="px-2 text-center text-body leading-6 text-muted-foreground">
-                Celle-ci a fait son temps. Mets-la à jour pour retrouver tes offres, ton
-                CV et Karria — ça prend une minute.
+                {magasin !== null
+                  ? "Mets Karria à jour pour continuer : ça prend une minute, et tu retrouves tes offres, ton CV et tes dossiers."
+                  : `Ouvre ${nomDuMagasin}, cherche « Karria » et touche « Mettre à jour » pour continuer.`}
               </Texte>
             </VStack>
           </VStack>
-          <BoutonAction libelle="Mettre à jour" onPress={onMettreAJour} />
+          {magasin !== null ? (
+            <BoutonAction libelle="Mettre à jour" onPress={onMettreAJour} />
+          ) : (
+            <BoutonAction
+              libelle={`Ouvrir ${nomDuMagasin}`}
+              ton="secondaire"
+              onPress={onMettreAJour}
+            />
+          )}
         </VStack>
       </SafeAreaView>
     </Box>

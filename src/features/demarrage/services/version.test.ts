@@ -9,6 +9,8 @@ import {
   bandeMontrable,
   fautIlReverifier,
   numeroDeBuild,
+  estBloquante,
+  libelleDeVersion,
   rendreOuvrable,
   REVERIFICATION_MS,
   urlDeMagasin,
@@ -45,26 +47,32 @@ describe("Les délais", () => {
   });
 });
 
-describe("Une mise à jour exigée sans magasin", () => {
+describe("Toute version en retard bloque (Marc, 2026-11-13)", () => {
   const base: Version = {
     etat: "requise",
     derniereBuild: 9,
     buildMinimale: 8,
+    derniereVersion: "1.2.0",
     urlStore: null,
   };
 
-  it("redevient « disponible » : on ne bloque pas derrière un bouton vide", () => {
-    expect(rendreOuvrable(base).etat).toBe("disponible");
+  it("bloque pour « requise » comme pour « disponible », même sans magasin", () => {
+    expect(estBloquante(base)).toBe(true);
+    expect(estBloquante({ ...base, etat: "disponible" })).toBe(true);
+    expect(estBloquante({ ...base, etat: "ok" })).toBe(false);
+    expect(estBloquante(null)).toBe(false);
   });
 
-  it("reste « requise » dès qu'il y a où aller", () => {
-    expect(rendreOuvrable({ ...base, urlStore: "https://apps.apple.com/x" }).etat).toBe(
-      "requise",
-    );
+  it("ne dégrade plus « requise » en « disponible »", () => {
+    expect(rendreOuvrable(base).etat).toBe("requise");
   });
 
-  it("ne touche pas aux autres états", () => {
-    expect(rendreOuvrable({ ...base, etat: "ok" }).etat).toBe("ok");
+  it("nomme la version à installer, ou le build à défaut", () => {
+    expect(libelleDeVersion(base)).toBe("Version 1.2.0");
+    expect(libelleDeVersion({ ...base, derniereVersion: null })).toBe("Build 9");
+    expect(
+      libelleDeVersion({ ...base, derniereVersion: null, derniereBuild: 0 }),
+    ).toBeNull();
   });
 });
 

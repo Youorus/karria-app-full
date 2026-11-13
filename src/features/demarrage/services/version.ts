@@ -24,6 +24,8 @@ export interface Version {
   etat: EtatDeVersion;
   derniereBuild: number;
   buildMinimale: number;
+  /** Le numéro lisible de la dernière version (« 1.2.0 ») ; `null` si le serveur ne le dit pas. */
+  derniereVersion: string | null;
   /** La fiche de l'application sur le magasin de la plateforme. */
   urlStore: string | null;
 }
@@ -64,10 +66,26 @@ export function bandeMontrable(
  * Un `requise` sans adresse de magasin se traite comme `disponible` : on
  * ne bloque pas quelqu'un derrière un bouton qui n'ouvre rien.
  */
+/**
+ * Décision de Marc (2026-11-13) : **toute** version en retard bloque. Dès que
+ * le serveur sert un build plus récent (« disponible » comme « requise »),
+ * l'écran de mise à jour prend toute la place, sans fermeture possible, et
+ * mène au magasin. Sans fiche de magasin connue, on bloque quand même et on
+ * dit où aller : laisser passer une version dépassée coûterait plus cher.
+ */
+export function estBloquante(version: Version | null): boolean {
+  return version !== null && version.etat !== "ok";
+}
+
+/** « Version 1.2.0 » ou, sans numéro lisible, « Build 42 » ; `null` sans rien à dire. */
+export function libelleDeVersion(version: Version): string | null {
+  if (version.derniereVersion) return `Version ${version.derniereVersion}`;
+  if (version.derniereBuild > 0) return `Build ${version.derniereBuild}`;
+  return null;
+}
+
 export function rendreOuvrable(version: Version): Version {
-  if (version.etat === "requise" && version.urlStore === null) {
-    return { ...version, etat: "disponible" };
-  }
+  // Gardée pour les anciens appels : l'écran bloque désormais même sans fiche.
   return version;
 }
 

@@ -14,6 +14,7 @@
  */
 
 const DERNIERE_BUILD = 12;
+const DERNIERE_VERSION = "1.1.0";
 const MAGASINS = {
   ios: "https://apps.apple.com/fr/app/karria/id0000000000",
   android: "https://play.google.com/store/apps/details?id=com.karria.app",
@@ -61,6 +62,7 @@ export function repondreVersion(
   return json(200, {
     status,
     latest_build: DERNIERE_BUILD,
+    latest_version: DERNIERE_VERSION,
     minimum_build: status === "update_required" ? build + 1 : 1,
     store_url: MAGASINS[plateforme],
   });

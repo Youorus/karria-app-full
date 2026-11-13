@@ -150,11 +150,14 @@ function Portail() {
 
   // Cette build n'est plus servie : l'écran bloquant prend la place de
   // toute la navigation — aucun écran ne peut passer au-dessus.
-  if (version.etat === "requise") {
+  if (version.bloquante) {
     return (
       <>
         <StatusBar style="auto" />
-        <EcranVersionObsolete onMettreAJour={version.ouvrirStore} />
+        <EcranVersionObsolete
+          version={version.version}
+          onMettreAJour={version.ouvrirStore}
+        />
       </>
     );
   }

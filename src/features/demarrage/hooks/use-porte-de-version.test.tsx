@@ -43,6 +43,7 @@ const reponse = (etat: Version["etat"], urlStore: string | null = STORE): Versio
   etat,
   derniereBuild: 9,
   buildMinimale: 2,
+  derniereVersion: "1.1.0",
   urlStore,
 });
 

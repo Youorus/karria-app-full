@@ -33,15 +33,21 @@ import {
 } from "../services/etat-version";
 import {
   bandeMontrable,
+  estBloquante,
   fautIlReverifier,
   numeroDeBuild,
   type EtatDeVersion,
+  type Version,
 } from "../services/version";
 
 const CLE_BANDE = "karria.version.bande";
 
 export interface PorteDeVersion {
   etat: EtatDeVersion;
+  /** La réponse du serveur telle quelle (numéro de version, builds). */
+  version: Version | null;
+  /** L'écran de mise à jour obligatoire prend toute la place. */
+  bloquante: boolean;
   urlStore: string | null;
   /** La bande « Une nouvelle version est disponible » est à montrer. */
   bande: boolean;
@@ -100,14 +106,21 @@ export function usePorteDeVersion(): PorteDeVersion {
 
   const urlStore = version?.urlStore ?? null;
   const ouvrirStore = useCallback(() => {
-    if (urlStore === null) return;
-    Linking.openURL(urlStore).catch((cause: unknown) => {
+    // Sans fiche connue : l'application du magasin, sur la recherche « Karria ».
+    const cible =
+      urlStore ??
+      (Platform.OS === "ios"
+        ? "itms-apps://apps.apple.com/fr/search?term=karria"
+        : "market://search?q=karria");
+    Linking.openURL(cible).catch((cause: unknown) => {
       console.warn("[karria] magasin impossible à ouvrir", cause);
     });
   }, [urlStore]);
 
   return {
     etat: version?.etat ?? "ok",
+    version,
+    bloquante: estBloquante(version),
     urlStore,
     bande: bande && version?.etat === "disponible",
     fermerBande: useCallback(() => setBande(false), []),

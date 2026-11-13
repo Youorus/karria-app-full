@@ -5,6 +5,12 @@
 
 **Dernière mise à jour : 2026-11-06**
 
+## 2026-11-13, 22 h — mise à jour obligatoire pour toute version en retard
+
+- Décision de Marc : dès que le serveur sert un build plus récent, l'écran « Une nouvelle version de Karria est sortie » prend toute la place, sans fermeture (`estBloquante` : « disponible » comme « requise »), montre le numéro (`latest_version`, sinon « Build N ») et un seul bouton : la fiche du magasin (`store_url`) ou, à défaut, la recherche « Karria » dans l'App Store / Google Play. Vérification au lancement et au retour au premier plan (toutes les 6 h), inchangée.
+- **Activation = réglage serveur à chaque sortie** : `APP_RELEASE__IOS_LATEST_BUILD` (le build publié), `APP_RELEASE__IOS_LATEST_VERSION` (« 1.2.0 »), `APP_RELEASE__IOS_STORE_URL` (la fiche App Store dès qu'elle existe), et les mêmes `ANDROID`. Aujourd'hui tout est à 0 en prod : rien ne bloque. Attention : un build de développement installé par Xcode porte `CFBundleVersion` = 1 ; dès que `LATEST_BUILD` sera > 1, l'iPhone de Marc sera bloqué sauf à monter son build local.
+- Les mises à jour JavaScript (EAS Update) restent silencieuses et indépendantes.
+
 ## 2026-11-13, 17 h 30 — export fidèle à l'atelier, profil sans carte CV
 
 - « Ce que j'ai finalisé n'est pas ce que j'obtiens » : deux causes côté app traitées. (1) Dossier : « Finaliser » et « la lettre » partaient **sans attendre** la sauvegarde serveur du CV adapté (`void sauverMaintenant()`) ; Finaliser relisait le dossier d'avant la dernière retouche. Désormais `await`. (2) Côté API, plus de resserrement silencieux à l'export.

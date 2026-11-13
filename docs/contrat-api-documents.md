@@ -300,11 +300,13 @@ anonymous_rate_limited`, 60 lectures par 10 min). `build` est le numéro de buil
 installé (entier ≥ 0).
 
 ```json
-{ "status": "ok", "latest_build": 0, "minimum_build": 0, "store_url": "" }
+{ "status": "ok", "latest_build": 0, "minimum_build": 0, "latest_version": "", "store_url": "" }
 ```
 
 - `status` : `update_required` si `build < minimum_build` (et `minimum_build > 0`) ;
-  `update_available` si `build < latest_build` ; sinon `ok`.
+  `update_available` si `build < latest_build` ; sinon `ok`. **Côté app (13/11/2026), les
+  deux premiers bloquent** : toute version en retard montre l'écran de mise à jour,
+  sans fermeture, avec `latest_version` (« 1.2.0 ») et le bouton vers `store_url`.
 - Réglages serveur `APP_RELEASE__{IOS,ANDROID}_{MINIMUM_BUILD,LATEST_BUILD,STORE_URL}` ;
   sans réglage (`0`, `0`, vide), toujours `ok`. `store_url` vide tant que la fiche n'existe
   pas : ne rien rendre cliquable.

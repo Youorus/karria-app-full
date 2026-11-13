@@ -20,6 +20,7 @@ interface ReleaseBrute {
   status: "ok" | "update_available" | "update_required";
   latest_build: number;
   minimum_build: number;
+  latest_version?: string | null;
   store_url: string | null;
 }
 
@@ -43,6 +44,7 @@ export async function lireVersion(
     etat: VERS_ETAT[brute.status] ?? "ok",
     derniereBuild: brute.latest_build,
     buildMinimale: brute.minimum_build,
+    derniereVersion: brute.latest_version ? String(brute.latest_version) : null,
     // Validée : https et l'hôte exact du magasin de la plateforme, sinon
     // rien — et « requise » se dégrade en « disponible » (`rendreOuvrable`).
     urlStore: urlDeMagasin(brute.store_url, plateforme),

@@ -21,17 +21,49 @@ jest.mock("@/components/orbe-vivante", () => ({
 jest.mock("@/components/marque", () => ({ SymboleKarria: () => null }));
 
 describe("L'écran « version obsolète »", () => {
-  it("dit qu'une nouvelle version attend, et n'offre qu'un geste", () => {
+  it("dit la nouvelle version, et n'offre qu'un geste : le magasin", () => {
     const mettreAJour = jest.fn();
-    render(<EcranVersionObsolete onMettreAJour={mettreAJour} />);
+    render(
+      <EcranVersionObsolete
+        version={{
+          etat: "disponible",
+          derniereBuild: 12,
+          buildMinimale: 0,
+          derniereVersion: "1.2.0",
+          urlStore: "https://apps.apple.com/fr/app/karria/id1",
+        }}
+        onMettreAJour={mettreAJour}
+      />,
+    );
 
     expect(screen.getByRole("header").props.children).toContain(
-      "Une nouvelle version de Karria t",
+      "Une nouvelle version de Karria est sortie",
     );
+    expect(screen.getByText("Version 1.2.0")).toBeTruthy();
     expect(screen.getAllByRole("button")).toHaveLength(1);
 
     fireEvent.press(screen.getByRole("button", { name: "Mettre à jour" }));
     expect(mettreAJour).toHaveBeenCalledTimes(1);
     expect(View).toBeDefined();
+  });
+
+  it("sans fiche de magasin, dit où aller et ouvre quand même le magasin", () => {
+    const mettreAJour = jest.fn();
+    render(
+      <EcranVersionObsolete
+        version={{
+          etat: "disponible",
+          derniereBuild: 12,
+          buildMinimale: 0,
+          derniereVersion: null,
+          urlStore: null,
+        }}
+        onMettreAJour={mettreAJour}
+      />,
+    );
+    expect(screen.getByText("Build 12")).toBeTruthy();
+    expect(screen.getByText(/cherche « Karria »/)).toBeTruthy();
+    fireEvent.press(screen.getByRole("button"));
+    expect(mettreAJour).toHaveBeenCalledTimes(1);
   });
 });
