@@ -256,7 +256,8 @@ export function EcranAtelier({ libre = false }: { libre?: boolean }) {
             // « Finaliser » passe d'abord par la lettre (« Et ta lettre ? »),
             // qui mène à Finaliser ; on ne saute pas une étape du dossier.
             // Sans dossier, il n'y a pas de lettre : droit aux exports.
-            if (geste === "finaliser") (a.libre ? a.allerAFinaliser : a.allerALaLettre)();
+            if (geste === "finaliser")
+              void (a.libre ? a.allerAFinaliser : a.allerALaLettre)();
             else if (geste === "modifier") a.ouvrir({ type: "modifier", cible: null });
             else a.ouvrir({ type: geste });
           }}

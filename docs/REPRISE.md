@@ -5,6 +5,11 @@
 
 **Dernière mise à jour : 2026-11-06**
 
+## 2026-11-13, 17 h 30 — export fidèle à l'atelier, profil sans carte CV
+
+- « Ce que j'ai finalisé n'est pas ce que j'obtiens » : deux causes côté app traitées. (1) Dossier : « Finaliser » et « la lettre » partaient **sans attendre** la sauvegarde serveur du CV adapté (`void sauverMaintenant()`) ; Finaliser relisait le dossier d'avant la dernière retouche. Désormais `await`. (2) Côté API, plus de resserrement silencieux à l'export.
+- Profil : carte « Mon CV » retirée (`CarteCv` plus montée ; le hook `use-profil` garde `cv`/`ouvrirCv` pour un usage futur).
+
 ## 2026-11-13, 17 h — couleur d'origine par défaut
 
 - La couleur choisie dans l'atelier libre reste dans le brouillon de **ce** CV ; elle n'est plus envoyée au choix de modèle (`retenirChoix`) et n'est plus relue comme défaut (`choisi?.couleur`) ni dans l'atelier ni à Finaliser : un nouveau CV part toujours de la couleur d'origine du modèle. Côté prod, la couleur retenue des comptes de Marc a été remise à NULL.

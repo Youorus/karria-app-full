@@ -48,7 +48,6 @@ import { BoutonParlerEquipe } from "@/features/equipe/components/bouton-parler-e
 import { CarteSoutien } from "@/features/soutien/components/carte-soutien";
 import { useCouleurs } from "@/theme/use-couleurs";
 
-import { CarteCv } from "../components/carte-cv";
 import { CarteIdentite } from "../components/carte-identite";
 import { ProfilInvite } from "../components/profil-invite";
 import { useProfil } from "../hooks/use-profil";
@@ -60,10 +59,8 @@ export function EcranProfil() {
     invite,
     seConnecter,
     identite,
-    cv,
     soutien,
     ouvrirParametres,
-    ouvrirCv,
     equipe,
     nouvelleVersion,
     mettreAJour,
@@ -108,10 +105,6 @@ export function EcranProfil() {
           >
             <Animated.View entering={entree(0)}>
               <CarteIdentite identite={identite} />
-            </Animated.View>
-
-            <Animated.View entering={entree(1)}>
-              <CarteCv cv={cv} onPress={ouvrirCv} />
             </Animated.View>
 
             <Animated.View entering={entree(2)}>

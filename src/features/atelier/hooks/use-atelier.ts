@@ -243,8 +243,8 @@ export interface Atelier {
     montrer: (rubrique: RubriqueEnListe, cle: string) => void;
     masques: (rubrique: RubriqueEnListe) => ReturnType<typeof elementsMasques>;
   };
-  allerALaLettre: () => void;
-  allerAFinaliser: () => void;
+  allerALaLettre: () => Promise<void>;
+  allerAFinaliser: () => Promise<void>;
   retour: () => void;
 }
 
@@ -1100,13 +1100,17 @@ export function useAtelier(libre = false): Atelier {
     if (p !== null) setPages(p);
   }, []);
 
-  const allerALaLettre = useCallback(() => {
-    void sauverMaintenant();
+  // Finaliser et la lettre relisent le dossier **sur le serveur** : on attend
+  // que la sauvegarde y soit avant de partir, sinon l'export rendrait le CV
+  // d'avant la dernière retouche (Marc, 13/11 : « ce n'est pas ce que j'ai
+  // finalisé »).
+  const allerALaLettre = useCallback(async () => {
+    await sauverMaintenant();
     pousserRoute({ pathname: "/atelier/[dossierId]/lettre", params: { dossierId } });
   }, [sauverMaintenant, pousserRoute, dossierId]);
 
-  const allerAFinaliser = useCallback(() => {
-    void sauverMaintenant();
+  const allerAFinaliser = useCallback(async () => {
+    await sauverMaintenant();
     // Venu de Finaliser : on y redescend, et il régénère puisque le brouillon
     // a bougé — l'analyse d'avant n'est pas perdue en chemin, elle se refait.
     if (revenirAFinaliser && router.canGoBack()) {
