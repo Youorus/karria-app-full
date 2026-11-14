@@ -60,6 +60,10 @@
 - Vu sur simulateur iPhone 17 (mode sombre) ; pas encore vu sur l'iPhone de Marc.
 - Prod : CV complet de démonstration écrit pour mtakoumba@gmail.com (pour tester les modèles) ; l'image de l'API avait perdu son tag sur le serveur, re-taguée `karria-api-ujqvaj:latest`.
 
+## Session du 2026-11-14 — Brief UI/UX de l'atelier CV pour une autre IA (Fable)
+
+Marc veut confier l'audit et la refonte visuelle/ergonomique du parcours CV (de l'édition à l'export) à une IA plus forte en visuel. Livré : **`docs/BRIEF-UX-ATELIER-CV.md`** — mission, personas, les deux dépôts et comment les lancer, l'architecture, le parcours écran par écran (routes, fichiers, comportements, faiblesses connues), ce qu'il faut savoir du backend, les règles non négociables, les livrables attendus (audit → plan priorisé → implémentation → preuve), les repères (REPRISE, ADR, feuille de route) et un glossaire. À remettre tel quel.
+
 ## Session du 2026-11-06 — « Rendre ma photo professionnelle » depuis l'onglet CV (Fable) — BRANCHE `feat/portrait`, NON POUSSÉE
 
 **Demande de Marc** : « Au niveau de l'onglet CV, quand l'utilisateur change son avatar, lui donner
