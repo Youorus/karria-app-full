@@ -80,6 +80,51 @@ async function monter() {
 }
 
 describe("Les filtres appartiennent à la vue affichée", () => {
+  it("affiche la page mémorisée au retour et ignore la réponse d'une ancienne vue", async () => {
+    const { result } = await monter();
+    act(() => result.current.changerDeVue("toutes"));
+    await waitFor(() => expect(result.current.vue).toBe("toutes"));
+
+    let terminer!: (fil: Fil) => void;
+    mockLireFil.mockImplementationOnce(
+      () =>
+        new Promise<Fil>((resolve) => {
+          terminer = resolve;
+        }),
+    );
+    act(() => result.current.changerDeVue("pour_toi"));
+    await waitFor(() => expect(result.current.vue).toBe("pour_toi"));
+    expect(result.current.chargement).toBe(false);
+    act(() => result.current.changerDeVue("toutes"));
+    await waitFor(() => expect(result.current.vue).toBe("toutes"));
+
+    await act(async () => {
+      terminer({
+        offres: [],
+        total: 19,
+        suivantes: false,
+        mode: "recherche",
+        resumeRecherche: "Ancienne réponse",
+        tri: "pertinence",
+        procheDisponible: true,
+      });
+    });
+    expect(result.current.vue).toBe("toutes");
+    expect(result.current.total).toBe(0);
+    expect(result.current.chargement).toBe(false);
+  });
+
+  it("relit la recherche et repart sans les filtres du lieu précédent", async () => {
+    const { result } = await monter();
+    act(() =>
+      result.current.appliquerFiltres({ ...FILTRES_PAR_DEFAUT, villes: ["Persan"] }),
+    );
+    await waitFor(() => expect(result.current.chargement).toBe(false));
+    act(() => result.current.rechargerApresRecherche());
+    await waitFor(() => expect(result.current.chargement).toBe(false));
+    expect(dernierAppel()).toEqual([FILTRES_PAR_DEFAUT, 0, "recherche", null]);
+  });
+
   it("un filtre posé sur « Ma recherche » reste en mode recherche", async () => {
     const { result } = await monter();
     expect(result.current.vue).toBe("pour_toi");
@@ -125,6 +170,23 @@ describe("Les filtres appartiennent à la vue affichée", () => {
 });
 
 describe("Le tri", () => {
+  it("affiche l'ordre que le serveur a servi même s'il diffère de la demande", async () => {
+    const { result } = await monter();
+    mockLireFil.mockResolvedValueOnce({
+      offres: [],
+      total: 0,
+      suivantes: false,
+      mode: "recherche",
+      resumeRecherche: "Infirmier",
+      tri: "pertinence",
+      procheDisponible: false,
+    });
+    act(() => result.current.changerDeTri("recentes"));
+    await waitFor(() => expect(result.current.chargement).toBe(false));
+    expect(dernierAppel()[3]).toBe("recentes");
+    expect(result.current.tri).toBe("pertinence");
+  });
+
   it("par défaut rien n'est envoyé, puis le choix part avec chaque page", async () => {
     const { result } = await monter();
     expect(dernierAppel()[3]).toBeNull();

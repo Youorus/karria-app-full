@@ -60,6 +60,7 @@ import {
 } from "../api/offres.api";
 import {
   FILTRES_PAR_DEFAUT,
+  type Fil,
   type Filtres,
   type ModeDuFil,
   type Offre,
@@ -71,6 +72,18 @@ import { memoriser } from "./memoire-offres";
 /** Le délai avant d'envoyer les offres vues : assez pour grouper un
  *  défilement, assez court pour qu'une fermeture n'en perde presque rien. */
 const DELAI_VUES_MS = 2_000;
+const DUREE_CACHE_MS = 30_000;
+const OPTIONS_VIDES: OptionsDeFiltre = { contrats: [], villes: [] };
+
+interface PageEnMemoire {
+  cle: string;
+  fil: Fil;
+  obtenueLe: number;
+}
+
+function cleDePage(filtres: Filtres, tri: Tri | null): string {
+  return JSON.stringify([filtres, tri]);
+}
 
 /** La vue choisie : la recherche en cours, ou tout le corpus. */
 export type VueDuFil = "pour_toi" | "toutes";
@@ -152,6 +165,7 @@ export function useFilOffres(): FilOffres {
   const [total, setTotal] = useState(0);
   // Le mode **servi** ; `null` avant la première réponse.
   const [modeServi, setModeServi] = useState<ModeDuFil | null>(null);
+  const [triServi, setTriServi] = useState<Tri>("recentes");
   const [resumeRecherche, setResumeRecherche] = useState<string | null>(null);
   const [procheDisponible, setProcheDisponible] = useState(false);
   const [suivantes, setSuivantes] = useState(false);
@@ -160,13 +174,19 @@ export function useFilOffres(): FilOffres {
   const [chargementSuite, setChargementSuite] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [reglages, setReglages] = useState(REGLAGES_PAR_DEFAUT);
-  const [options, setOptions] = useState<OptionsDeFiltre>({ contrats: [], villes: [] });
+  const [optionsParMode, setOptionsParMode] = useState<
+    Partial<Record<ModeDuFil, OptionsDeFiltre>>
+  >({});
+  const [relanceOptions, setRelanceOptions] = useState(0);
   // La vue demandée au serveur ; `null` le laisse la déduire des critères.
   const [demande, setDemande] = useState<ModeDuFil | null>(null);
   // Relance le chargement sans rien changer d'autre (session ouverte,
   // nouvelle recherche).
   const [relance, setRelance] = useState(0);
   const jeton = useRef(0);
+  const premierePageEnCours = useRef(false);
+  const pageSuivanteEnCours = useRef(false);
+  const pages = useRef<Partial<Record<ModeDuFil, PageEnMemoire>>>({});
   // Les offres vues et pas encore envoyées, et celles déjà envoyées (pour
   // ne pas renvoyer dix fois la même en remontant le fil).
   const aEnvoyer = useRef(new Set<string>());
@@ -179,59 +199,100 @@ export function useFilOffres(): FilOffres {
   // ont les mêmes réglages par défaut : peu importe laquelle.
   const cle: ModeDuFil = demande ?? mode;
   const { filtres, tri: triChoisi } = reglages[cle];
-  const tri = triChoisi ?? triParDefaut(mode);
+  const afficher = useCallback((fil: Fil) => {
+    memoriser(fil.offres);
+    setOffres(fil.offres);
+    setTotal(fil.total);
+    setModeServi(fil.mode);
+    setTriServi(fil.tri);
+    setResumeRecherche(fil.resumeRecherche);
+    setProcheDisponible(fil.procheDisponible);
+    setSuivantes(fil.suivantes);
+    setErreur(null);
+  }, []);
 
-  /** Charge la première page. Aucun `setState` avant la réponse : appelé
-   *  depuis un effet, il ne déclenche pas de rendu en cascade. */
+  /** Affiche une page encore récente pendant sa relecture, si la vue et ses réglages coïncident. */
   const chargerDebut = useCallback(
-    (pour: Filtres, voulu: ModeDuFil | null, ordre: Tri | null) => {
+    (pour: Filtres, voulu: ModeDuFil | null, ordre: Tri | null, reutiliser: boolean) => {
       const numero = ++jeton.current;
-      return lireFil(pour, 0, voulu, ordre).then(
-        (fil) => {
+      premierePageEnCours.current = true;
+      pageSuivanteEnCours.current = false;
+      setChargementSuite(false);
+      setErreur(null);
+      const clePage = cleDePage(pour, ordre);
+      const memorisee = reutiliser && voulu !== null ? pages.current[voulu] : undefined;
+      if (
+        memorisee !== undefined &&
+        memorisee.cle === clePage &&
+        Date.now() - memorisee.obtenueLe < DUREE_CACHE_MS
+      ) {
+        afficher(memorisee.fil);
+        setChargement(false);
+      } else if (reutiliser) {
+        setChargement(true);
+      }
+      void lireFil(pour, 0, voulu, ordre)
+        .then(
+          (fil) => {
+            if (numero !== jeton.current) return;
+            if (voulu === null || voulu === fil.mode) {
+              pages.current[fil.mode] = { cle: clePage, fil, obtenueLe: Date.now() };
+            }
+            afficher(fil);
+            if (voulu !== null && voulu !== fil.mode) setDemande(fil.mode);
+          },
+          (cause: unknown) => {
+            if (numero !== jeton.current) return;
+            if (triImpossible(cause)) {
+              // La recherche a perdu son lieu : l'ordre par défaut, et l'on
+              // recharge (le changement de réglage relance l'effet).
+              setProcheDisponible(false);
+              pages.current = {};
+              setReglages(sansProches);
+              return;
+            }
+            console.warn("[karria] fil indisponible", cause);
+            setErreur(messageDErreur(cause));
+          },
+        )
+        .finally(() => {
           if (numero !== jeton.current) return;
-          memoriser(fil.offres);
-          setOffres(fil.offres);
-          setTotal(fil.total);
-          setModeServi(fil.mode);
-          setResumeRecherche(fil.resumeRecherche);
-          setProcheDisponible(fil.procheDisponible);
-          setSuivantes(fil.suivantes);
-          setErreur(null);
-        },
-        (cause: unknown) => {
-          if (numero !== jeton.current) return;
-          if (triImpossible(cause)) {
-            // La recherche a perdu son lieu : l'ordre par défaut, et l'on
-            // recharge (le changement de réglage relance l'effet).
-            setProcheDisponible(false);
-            setReglages(sansProches);
-            return;
-          }
-          console.warn("[karria] fil indisponible", cause);
-          setErreur(messageDErreur(cause));
-        },
-      );
+          premierePageEnCours.current = false;
+          setChargement(false);
+          setActualisation(false);
+        });
     },
-    [],
+    [afficher],
   );
 
-  // Les options suivent la vue **servie** : elles n'existent qu'une fois le
-  // mode connu.
-  const chargerOptions = useCallback((pour: ModeDuFil) => {
-    lireOptionsDeFiltre(pour).then(setOptions, (cause: unknown) =>
-      // Sans options, la feuille de filtres n'offre que la période et
-      // l'affichage : dégradé, pas cassé.
-      console.warn("[karria] options de filtre indisponibles", cause),
-    );
+  const invaliderPage = useCallback(() => {
+    ++jeton.current;
   }, []);
 
   useEffect(() => {
-    void chargerDebut(filtres, demande, triChoisi).finally(() => setChargement(false));
-  }, [chargerDebut, filtres, demande, triChoisi, relance]);
+    let actif = true;
+    void Promise.resolve().then(() => {
+      if (actif) chargerDebut(filtres, demande, triChoisi, true);
+    });
+    return () => {
+      actif = false;
+      invaliderPage();
+    };
+  }, [chargerDebut, filtres, demande, triChoisi, relance, invaliderPage]);
 
   useEffect(() => {
-    if (modeServi !== null) chargerOptions(modeServi);
-  }, [chargerOptions, modeServi, relance]);
+    if (modeServi === null) return;
+    let enCours = true;
+    void lireOptionsDeFiltre(modeServi).then(
+      (options) => {
+        if (enCours) setOptionsParMode((avant) => ({ ...avant, [modeServi]: options }));
+      },
+      (cause: unknown) => console.warn("[karria] options de filtre indisponibles", cause),
+    );
+    return () => {
+      enCours = false;
+    };
+  }, [modeServi, relance, relanceOptions]);
 
   const envoyerLesVues = useCallback(() => {
     minuteurVues.current = null;
@@ -272,14 +333,22 @@ export function useFilOffres(): FilOffres {
   );
 
   const actualiser = useCallback(() => {
+    pages.current = {};
     setActualisation(true);
-    void chargerDebut(filtres, demande, triChoisi).finally(() => setActualisation(false));
-    if (modeServi !== null) chargerOptions(modeServi);
-  }, [chargerDebut, chargerOptions, filtres, demande, triChoisi, modeServi]);
+    chargerDebut(filtres, demande, triChoisi, false);
+    setRelanceOptions((n) => n + 1);
+  }, [chargerDebut, filtres, demande, triChoisi]);
 
   const chargerLaSuite = useCallback(() => {
-    if (!suivantes || chargementSuite || chargement) return;
+    if (
+      !suivantes ||
+      pageSuivanteEnCours.current ||
+      premierePageEnCours.current ||
+      chargement
+    )
+      return;
     const numero = jeton.current;
+    pageSuivanteEnCours.current = true;
     setChargementSuite(true);
     lireFil(filtres, offres.length, demande, triChoisi)
       .then((fil) => {
@@ -291,38 +360,34 @@ export function useFilOffres(): FilOffres {
       .catch((cause: unknown) =>
         console.warn("[karria] page suivante indisponible", cause),
       )
-      .finally(() => setChargementSuite(false));
-  }, [
-    suivantes,
-    chargementSuite,
-    chargement,
-    filtres,
-    offres.length,
-    demande,
-    triChoisi,
-  ]);
+      .finally(() => {
+        if (numero !== jeton.current) return;
+        pageSuivanteEnCours.current = false;
+        setChargementSuite(false);
+      });
+  }, [suivantes, chargement, filtres, offres.length, demande, triChoisi]);
 
   const appliquerFiltres = useCallback(
     (nouveaux: Filtres) => {
-      setChargement(true);
+      if (cleDePage(nouveaux, triChoisi) === cleDePage(filtres, triChoisi)) return;
       setReglages((r) => ({ ...r, [cle]: { ...r[cle], filtres: nouveaux } }));
     },
-    [cle],
+    [cle, filtres, triChoisi],
   );
 
   const changerDeTri = useCallback(
     (nouveau: Tri) => {
-      if (nouveau === tri) return;
       // Le défaut du mode se note `null` : il n'est pas envoyé, et la vue
       // n'a pas de choix à retenir.
       const choisi = nouveau === triParDefaut(cle) ? null : nouveau;
-      setChargement(true);
+      if (choisi === triChoisi) return;
       setReglages((r) => ({ ...r, [cle]: { ...r[cle], tri: choisi } }));
     },
-    [cle, tri],
+    [cle, triChoisi],
   );
 
   const remplacer = useCallback((id: string, modif: Partial<Offre>) => {
+    pages.current = {};
     setOffres((liste) => liste.map((o) => (o.id === id ? { ...o, ...modif } : o)));
   }, []);
 
@@ -351,7 +416,9 @@ export function useFilOffres(): FilOffres {
   // d'un invité — le fil et ses options se relisent.
   const etaitInvite = useRef(invite);
   useEffect(() => {
-    if (etaitInvite.current && !invite) {
+    if (etaitInvite.current !== invite) {
+      pages.current = {};
+      setOptionsParMode({});
       setChargement(true);
       setRelance((n) => n + 1);
     }
@@ -369,6 +436,8 @@ export function useFilOffres(): FilOffres {
   // La vue passe sur la recherche que Karria vient de poser, même depuis
   // « Toutes les offres ».
   const rechargerApresRecherche = useCallback(() => {
+    pages.current = {};
+    setOptionsParMode({});
     setChargement(true);
     setDemande("recherche");
     setReglages((r) => ({ ...r, recherche: REGLAGE_PAR_DEFAUT }));
@@ -390,9 +459,9 @@ export function useFilOffres(): FilOffres {
       const voulu: ModeDuFil = cible === "pour_toi" ? "recherche" : "toutes";
       // Déjà demandée mais pas servie (critères retirés entre-temps) : un
       // même `setDemande` ne relancerait rien et l'attente resterait figée.
-      if (cible === vue || voulu === demande) return;
-      setChargement(true);
-      setDemande(voulu);
+      if (cible === vue) return;
+      if (voulu === demande) setRelance((n) => n + 1);
+      else setDemande(voulu);
     },
     [vue, demande],
   );
@@ -409,8 +478,8 @@ export function useFilOffres(): FilOffres {
     chargementSuite,
     erreur,
     filtres,
-    options,
-    tri,
+    options: optionsParMode[mode] ?? OPTIONS_VIDES,
+    tri: triServi,
     procheDisponible,
     actualiser,
     chargerLaSuite,

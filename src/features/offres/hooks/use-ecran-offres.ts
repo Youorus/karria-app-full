@@ -47,7 +47,7 @@
  */
 
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ViewabilityConfigCallbackPairs, ViewToken } from "react-native";
 
 import { useMenuCompte } from "@/features/auth/hooks/use-menu-compte";
@@ -117,9 +117,9 @@ export interface EcranOffres extends FilOffres {
 const nombre = (n: number) => n.toLocaleString("fr-FR");
 
 const LIBELLES_TRI: Record<Tri, string> = {
-  pertinence: "Pertinence",
-  recentes: "Plus récentes",
-  proches: "Plus proches",
+  pertinence: "Pertinentes",
+  recentes: "Récentes",
+  proches: "Proches",
 };
 
 export function useEcranOffres(): EcranOffres {
@@ -185,7 +185,10 @@ export function useEcranOffres(): EcranOffres {
   );
   // Les annonces se glissent parmi les offres principales seulement, et
   // n'existent dans la liste qu'une fois chargées (aucun trou).
-  const nombrePrincipales = offres.filter(estPrincipale).length;
+  const nombrePrincipales = useMemo(
+    () => offres.filter(estPrincipale).length,
+    [offres, estPrincipale],
+  );
   const annonces = useAnnoncesDeListe(nombrePrincipales, REGLE_DU_FIL);
 
   const elements = useMemo<ElementDuFil[]>(() => {
@@ -276,7 +279,13 @@ export function useEcranOffres(): EcranOffres {
   }, [exiger]);
   useReprise("karria", () => setAgentOuvert(true));
 
-  const signalerDefilement = useCallback((y: number) => setDefile(y > 0), []);
+  const seuilFranchi = useRef(false);
+  const signalerDefilement = useCallback((y: number) => {
+    const loinDuHaut = y > 24;
+    if (loinDuHaut === seuilFranchi.current) return;
+    seuilFranchi.current = loinDuHaut;
+    setDefile(loinDuHaut);
+  }, []);
 
   // Une seule paire pour la vie de la liste (`use-visibilite-stable.ts`) :
   // `signalerVisibles` change d'identité à la connexion, et `FlatList`

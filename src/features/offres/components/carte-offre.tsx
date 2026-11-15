@@ -17,22 +17,10 @@
  * Le liseré bleu signale une offre dont le détail n'a jamais été ouvert ;
  * il disparaît à la première ouverture.
  *
- * ═══ Le mouvement ═══
- *
- * Celui de la V1, sur le fil natif : chaque carte entre en fondu en
- * montant de 20 pt, décalée de 40 ms par rang (400 ms au plus) — la liste
- * se « dépose » au lieu d'apparaître d'un bloc ; la pression l'enfonce à
- * 97 %. Le geste « mouvement réduit » coupe l'entrée.
  */
 
+import { memo } from "react";
 import { Pressable } from "react-native";
-import Animated, {
-  FadeInDown,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
 
 import { Icone } from "@/components/icone";
 import { Texte } from "@/components/texte";
@@ -46,17 +34,14 @@ import { contratCourt, ilYa, salaireLisible } from "../services/presentation";
 import { TuileEntreprise } from "./tuile-entreprise";
 import type { Offre } from "../types/offres.types";
 
-/** Le ressort par défaut de la V1 (`Animation.spring`). */
-const RESSORT = { damping: 22, stiffness: 250 };
-
 interface Props {
   offre: Offre;
   rang: number;
   /** « à 12 km » : en tri « Plus proches » seulement. */
   distance?: string | null;
   maintenant: Date;
-  onOuvrir: () => void;
-  onGarder: () => void;
+  onOuvrir: (offre: Offre) => void;
+  onGarder: (offre: Offre) => void;
 }
 
 function Pastille({
@@ -87,7 +72,7 @@ function Pastille({
   );
 }
 
-export function CarteOffre({
+export const CarteOffre = memo(function CarteOffre({
   offre,
   rang,
   distance = null,
@@ -96,153 +81,131 @@ export function CarteOffre({
   onGarder,
 }: Props) {
   const couleurs = useCouleurs();
-  const reduit = useReducedMotion();
-  const echelle = useSharedValue(1);
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: echelle.value }] }));
   const salaire = salaireLisible(offre.salaire);
   const temps = ilYa(offre.publieeLe, maintenant);
 
   return (
-    // Deux couches : l'entrée (animation de mise en page) et la pression
-    // (transformation) ne peuvent pas partager la même vue sans que l'une
-    // écrase l'autre — Reanimated le signale.
-    <Animated.View
-      entering={
-        reduit ? undefined : FadeInDown.duration(450).delay(Math.min(rang * 40, 400))
-      }
+    <Pressable
+      onPress={() => onOuvrir(offre)}
+      className="active:opacity-90"
+      accessibilityRole="button"
+      accessibilityLabel={`${offre.titre}${offre.entreprise ? `, ${offre.entreprise}` : ""}`}
+      accessibilityHint="Ouvre le détail de l'offre"
     >
-      <Animated.View style={style}>
-        <Pressable
-          onPress={onOuvrir}
-          onPressIn={() => echelle.set(withSpring(0.97, RESSORT))}
-          onPressOut={() => echelle.set(withSpring(1, RESSORT))}
-          accessibilityRole="button"
-          accessibilityLabel={`${offre.titre}${offre.entreprise ? `, ${offre.entreprise}` : ""}`}
-          accessibilityHint="Ouvre le détail de l'offre"
-        >
-          <VStack
-            className={`rounded-carte border bg-card p-4 ${
-              offre.nonOuverte ? "border-primary" : "border-border-subtle"
-            }`}
-          >
-            {/* 1. L'entreprise, le titre, le signet */}
-            <HStack space="md" className="items-center">
-              <TuileEntreprise
-                logo={offre.logo}
-                entreprise={offre.entreprise}
-                teinte={rang}
-                taille="carte"
-                cle={offre.id}
-              />
-              <VStack className="flex-1">
-                <HStack space="xs" className="items-center">
-                  <Texte
-                    className="shrink font-medium text-caption uppercase tracking-widest text-muted-foreground"
-                    numberOfLines={1}
-                  >
-                    {offre.entreprise ?? "Entreprise"}
-                  </Texte>
-
-                  {offre.nonOuverte ? (
-                    <Box className="h-1.5 w-1.5 rounded-full bg-primary" />
-                  ) : null}
-                </HStack>
-                <Texte className="font-bold text-body text-foreground" numberOfLines={2}>
-                  {offre.titre}
-                </Texte>
-              </VStack>
-              <Pressable
-                onPress={onGarder}
-                hitSlop={10}
-                className="p-1"
-                accessibilityRole="button"
-                accessibilityLabel={
-                  offre.enregistree ? "Retirer de mes offres" : "Garder l'offre"
-                }
-                accessibilityState={{ selected: offre.enregistree }}
+      <VStack
+        className={`rounded-carte border bg-card p-4 ${
+          offre.nonOuverte ? "border-primary" : "border-border-subtle"
+        }`}
+      >
+        {/* 1. L'entreprise, le titre, le signet */}
+        <HStack space="md" className="items-center">
+          <TuileEntreprise
+            logo={offre.logo}
+            entreprise={offre.entreprise}
+            teinte={rang}
+            taille="carte"
+            cle={offre.id}
+          />
+          <VStack className="flex-1">
+            <HStack space="xs" className="items-center">
+              <Texte
+                className="shrink font-medium text-caption uppercase tracking-widest text-muted-foreground"
+                numberOfLines={1}
               >
-                <Icone
-                  nom={offre.enregistree ? "signetPlein" : "signet"}
-                  couleur={offre.enregistree ? couleurs.primaire : couleurs.estompe}
-                  taille={20}
-                />
-              </Pressable>
-            </HStack>
+                {offre.entreprise ?? "Entreprise"}
+              </Texte>
 
-            {/* 2. Le lieu et le temps */}
-            <HStack className="mt-3 items-center justify-between">
-              <HStack space="xs" className="flex-1 items-center">
-                <Icone nom="lieu" couleur={couleurs.estompe} taille={12} />
-                <Texte
-                  className="shrink text-footnote text-muted-foreground"
-                  numberOfLines={1}
-                >
-                  {offre.lieu ?? "Lieu non précisé"}
-                </Texte>
-                {/* La distance ne se coupe jamais : c'est elle qu'on a demandée. */}
-                {distance !== null ? (
-                  <Texte
-                    className="text-footnote text-muted-foreground"
-                    numberOfLines={1}
-                  >
-                    · {distance}
-                  </Texte>
-                ) : null}
-              </HStack>
-              <Texte className="text-footnote text-foreground-faint">{temps}</Texte>
-            </HStack>
-
-            {/* 3. Les pastilles */}
-            <HStack className="mt-3 flex-wrap gap-2">
-              {offre.qualite === "haute" ? (
-                <Pastille
-                  libelle="Très alignée"
-                  fond="bg-success"
-                  texte="text-on-scrim"
-                />
-              ) : offre.qualite === "basse" ? (
-                <Pastille
-                  libelle="À explorer"
-                  fond="bg-foreground-faint"
-                  texte="text-on-scrim"
-                />
-              ) : null}
-              {offre.contrat !== null ? (
-                <Pastille
-                  icone={<Icone nom="contrat" couleur={couleurs.estompe} taille={12} />}
-                  libelle={contratCourt(offre.contrat)}
-                  libelleComplet={offre.contrat}
-                  fond="bg-remplissage"
-                  texte="text-muted-foreground"
-                />
-              ) : null}
-              {offre.teletravail !== null && offre.teletravail !== "sur site" ? (
-                <Pastille
-                  icone={<Icone nom="appareil" couleur={couleurs.estompe} taille={12} />}
-                  libelle={offre.teletravail}
-                  fond="bg-remplissage"
-                  texte="text-muted-foreground"
-                />
-              ) : null}
-              {salaire !== null ? (
-                <Pastille
-                  icone={<Icone nom="salaire" couleur={SALAIRE} taille={12} />}
-                  libelle={salaire}
-                  fond="bg-salaire"
-                  texte="text-salaire-foreground"
-                />
+              {offre.nonOuverte ? (
+                <Box className="h-1.5 w-1.5 rounded-full bg-primary" />
               ) : null}
             </HStack>
+            <Texte className="font-bold text-body text-foreground" numberOfLines={2}>
+              {offre.titre}
+            </Texte>
+          </VStack>
+          <Pressable
+            onPress={() => onGarder(offre)}
+            hitSlop={10}
+            className="p-1"
+            accessibilityRole="button"
+            accessibilityLabel={
+              offre.enregistree ? "Retirer de mes offres" : "Garder l'offre"
+            }
+            accessibilityState={{ selected: offre.enregistree }}
+          >
+            <Icone
+              nom={offre.enregistree ? "signetPlein" : "signet"}
+              couleur={offre.enregistree ? couleurs.primaire : couleurs.estompe}
+              taille={20}
+            />
+          </Pressable>
+        </HStack>
 
-            {/* 4. Pourquoi elle est là */}
-            {offre.raisons.length > 0 ? (
-              <Texte className="mt-2 text-caption text-primary" numberOfLines={1}>
-                {offre.raisons.join(" · ")}
+        {/* 2. Le lieu et le temps */}
+        <HStack className="mt-3 items-center justify-between">
+          <HStack space="xs" className="flex-1 items-center">
+            <Icone nom="lieu" couleur={couleurs.estompe} taille={12} />
+            <Texte
+              className="shrink text-footnote text-muted-foreground"
+              numberOfLines={1}
+            >
+              {offre.lieu ?? "Lieu non précisé"}
+            </Texte>
+            {/* La distance ne se coupe jamais : c'est elle qu'on a demandée. */}
+            {distance !== null ? (
+              <Texte className="text-footnote text-muted-foreground" numberOfLines={1}>
+                · {distance}
               </Texte>
             ) : null}
-          </VStack>
-        </Pressable>
-      </Animated.View>
-    </Animated.View>
+          </HStack>
+          <Texte className="text-footnote text-foreground-faint">{temps}</Texte>
+        </HStack>
+
+        {/* 3. Les pastilles */}
+        <HStack className="mt-3 flex-wrap gap-2">
+          {offre.qualite === "haute" ? (
+            <Pastille libelle="Très alignée" fond="bg-success" texte="text-on-scrim" />
+          ) : offre.qualite === "basse" ? (
+            <Pastille
+              libelle="À explorer"
+              fond="bg-foreground-faint"
+              texte="text-on-scrim"
+            />
+          ) : null}
+          {offre.contrat !== null ? (
+            <Pastille
+              icone={<Icone nom="contrat" couleur={couleurs.estompe} taille={12} />}
+              libelle={contratCourt(offre.contrat)}
+              libelleComplet={offre.contrat}
+              fond="bg-remplissage"
+              texte="text-muted-foreground"
+            />
+          ) : null}
+          {offre.teletravail !== null && offre.teletravail !== "sur site" ? (
+            <Pastille
+              icone={<Icone nom="appareil" couleur={couleurs.estompe} taille={12} />}
+              libelle={offre.teletravail}
+              fond="bg-remplissage"
+              texte="text-muted-foreground"
+            />
+          ) : null}
+          {salaire !== null ? (
+            <Pastille
+              icone={<Icone nom="salaire" couleur={SALAIRE} taille={12} />}
+              libelle={salaire}
+              fond="bg-salaire"
+              texte="text-salaire-foreground"
+            />
+          ) : null}
+        </HStack>
+
+        {/* 4. Pourquoi elle est là */}
+        {offre.raisons.length > 0 ? (
+          <Texte className="mt-2 text-caption text-primary" numberOfLines={1}>
+            {offre.raisons.join(" · ")}
+          </Texte>
+        ) : null}
+      </VStack>
+    </Pressable>
   );
-}
+});

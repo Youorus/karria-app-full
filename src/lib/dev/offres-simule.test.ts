@@ -232,6 +232,29 @@ describe("La conversation avec Karria", () => {
 });
 
 describe("La recherche en cours", () => {
+  it("changer le lieu change les offres personnalisées et conserve le corpus complet", async () => {
+    const ids = (o: Corps) => o.items.map((item) => item.job_offer_id);
+    const rechercher = async (label: string) => {
+      const pose = await appeler("PUT", "/search/criteria", {
+        job_titles: ["Serveur", "Infirmier"],
+        location: { label },
+      });
+      expect(pose.statut).toBe(200);
+      const personnalise = await appeler("GET", "/job-matches/me?mode=search&limit=50");
+      const corpus = await appeler(
+        "GET",
+        "/job-matches/me?mode=all_offers&sort=fresh&limit=50",
+      );
+      expect(personnalise.corps.criteria_summary).toContain(label);
+      expect(personnalise.corps.items.length).toBeGreaterThan(0);
+      return { personnalise: ids(personnalise.corps), corpus: ids(corpus.corps) };
+    };
+    const marseille = await rechercher("Marseille");
+    const paris = await rechercher("Paris");
+    expect(paris.personnalise).not.toEqual(marseille.personnalise);
+    expect(paris.corpus).toEqual(marseille.corpus);
+  });
+
   it("se lit, se pose directement et s'oublie", async () => {
     const rien = await appeler("GET", "/search/criteria");
     expect(rien.corps.criteria).toBeNull();

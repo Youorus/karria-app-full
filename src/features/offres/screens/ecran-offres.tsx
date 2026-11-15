@@ -21,8 +21,15 @@
  * de la liste) : c'est ce qui fait tomber « Nouvelle ».
  */
 
-import { useRef } from "react";
-import { FlatList, Pressable, RefreshControl } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  FlatList,
+  Pressable,
+  RefreshControl,
+  type ListRenderItem,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Aura } from "@/components/aura";
@@ -46,11 +53,40 @@ import { SelecteurVue } from "../components/selecteur-vue";
 import { SqueletteFil } from "../components/squelette-fil";
 import { useEcranOffres, type ElementDuFil } from "../hooks/use-ecran-offres";
 
+const LISTE_VIDE: ElementDuFil[] = [];
+
+function cleElement(el: ElementDuFil): string {
+  if (el.type === "offre") return String(el.offre.id);
+  if (el.type === "annonce") return `annonce-${el.emplacement}`;
+  return el.type;
+}
+
 export function EcranOffres() {
   const couleurs = useCouleurs();
   const { bottom } = useSafeAreaInsets();
   // Une référence de vue, pas un état : elle sert seulement à remonter.
   const liste = useRef<FlatList<ElementDuFil>>(null);
+  const [deplacement, setDeplacement] = useState(false);
+  const repriseAura = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const annulerRepriseAura = useCallback(() => {
+    if (repriseAura.current !== null) clearTimeout(repriseAura.current);
+    repriseAura.current = null;
+  }, []);
+  useEffect(() => annulerRepriseAura, [annulerRepriseAura]);
+
+  const suspendreAura = useCallback(() => {
+    annulerRepriseAura();
+    setDeplacement(true);
+  }, [annulerRepriseAura]);
+  const relacherLeFil = useCallback(() => {
+    // L'inertie peut prendre le relais après la fin du geste.
+    annulerRepriseAura();
+    repriseAura.current = setTimeout(() => setDeplacement(false), 150);
+  }, [annulerRepriseAura]);
+  const reprendreAura = useCallback(() => {
+    annulerRepriseAura();
+    setDeplacement(false);
+  }, [annulerRepriseAura]);
   const {
     elements,
     maintenant,
@@ -86,11 +122,58 @@ export function EcranOffres() {
 
   const basBouton = Math.max(bottom, 8) + ECART_BAS_BARRE + HAUTEUR_BARRE + 16;
 
+  const surDefilement = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) =>
+      signalerDefilement(e.nativeEvent.contentOffset.y),
+    [signalerDefilement],
+  );
+  const triAffiche = rangeeTri?.actif;
+  useEffect(() => {
+    liste.current?.scrollToOffset({ offset: 0, animated: false });
+    signalerDefilement(0);
+  }, [filtres, mode, triAffiche, signalerDefilement]);
+
+  const rendreElement = useCallback<ListRenderItem<ElementDuFil>>(
+    ({ item }) =>
+      item.type === "offre" ? (
+        <CarteOffre
+          offre={item.offre}
+          rang={item.rang}
+          distance={item.distance}
+          maintenant={maintenant}
+          onOuvrir={ouvrirOffre}
+          onGarder={garder}
+        />
+      ) : item.type === "annonce" ? (
+        <CarteAnnonce annonce={item.annonce} />
+      ) : item.type === "plus" ? (
+        <Pressable
+          onPress={voirLesAutres}
+          className="min-h-[52px] items-center justify-center rounded-tuile border-[1.5px] border-border-champ"
+          accessibilityRole="button"
+        >
+          <Texte className="font-bold text-body text-primary">
+            Voir {item.nombre} offre{item.nombre > 1 ? "s" : ""} supplémentaire
+            {item.nombre > 1 ? "s" : ""}
+          </Texte>
+        </Pressable>
+      ) : (
+        <HStack space="md" className="items-center pt-2">
+          <Box className="h-px flex-1 bg-border-subtle" />
+          <Texte className="font-bold text-caption uppercase tracking-widest text-foreground-faint">
+            Autres opportunités
+          </Texte>
+          <Box className="h-px flex-1 bg-border-subtle" />
+        </HStack>
+      ),
+    [garder, maintenant, ouvrirOffre, voirLesAutres],
+  );
+
   return (
     <Box style={{ flex: 1 }} className="bg-background">
       <RideauAgent ouvert={agentOuvert} onFermer={fermerAgent} onRecherche={surRecherche}>
         <Box style={{ flex: 1 }} className="bg-background">
-          <Aura visible={!agentOuvert} />
+          <Aura visible={!agentOuvert && !deplacement} />
           <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
             <EnTeteKarria
               titre="Pour toi"
@@ -121,96 +204,57 @@ export function EcranOffres() {
               </VStack>
             ) : null}
 
-            {chargement ? (
-              <Box className="px-5 pt-3">
-                <SqueletteFil />
-              </Box>
-            ) : (
-              <FlatList
-                ref={liste}
-                data={elements}
-                keyExtractor={(el) =>
-                  el.type === "offre"
-                    ? String(el.offre.id)
-                    : el.type === "annonce"
-                      ? `annonce-${el.emplacement}`
-                      : el.type
-                }
-                renderItem={({ item }) =>
-                  item.type === "offre" ? (
-                    <CarteOffre
-                      offre={item.offre}
-                      rang={item.rang}
-                      distance={item.distance}
-                      maintenant={maintenant}
-                      onOuvrir={() => ouvrirOffre(item.offre)}
-                      onGarder={() => garder(item.offre)}
-                    />
-                  ) : item.type === "annonce" ? (
-                    <CarteAnnonce annonce={item.annonce} />
-                  ) : item.type === "plus" ? (
-                    <Pressable
-                      onPress={voirLesAutres}
-                      className="min-h-[52px] items-center justify-center rounded-tuile border-[1.5px] border-border-champ"
-                      accessibilityRole="button"
-                    >
-                      <Texte className="font-bold text-body text-primary">
-                        Voir {item.nombre} offre{item.nombre > 1 ? "s" : ""}{" "}
-                        supplémentaire
-                        {item.nombre > 1 ? "s" : ""}
-                      </Texte>
-                    </Pressable>
-                  ) : (
-                    <HStack space="md" className="items-center pt-2">
-                      <Box className="h-px flex-1 bg-border-subtle" />
-                      <Texte className="font-bold text-caption uppercase tracking-widest text-foreground-faint">
-                        Autres opportunités
-                      </Texte>
-                      <Box className="h-px flex-1 bg-border-subtle" />
-                    </HStack>
-                  )
-                }
-                ListHeaderComponent={
-                  erreur !== null ? (
-                    <MessageErreur
-                      message={erreur}
-                      action={actualiser}
-                      libelleAction="Réessayer"
-                    />
-                  ) : null
-                }
-                ListEmptyComponent={
-                  erreur === null ? (
-                    <VStack space="sm" className="items-center px-6 py-16">
-                      <Texte className="font-bold text-title-sm tracking-tight text-foreground">
-                        Aucune offre pour le moment
-                      </Texte>
-                      <Texte className="text-center text-body text-muted-foreground">
-                        {mode === "recherche"
-                          ? "Ajuste tes filtres, ou demande à Karria d'élargir ta recherche."
-                          : "Ajuste tes filtres, ou dis à Karria ce que tu cherches."}
-                      </Texte>
-                    </VStack>
-                  ) : null
-                }
-                ListFooterComponent={chargementSuite ? <SqueletteFil cartes={1} /> : null}
-                onEndReached={chargerLaSuite}
-                onEndReachedThreshold={0.5}
-                viewabilityConfigCallbackPairs={visibilite}
-                onScroll={(e) => signalerDefilement(e.nativeEvent.contentOffset.y)}
-                scrollEventThrottle={64}
-                contentContainerClassName="gap-3 px-5 pt-3"
-                contentContainerStyle={{ paddingBottom: basBouton + 60 }}
-                showsVerticalScrollIndicator={false}
-                refreshControl={
-                  <RefreshControl
-                    refreshing={actualisation}
-                    onRefresh={actualiser}
-                    tintColor={couleurs.primaire}
+            <FlatList
+              ref={liste}
+              data={chargement ? LISTE_VIDE : elements}
+              keyExtractor={cleElement}
+              renderItem={rendreElement}
+              ListHeaderComponent={
+                erreur !== null ? (
+                  <MessageErreur
+                    message={erreur}
+                    action={actualiser}
+                    libelleAction="Réessayer"
                   />
-                }
-              />
-            )}
+                ) : null
+              }
+              ListEmptyComponent={
+                chargement ? (
+                  <SqueletteFil />
+                ) : erreur === null ? (
+                  <VStack space="sm" className="items-center px-6 py-16">
+                    <Texte className="font-bold text-title-sm tracking-tight text-foreground">
+                      Aucune offre pour le moment
+                    </Texte>
+                    <Texte className="text-center text-body text-muted-foreground">
+                      {mode === "recherche"
+                        ? "Ajuste tes filtres, ou demande à Karria d'élargir ta recherche."
+                        : "Ajuste tes filtres, ou dis à Karria ce que tu cherches."}
+                    </Texte>
+                  </VStack>
+                ) : null
+              }
+              ListFooterComponent={chargementSuite ? <SqueletteFil cartes={1} /> : null}
+              onEndReached={chargerLaSuite}
+              onEndReachedThreshold={0.5}
+              viewabilityConfigCallbackPairs={visibilite}
+              onScrollBeginDrag={suspendreAura}
+              onScrollEndDrag={relacherLeFil}
+              onMomentumScrollBegin={suspendreAura}
+              onMomentumScrollEnd={reprendreAura}
+              onScroll={surDefilement}
+              scrollEventThrottle={64}
+              contentContainerClassName="gap-3 px-5 pt-3"
+              contentContainerStyle={{ paddingBottom: basBouton + 60 }}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={actualisation}
+                  onRefresh={actualiser}
+                  tintColor={couleurs.primaire}
+                />
+              }
+            />
           </SafeAreaView>
 
           {/* Le ✦ : à droite, 16 pt au-dessus de la barre d'onglets. */}

@@ -770,9 +770,11 @@ function filDesMatchs(chemin: string): Response {
     liste = [...liste].sort((a, b) => a.offre.heures - b.offre.heures);
   }
   if (tri === "nearest") {
-    liste = [...liste].sort(
-      (a, b) => (distanceDe(a.offre) ?? 0) - (distanceDe(b.offre) ?? 0),
-    );
+    liste = [...liste].sort((a, b) => {
+      const distanceA = distanceDe(a.offre) ?? Infinity;
+      const distanceB = distanceDe(b.offre) ?? Infinity;
+      return distanceA === distanceB ? 0 : distanceA - distanceB;
+    });
   }
   const page = liste.slice(offset, offset + limit);
   return json(200, {

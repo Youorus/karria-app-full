@@ -1,79 +1,60 @@
-/**
- * Le tri rapide du fil : « Pertinence · Plus récentes · Plus proches ».
- *
- * ═══ Pourquoi des mots et pas des pastilles ═══
- *
- * Le fil a déjà son sélecteur de vue en capsule ; une seconde rangée de
- * capsules ferait deux commandes de même poids l'une sous l'autre. Ici,
- * trois mots séparés de points médians : le choix actif est en gras et en
- * couleur de texte, les autres estompés. Pas d'icône, pas de badge — la
- * rangée se lit comme une phrase et ne vole pas la vedette aux offres.
- *
- * ═══ Accessibilité ═══
- *
- * Un groupe de boutons radio : le lecteur d'écran annonce « Plus proches,
- * bouton radio, sélectionné, 2 sur 3 ». La zone de toucher déborde du mot
- * (`hitSlop`) pour atteindre 44 pt sans épaissir la rangée.
- */
+/** Les ordres du fil sont des boutons radio, avec une cible tactile complète. */
 
 import { Pressable } from "react-native";
 
+import { Icone } from "@/components/icone";
 import { Texte } from "@/components/texte";
 import { HStack } from "@/components/ui/hstack";
+import { useCouleurs } from "@/theme/use-couleurs";
 
 import type { Tri } from "../types/offres.types";
 
-/** Ce qui manque à un mot de 20 pt de haut pour une cible de 44 pt. */
-const DEBORD = { top: 12, bottom: 12, left: 6, right: 6 };
+const AIDES: Record<Tri, string> = {
+  pertinence: "Classe selon tes critères de recherche.",
+  recentes: "Affiche en premier les offres publiées récemment.",
+  proches: "Classe par distance depuis le lieu de ta recherche.",
+};
 
 interface Props {
   choix: { tri: Tri; libelle: string }[];
   actif: Tri;
-  /** Pendant un chargement : un second toucher attendrait. */
   desactive: boolean;
   onChanger: (tri: Tri) => void;
 }
 
 export function RangeeTri({ choix, actif, desactive, onChanger }: Props) {
+  const couleurs = useCouleurs();
   return (
-    <HStack
-      className="flex-wrap items-center gap-x-2 px-2"
-      accessibilityRole="radiogroup"
-      accessibilityLabel="Trier les offres"
-    >
-      {choix.map((c, i) => {
-        const selectionne = c.tri === actif;
+    <HStack className="flex-wrap items-center gap-x-1" accessibilityRole="radiogroup">
+      <Texte className="mr-1 text-footnote text-muted-foreground">Trier par</Texte>
+      {choix.map(({ tri, libelle }) => {
+        const selectionne = tri === actif;
         return (
-          <HStack key={c.tri} className="items-center gap-x-2">
-            {i > 0 ? (
-              <Texte
-                className="text-footnote text-foreground-faint"
-                importantForAccessibility="no"
-                accessibilityElementsHidden
-              >
-                ·
-              </Texte>
+          <Pressable
+            key={tri}
+            onPress={() => {
+              if (!selectionne) onChanger(tri);
+            }}
+            disabled={desactive}
+            className={`min-h-touch flex-row items-center justify-center gap-1 rounded-full px-2 active:opacity-80 ${
+              selectionne ? "bg-remplissage" : ""
+            }`}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: selectionne, disabled: desactive }}
+            accessibilityLabel={libelle}
+            accessibilityHint={AIDES[tri]}
+          >
+            {selectionne ? (
+              <Icone nom="coche" couleur={couleurs.primaire} taille={12} />
             ) : null}
-            <Pressable
-              onPress={() => {
-                if (!selectionne) onChanger(c.tri);
-              }}
-              disabled={desactive}
-              hitSlop={DEBORD}
-              className="py-1"
-              accessibilityRole="radio"
-              accessibilityState={{ checked: selectionne, disabled: desactive }}
-              accessibilityLabel={c.libelle}
+            <Texte
+              className={`text-footnote ${
+                selectionne ? "font-bold text-foreground" : "text-muted-foreground"
+              }`}
             >
-              <Texte
-                className={`text-footnote ${
-                  selectionne ? "font-bold text-foreground" : "text-muted-foreground"
-                }`}
-              >
-                {c.libelle}
-              </Texte>
-            </Pressable>
-          </HStack>
+              {libelle}
+            </Texte>
+          </Pressable>
         );
       })}
     </HStack>
