@@ -1,102 +1,35 @@
 /**
- * La barre basse de l'atelier : cinq gestes, un seul appelle au clic.
- *
- * ═══ Pourquoi cinq, et pourquoi là ═══
- *
- * Modifier, Karria, Mise en avant, Intitulé : quatre façons de travailler la
- * feuille, toutes réversibles. Finaliser : la suite du parcours — c'est la
- * seule en bleu plein. Le reste est au ton de l'écran, en icône et un mot,
- * dans une capsule de verre qui flotte sous la page (le pied des détails).
- *
- * ═══ La pastille de Karria ═══
- *
- * Un petit nombre sur « Karria » quand des propositions attendent : la
- * personne sait qu'il y a quelque chose à relire, sans qu'on l'interrompe.
- * Pas de point rouge, pas d'étincelle : un chiffre.
- *
- * Sans dossier (l'atelier libre), Karria n'a rien à proposer : son geste
- * n'est pas là, la barre a quatre places.
+ * Quelques gestes nommés, sous le papier. Le pied occupe sa place réelle :
+ * agrandir le texte pousse la mise en page au lieu de rogner les commandes.
  */
 
-import { Pressable } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
+import { Pressable, useWindowDimensions, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Icone, type NomIcone } from "@/components/icone";
-import { PiedFlottant } from "@/components/pied-flottant";
+import { BoutonAction } from "@/components/bouton-action";
+import { Icone } from "@/components/icone";
 import { Texte } from "@/components/texte";
-import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
-import { SUR_PRIMAIRE } from "@/theme";
+import { VStack } from "@/components/ui/vstack";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import { TEXTES } from "../services/presentation";
 import { phraseDepassement } from "../services/une-page";
 
-export type GesteAtelier =
-  "modifier" | "karria" | "mise-en-avant" | "intitule" | "finaliser";
+export type GesteAtelier = "modifier" | "karria" | "finaliser";
 
 interface Props {
   /** Les propositions de Karria encore à relire. */
   enAttente: number;
   onGeste: (geste: GesteAtelier) => void;
-  desactivee?: boolean;
+  finalisationIndisponible?: boolean;
+  sauvegardeEnCours?: boolean;
   /** Faux : pas de geste « Karria » (atelier libre, sans dossier). */
   avecKarria?: boolean;
   /** Le nombre de pages de la feuille ; au-delà d'une, la barre le dit. */
   pages?: number;
   /** « Tenir sur une page » : ouvre la feuille qui le propose. */
   onPages?: () => void;
-}
-
-const RESSORT = { duration: 150, dampingRatio: 1 } as const;
-
-function Geste({
-  icone,
-  libelle,
-  pastille,
-  onPress,
-  desactive,
-}: {
-  icone: NomIcone;
-  libelle: string;
-  pastille?: number;
-  onPress: () => void;
-  desactive: boolean;
-}) {
-  const couleurs = useCouleurs();
-  const echelle = useSharedValue(1);
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: echelle.get() }] }));
-  return (
-    <Animated.View style={[{ flex: 1 }, style]}>
-      <Pressable
-        onPress={onPress}
-        onPressIn={() => echelle.set(withSpring(0.94, RESSORT))}
-        onPressOut={() => echelle.set(withSpring(1, RESSORT))}
-        disabled={desactive}
-        className={`min-h-touch items-center justify-center gap-1 py-1.5 ${desactive ? "opacity-40" : ""}`}
-        accessibilityRole="button"
-        accessibilityLabel={pastille ? `${libelle}, ${pastille} à relire` : libelle}
-      >
-        <Box>
-          <Icone nom={icone} couleur={couleurs.texte} taille={20} graisse="medium" />
-          {pastille ? (
-            <Box className="absolute -right-2.5 -top-1.5 h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1">
-              <Texte className="font-bold text-[10px] leading-[12px] text-primary-foreground">
-                {pastille > 9 ? "9+" : pastille}
-              </Texte>
-            </Box>
-          ) : null}
-        </Box>
-        <Texte className="font-medium text-caption text-foreground" numberOfLines={1}>
-          {libelle}
-        </Texte>
-      </Pressable>
-    </Animated.View>
-  );
 }
 
 /**
@@ -114,10 +47,14 @@ function LignePages({ pages, onPress }: { pages: number; onPress: () => void }) 
       accessibilityLabel={`${phraseDepassement(pages)}. ${TEXTES.unePageAgir}`}
     >
       <Icone nom="cv" couleur={couleurs.estompe} taille={14} />
-      <Texte className="flex-1 text-footnote text-foreground" numberOfLines={1}>
-        {phraseDepassement(pages)}
-      </Texte>
-      <Texte className="font-bold text-footnote text-primary">{TEXTES.unePageAgir}</Texte>
+      <VStack className="min-w-0 flex-1 py-2">
+        <Texte className="text-footnote text-foreground">
+          {phraseDepassement(pages)}
+        </Texte>
+        <Texte className="font-bold text-body text-foreground">
+          {TEXTES.unePageAgir}
+        </Texte>
+      </VStack>
       <Icone nom="suivant" couleur={couleurs.primaire} taille={11} graisse="bold" />
     </Pressable>
   );
@@ -126,63 +63,62 @@ function LignePages({ pages, onPress }: { pages: number; onPress: () => void }) 
 export function BarreAtelier({
   enAttente,
   onGeste,
-  desactivee = false,
+  finalisationIndisponible = false,
+  sauvegardeEnCours = false,
   avecKarria = true,
   pages = 1,
   onPages,
 }: Props) {
-  const couleurs = useCouleurs();
+  const { width, fontScale } = useWindowDimensions();
+  const empiler = width / Math.max(fontScale, 1) < (avecKarria ? 440 : 310);
   return (
-    <PiedFlottant>
-      {pages > 1 && onPages !== undefined && !desactivee ? (
-        <LignePages pages={pages} onPress={onPages} />
-      ) : null}
-      <HStack className="items-center">
-        <Geste
-          icone="crayon"
-          libelle={TEXTES.modifier}
-          onPress={() => onGeste("modifier")}
-          desactive={desactivee}
-        />
-        {avecKarria ? (
-          <Geste
-            icone="bulle"
-            libelle={TEXTES.karria}
-            pastille={enAttente}
-            onPress={() => onGeste("karria")}
-            desactive={desactivee}
-          />
-        ) : null}
-        <Geste
-          icone="filtres"
-          libelle={TEXTES.enAvant}
-          onPress={() => onGeste("mise-en-avant")}
-          desactive={desactivee}
-        />
-        <Geste
-          icone="identite"
-          libelle={TEXTES.intitule}
-          onPress={() => onGeste("intitule")}
-          desactive={desactivee}
-        />
-        <Pressable
-          onPress={() => onGeste("finaliser")}
-          disabled={desactivee}
-          className={`ml-1 h-11 flex-row items-center gap-1.5 rounded-full bg-primary px-4 ${desactivee ? "opacity-40" : ""}`}
-          accessibilityRole="button"
-          accessibilityLabel={TEXTES.finaliser}
-        >
-          <Texte className="font-bold text-footnote text-primary-foreground">
-            {TEXTES.finaliser}
-          </Texte>
-          <Icone
-            nom="suivant"
-            couleur={SUR_PRIMAIRE[couleurs.mode]}
-            taille={12}
-            graisse="bold"
-          />
-        </Pressable>
-      </HStack>
-    </PiedFlottant>
+    <SafeAreaView key={fontScale} edges={["bottom"]}>
+      <VStack className="gap-2 border-t border-border-subtle bg-background px-3 pb-2 pt-2">
+        {pages > 1 && onPages ? <LignePages pages={pages} onPress={onPages} /> : null}
+        <View className={empiler ? "flex-col gap-2" : "flex-row items-start gap-2"}>
+          <HStack
+            className={
+              empiler
+                ? "w-full flex-wrap items-start gap-2"
+                : "min-w-0 flex-1 flex-wrap items-start gap-2"
+            }
+          >
+            <BoutonAction
+              libelle="Modifier le CV"
+              ton="secondaire"
+              multiligne
+              pleineLargeur={empiler && fontScale > 1.4}
+              onPress={() => onGeste("modifier")}
+            />
+            {avecKarria ? (
+              <BoutonAction
+                libelle={enAttente > 0 ? `Karria (${enAttente})` : "Karria"}
+                accessibilityLabel={
+                  enAttente > 0 ? `Karria, ${enAttente} propositions à relire` : "Karria"
+                }
+                ton="discret"
+                pleineLargeur={empiler && fontScale > 1.4}
+                multiligne
+                onPress={() => onGeste("karria")}
+              />
+            ) : null}
+          </HStack>
+          <Pressable
+            onPress={() => onGeste("finaliser")}
+            disabled={finalisationIndisponible || sauvegardeEnCours}
+            accessibilityRole="button"
+            accessibilityState={{
+              disabled: finalisationIndisponible || sauvegardeEnCours,
+              busy: sauvegardeEnCours,
+            }}
+            className={`min-h-touch items-center justify-center rounded-carte bg-action-primary px-4 py-3 active:opacity-80 ${empiler ? "w-full" : ""} ${finalisationIndisponible || sauvegardeEnCours ? "opacity-50" : ""}`}
+          >
+            <Texte className="text-center font-bold text-body text-primary-foreground">
+              {sauvegardeEnCours ? "Enregistrement…" : TEXTES.finaliser}
+            </Texte>
+          </Pressable>
+        </View>
+      </VStack>
+    </SafeAreaView>
   );
 }

@@ -16,6 +16,7 @@
  */
 
 import { useEffect } from "react";
+import { useWindowDimensions, View } from "react-native";
 import Animated, {
   useAnimatedProps,
   useReducedMotion,
@@ -50,6 +51,12 @@ const SURFACE: Record<NiveauAts, string> = {
   faible: "border-destructive bg-surface-destructive",
 };
 
+const BADGE: Record<NiveauAts, string> = {
+  bon: "bg-surface-success border-success",
+  moyen: "bg-surface-warning border-warning",
+  faible: "bg-surface-destructive border-destructive",
+};
+
 const TEXTE: Record<NiveauAts, string> = {
   bon: "text-success",
   moyen: "text-warning",
@@ -79,7 +86,7 @@ function Anneau({
     strokeDasharray: `${(CIRCONFERENCE * Math.max(0, Math.min(100, avancement.value))) / 100} ${CIRCONFERENCE}`,
   }));
   return (
-    <Svg width={TAILLE} height={TAILLE} style={{ position: "absolute" }}>
+    <Svg width={TAILLE} height={TAILLE}>
       <Circle
         cx={TAILLE / 2}
         cy={TAILLE / 2}
@@ -105,6 +112,8 @@ function Anneau({
 
 export function VerdictAts({ score }: { score: ScoreAts }) {
   const { mode } = useCouleurs();
+  const { width, fontScale } = useWindowDimensions();
+  const empiler = width / Math.max(fontScale, 1) < 365;
   const couleur =
     score.niveau === "bon"
       ? SUCCES[mode]
@@ -118,55 +127,69 @@ export function VerdictAts({ score }: { score: ScoreAts }) {
     <VStack
       className={`gap-4 rounded-carte border-[1.5px] p-5 ${SURFACE[score.niveau]}`}
       accessible
-      accessibilityRole="summary"
+      accessibilityRole="text"
       accessibilityLabel={`${etiquette}. ${titre} ${TEXTES.atsVerdictSous}`}
     >
-      <HStack className="items-center justify-between gap-3">
-        <HStack className="items-center gap-1.5">
+      <HStack className="flex-wrap items-center justify-between gap-2">
+        <HStack className="max-w-full items-center gap-1.5">
           <Icone nom="bouclier" couleur={couleur} taille={13} graisse="bold" />
-          <Texte className="text-caption font-bold uppercase tracking-wide text-muted-foreground">
+          <Texte className="shrink text-caption font-bold uppercase tracking-wide text-muted-foreground">
             {TEXTES.atsVerdictSur}
           </Texte>
         </HStack>
         <HStack
-          className="items-center gap-1.5 rounded-full px-2.5 py-1"
-          style={{ backgroundColor: couleur }}
+          className={`max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 ${BADGE[score.niveau]}`}
         >
           <Icone
             nom={score.niveau === "bon" ? "coche" : "eclair"}
-            couleur="#ffffff"
+            couleur={couleur}
             taille={11}
             graisse="bold"
           />
-          <Texte className="text-caption font-bold text-on-scrim">{etiquette}</Texte>
+          <Texte className="shrink text-caption font-bold text-foreground">
+            {etiquette}
+          </Texte>
         </HStack>
       </HStack>
 
-      <HStack className="items-center gap-5">
-        <Box
-          style={{ width: TAILLE, height: TAILLE }}
-          className="items-center justify-center"
-        >
-          <Anneau score={score.score} couleur={couleur} rail={CONTOUR[mode]} />
-          <HStack className="items-baseline">
+      <View
+        className={empiler ? "flex-col items-start gap-3" : "flex-row items-center gap-4"}
+      >
+        <Box className="h-[124px] w-[124px] shrink-0 items-center justify-center">
+          <Box
+            className="absolute inset-0 items-center justify-center"
+            pointerEvents="none"
+          >
+            <Anneau score={score.score} couleur={couleur} rail={CONTOUR[mode]} />
+          </Box>
+          <HStack
+            accessible={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            className="items-baseline"
+          >
             <Texte
+              allowFontScaling={false}
               className={`font-display text-hero tracking-tight ${TEXTE[score.niveau]}`}
             >
               {score.score}
             </Texte>
-            <Texte className={`font-display text-title-sm ${TEXTE[score.niveau]}`}>
+            <Texte
+              allowFontScaling={false}
+              className={`font-display text-title-sm ${TEXTE[score.niveau]}`}
+            >
               %
             </Texte>
           </HStack>
         </Box>
-        <VStack className="flex-1 gap-1.5">
-          <Texte className="font-display text-title-sm leading-6 tracking-tight text-foreground">
+        <VStack className={empiler ? "w-full" : "min-w-0 flex-1"}>
+          <Texte className="font-display text-title-sm tracking-tight text-foreground">
             {titre}
           </Texte>
         </VStack>
-      </HStack>
+      </View>
 
-      <Texte className="text-caption leading-4 text-muted-foreground">
+      <Texte className="text-footnote text-muted-foreground">
         {TEXTES.atsVerdictSous}
       </Texte>
     </VStack>

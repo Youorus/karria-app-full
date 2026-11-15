@@ -1,22 +1,6 @@
 /**
- * La pastille du modèle — le geste « changer de modèle », toujours au même endroit.
- *
- * ═══ Pourquoi une pastille sur la feuille, pas un mot dans l'en-tête ═══
- *
- * L'en-tête de l'atelier porte déjà l'entreprise et le poste (le contexte
- * du dossier) ; y glisser le modèle en ferait un troisième texte gris que
- * personne ne devinerait touchable. La pastille, elle, est posée **sur la
- * feuille**, en haut à gauche, là où la mise en page se voit — et à la
- * même place dans l'atelier d'un dossier, l'atelier libre et la lettre :
- * un seul endroit à apprendre. Elle dit le nom du modèle et « Changer »,
- * pour que le geste soit lu comme un geste, pas comme une étiquette.
- *
- * Même matière que les autres pastilles de la feuille (« 2 pages ») et que
- * la barre des gestes : une capsule au ton de l'écran, une icône, un mot ;
- * rien de bleu — la seule action bleue de l'écran reste « Finaliser ».
- *
- * Sans modèle encore connu (la galerie n'a pas répondu) : « Choisir un
- * modèle », même geste.
+ * Le modèle courant et un verbe explicite : la commande vit à côté de
+ * la couleur sans cacher une partie du document.
  */
 
 import { Pressable } from "react-native";
@@ -39,8 +23,7 @@ export function PastilleModele({ libelle, onPress }: Props) {
   return (
     <Pressable
       onPress={onPress}
-      hitSlop={6}
-      className="h-9 flex-row items-center rounded-full border border-border-subtle bg-card pl-2.5 pr-3 shadow-sm active:opacity-80"
+      className="min-h-touch max-w-full flex-row items-center rounded-carte border border-border-subtle bg-card px-3 py-2 active:opacity-80"
       accessibilityRole="button"
       accessibilityLabel={
         libelle === null
@@ -51,20 +34,9 @@ export function PastilleModele({ libelle, onPress }: Props) {
     >
       <HStack className="items-center gap-1.5">
         <Icone nom="modeles" couleur={couleurs.texte} taille={13} graisse="medium" />
-        {libelle === null ? (
-          <Texte className="font-bold text-footnote text-foreground" numberOfLines={1}>
-            {TEXTES.modeleChoisir}
-          </Texte>
-        ) : (
-          <>
-            <Texte className="font-bold text-footnote text-foreground" numberOfLines={1}>
-              {libelle}
-            </Texte>
-            <Texte className="text-footnote text-muted-foreground" numberOfLines={1}>
-              · {TEXTES.modeleChanger}
-            </Texte>
-          </>
-        )}
+        <Texte className="shrink font-bold text-footnote text-foreground">
+          {libelle === null ? TEXTES.modeleChoisir : `Changer de modèle · ${libelle}`}
+        </Texte>
       </HStack>
     </Pressable>
   );

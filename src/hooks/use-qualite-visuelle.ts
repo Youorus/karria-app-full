@@ -22,7 +22,7 @@
 import * as Device from "expo-device";
 import { useIsFocused } from "expo-router";
 import { useEffect, useState } from "react";
-import { AppState, PixelRatio, Platform } from "react-native";
+import { AccessibilityInfo, AppState, PixelRatio, Platform } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
 
 import { palierVisuel, type PalierVisuel } from "./qualite-visuelle";
@@ -47,17 +47,37 @@ export function useQualiteVisuelle(): PalierVisuel {
 /**
  * Vrai quand un effet continu a le droit de tourner : écran au premier
  * plan, application active, et aucun réglage de mouvement réduit.
- * À appeler depuis un écran (il lit la navigation).
+ * Un panneau qui partage sa route avec un écran peut aussi être masqué.
  */
-export function useAnimationActive(): boolean {
-  const reduit = useReducedMotion();
+export function useAnimationActive(visible: boolean): boolean {
+  const [reduit, setReduit] = useState(useReducedMotion());
   const auPremierPlan = useIsFocused();
   const [appActive, setAppActive] = useState(AppState.currentState === "active");
   useEffect(() => {
-    const abonnement = AppState.addEventListener("change", (etat) =>
+    const cycle = AppState.addEventListener("change", (etat) =>
       setAppActive(etat === "active"),
     );
-    return () => abonnement.remove();
+    // Reanimated lit le réglage au lancement. L'événement natif permet
+    // de le respecter tant que l'application reste ouverte.
+    let lectureValide = true;
+    const mouvement = AccessibilityInfo.addEventListener(
+      "reduceMotionChanged",
+      (valeur) => {
+        lectureValide = false;
+        setReduit(valeur);
+      },
+    );
+    void AccessibilityInfo.isReduceMotionEnabled().then(
+      (valeur) => {
+        if (lectureValide) setReduit(valeur);
+      },
+      () => {},
+    );
+    return () => {
+      lectureValide = false;
+      mouvement.remove();
+      cycle.remove();
+    };
   }, []);
-  return !reduit && auPremierPlan && appActive;
+  return visible && !reduit && auPremierPlan && appActive;
 }

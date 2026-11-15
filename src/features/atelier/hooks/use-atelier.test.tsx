@@ -69,6 +69,7 @@ jest.mock("expo-file-system", () => {
 });
 
 let mockParams: Record<string, string> = {};
+const mockPousser = jest.fn();
 jest.mock("expo-router", () => {
   const { useEffect } = jest.requireActual<typeof import("react")>("react");
   return {
@@ -78,7 +79,7 @@ jest.mock("expo-router", () => {
   };
 });
 jest.mock("@/lib/navigation", () => ({
-  useNavigationUnique: () => ({ pousser: jest.fn(), remplacer: jest.fn() }),
+  useNavigationUnique: () => ({ pousser: mockPousser, remplacer: jest.fn() }),
 }));
 jest.mock("@/features/auth/hooks/use-action-ia", () => ({
   useActionIa: () => ({
@@ -206,6 +207,7 @@ const mockDossier: Dossier = {
   creeLe: "2026-11-05T09:00:00Z",
   modifieLe: "2026-11-05T09:00:00Z",
 };
+const mockModifierCv = jest.fn<(id: string, cv: Cv) => Promise<Dossier>>();
 const mockChangerModele =
   jest.fn<(id: string, modeleId: string | null) => Promise<Dossier>>();
 const mockChangerCouleur =
@@ -216,7 +218,7 @@ jest.mock("@/features/candidatures/api/candidatures.api", () => ({
     mockChangerModele(id, modeleId),
   changerCouleurDuDossier: (id: string, couleur: string | null) =>
     mockChangerCouleur(id, couleur),
-  modifierCvDuDossier: async () => mockDossier,
+  modifierCvDuDossier: (id: string, cv: Cv) => mockModifierCv(id, cv),
   deciderProposition: async () => mockDossier,
   relancerAdaptation: async () => mockDossier,
 }));
@@ -227,6 +229,10 @@ describe("L'atelier : changer de modèle ne perd rien", () => {
   beforeEach(() => {
     mockDisque.clear();
     mockParams = {};
+    mockPousser.mockClear();
+    mockModifierCv
+      .mockReset()
+      .mockImplementation(async (_id, cv) => ({ ...mockDossier, cv }));
     mockRendre.mockReset();
     mockRendre.mockResolvedValue({ html: "<html/>", pages: 1, avertissements: [] });
     mockChangerModele.mockReset();
@@ -293,14 +299,18 @@ describe("L'atelier : changer de modèle ne perd rien", () => {
     act(() => result.current.ouvrir({ type: "couleur" }));
     act(() => result.current.choisirCouleur("#2E7D32", false));
     act(() => result.current.garderCouleur());
-    expect(mockChangerCouleur).toHaveBeenCalledWith("dos_1", "#2E7D32");
+    await waitFor(() =>
+      expect(mockChangerCouleur).toHaveBeenCalledWith("dos_1", "#2E7D32"),
+    );
     await waitFor(() => expect(result.current.dossier?.couleur).toBe("#2E7D32"));
 
     // « Revenir à la couleur d'origine » : null part au dossier.
     act(() => result.current.ouvrir({ type: "couleur" }));
     act(() => result.current.choisirCouleur(null));
     act(() => result.current.garderCouleur());
-    expect(mockChangerCouleur).toHaveBeenLastCalledWith("dos_1", null);
+    await waitFor(() =>
+      expect(mockChangerCouleur).toHaveBeenLastCalledWith("dos_1", null),
+    );
   });
 
   it("libre : `?couleur=` (Mes CV) pose la couleur de l'export, un code invalide est ignoré", async () => {
@@ -321,9 +331,9 @@ describe("L'atelier : changer de modèle ne perd rien", () => {
   it("libre : deux changements laissent le CV retouché, l'historique et le brouillon intacts", async () => {
     const { result } = renderHook(() => useAtelier(true));
     await waitFor(() => expect(result.current.chargement).toBe(false));
-    // Premier modèle gratuit, et la feuille du modèle s'ouvre d'elle-même.
+    // Le premier modèle disponible permet de commencer sans confirmation.
     expect(result.current.modeleId).toBe(LIBRE);
-    expect(result.current.feuille).toEqual({ type: "modele" });
+    expect(result.current.feuille).toBeNull();
 
     act(() => result.current.changerIntitule("Vendeuse senior"));
     const retouche = result.current.cv;
@@ -375,13 +385,13 @@ describe("L'atelier : changer de modèle ne perd rien", () => {
     mockParams = { dossierId: "dos_1" };
     const { result } = renderHook(() => useAtelier(false));
     await waitFor(() => expect(result.current.chargement).toBe(false));
-    expect(result.current.feuille).toEqual({ type: "modele" });
+    expect(result.current.feuille).toBeNull();
     const avant = result.current.cv;
     mockRendre.mockClear();
 
     act(() => result.current.choisirModele(ACHETE));
 
-    expect(mockChangerModele).toHaveBeenCalledWith("dos_1", ACHETE);
+    await waitFor(() => expect(mockChangerModele).toHaveBeenCalledWith("dos_1", ACHETE));
     await waitFor(() => expect(result.current.dossier?.modeleId).toBe(ACHETE));
     expect(result.current.modeleId).toBe(ACHETE);
     expect(result.current.cv).toBe(avant);
@@ -394,6 +404,39 @@ describe("L'atelier : changer de modèle ne perd rien", () => {
 
     act(() => result.current.garderModele());
     expect(result.current.feuille).toBeNull();
+  });
+
+  it("Finaliser attend l’écriture en vol et garde l’atelier ouvert si elle échoue", async () => {
+    mockParams = { dossierId: "dos_1" };
+    let echouer: (cause: Error) => void = () => undefined;
+    mockModifierCv.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          echouer = reject;
+        }),
+    );
+    const { result } = renderHook(() => useAtelier(false));
+    await waitFor(() => expect(result.current.chargement).toBe(false));
+    act(() => result.current.changerIntitule("Vendeuse senior"));
+
+    let ecriture = Promise.resolve();
+    await act(async () => {
+      ecriture = result.current.allerAFinaliser();
+    });
+    await waitFor(() => expect(mockModifierCv).toHaveBeenCalledTimes(1));
+    expect(mockPousser).not.toHaveBeenCalled();
+    await act(async () => {
+      echouer(new Error("Pas de connexion"));
+      await ecriture;
+    });
+    expect(result.current.enregistrement).toBe("erreur");
+    expect(mockPousser).not.toHaveBeenCalled();
+    await act(() => result.current.allerAFinaliser());
+    expect(mockModifierCv).toHaveBeenCalledTimes(2);
+    expect(mockPousser).toHaveBeenCalledWith({
+      pathname: "/atelier/[dossierId]/finaliser",
+      params: { dossierId: "dos_1" },
+    });
   });
 
   it("dossier : un refus `template_locked` remet l'ancien modèle et le dit", async () => {

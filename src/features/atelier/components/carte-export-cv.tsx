@@ -1,31 +1,14 @@
 /**
- * Un CV mis en page, dans « Mes CV » — une feuille, pas une fiche.
- *
- * ═══ L'anatomie ═══
- *
- * À gauche, la vignette du modèle (celle de la galerie : on reconnaît le
- * dessin avant de lire le nom) dans un cadre de feuille ; à droite, le nom
- * du modèle — précédé d'un rond de la couleur principale quand la personne
- * en a posé une (ADR-0034) — et « Créé hier ». Toucher cette partie ouvre
- * l'aperçu. Dessous,
- * les gestes : PDF et Word (les mêmes boutons que Finaliser), puis, à
- * droite, envoyer par e-mail et supprimer — deux ronds au ton de l'écran,
- * 40 pt, nommés pour le lecteur d'écran.
- *
- * Rien d'autre : pas de score, pas d'étiquette. On revient ici pour
- * retrouver **un** CV et l'envoyer ; un CV a déjà été jugé à Finaliser.
- *
- * ═══ Le mouvement ═══
- *
- * L'entrée du fil (fondu en montant, décalée par rang) ; « mouvement
- * réduit » la coupe.
+ * Une carte sert d'abord à retrouver et ouvrir le CV réellement exporté.
+ * Les autres gestes sont dans une feuille nommée, à l'écart de l'ouverture.
  */
 
 import { Image } from "expo-image";
+import { BoutonAction } from "@/components/bouton-action";
 import { Pressable } from "react-native";
 import Animated, { FadeInDown, useReducedMotion } from "react-native-reanimated";
 
-import { Icone, type NomIcone } from "@/components/icone";
+import { Icone } from "@/components/icone";
 import { SymboleKarria } from "@/components/marque";
 import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
@@ -34,11 +17,12 @@ import { VStack } from "@/components/ui/vstack";
 import type { Modele } from "@/features/modeles/types/modeles.types";
 import { useCouleurs } from "@/theme/use-couleurs";
 
+import { useSuiteApresFeuille } from "../hooks/use-suite-apres-feuille";
 import { libelleDuModele, ligneDeCreation, TEXTES_MES_CV } from "../services/mes-cv";
-import { TEXTES } from "../services/presentation";
 import type { Format } from "../services/telechargement";
 import type { Export } from "../types/atelier.types";
-import { BoutonFormat } from "./bouton-format";
+import { FeuilleBasse } from "./feuille-basse";
+import { FormatsExport } from "./formats-export";
 
 const LARGEUR_VIGNETTE = 56;
 const HAUTEUR_VIGNETTE = Math.round(LARGEUR_VIGNETTE / 0.72);
@@ -101,35 +85,6 @@ function Vignette({
   );
 }
 
-function Rond({
-  icone,
-  libelle,
-  onPress,
-  desactive,
-}: {
-  icone: NomIcone;
-  libelle: string;
-  onPress: () => void;
-  desactive: boolean;
-}) {
-  const couleurs = useCouleurs();
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={desactive}
-      hitSlop={4}
-      className={`h-10 w-10 items-center justify-center rounded-full bg-remplissage active:opacity-80 ${
-        desactive ? "opacity-40" : ""
-      }`}
-      accessibilityRole="button"
-      accessibilityLabel={libelle}
-      accessibilityState={{ disabled: desactive }}
-    >
-      <Icone nom={icone} couleur={couleurs.texte} taille={16} graisse="medium" />
-    </Pressable>
-  );
-}
-
 interface Props {
   exporte: Export;
   modele: Modele | null;
@@ -145,8 +100,6 @@ interface Props {
   onTelecharger: (format: Format) => void;
   onEnvoyer: () => void;
   onSupprimer: () => void;
-  /** « Voir avec un autre modèle » : l'atelier libre, la feuille du modèle ouverte. */
-  onAutreModele: () => void;
 }
 
 export function CarteExportCv({
@@ -161,10 +114,10 @@ export function CarteExportCv({
   onTelecharger,
   onEnvoyer,
   onSupprimer,
-  onAutreModele,
 }: Props) {
   const couleurs = useCouleurs();
   const reduit = useReducedMotion();
+  const actions = useSuiteApresFeuille();
   const libelle = libelleDuModele(exporte);
   return (
     <Animated.View
@@ -175,7 +128,7 @@ export function CarteExportCv({
           onPress={onOuvrir}
           className="flex-row items-center gap-3 active:opacity-80"
           accessibilityRole="button"
-          accessibilityLabel={`${TEXTES_MES_CV.ouvrir} le CV, modèle ${libelle}`}
+          accessibilityLabel={`${TEXTES_MES_CV.ouvrir} le CV, modèle ${libelle}. ${ligneDeCreation(exporte, maintenant)}`}
         >
           <Vignette modele={modele} apercu={exporte.apercus[0] ?? null} id={exporte.id} />
           <VStack className="flex-1 gap-0.5">
@@ -187,14 +140,11 @@ export function CarteExportCv({
                   accessibilityLabel={`Couleur ${exporte.couleur}`}
                 />
               ) : null}
-              <Texte
-                className="shrink font-bold text-body text-foreground"
-                numberOfLines={1}
-              >
+              <Texte className="shrink font-bold text-body text-foreground">
                 {libelle}
               </Texte>
             </HStack>
-            <Texte className="text-footnote text-muted-foreground" numberOfLines={1}>
+            <Texte className="text-footnote text-muted-foreground">
               {ligneDeCreation(exporte, maintenant)}
             </Texte>
             {envoyeA !== null ? (
@@ -216,43 +166,40 @@ export function CarteExportCv({
             graisse="semibold"
           />
         </Pressable>
-        <HStack className="items-center gap-2">
-          {exporte.pdf !== null ? (
-            <BoutonFormat
-              format="pdf"
-              enCours={telechargement === "pdf"}
-              desactive={occupe}
-              onPress={() => onTelecharger("pdf")}
-            />
-          ) : null}
-          {exporte.docx !== null ? (
-            <BoutonFormat
-              format="docx"
-              enCours={telechargement === "docx"}
-              desactive={occupe}
-              onPress={() => onTelecharger("docx")}
-            />
-          ) : null}
-          <Box className="flex-1" />
-          <Rond
-            icone="modeles"
-            libelle={TEXTES.autreModele}
-            onPress={onAutreModele}
-            desactive={occupe}
+        <BoutonAction
+          libelle="Actions sur ce CV"
+          ton="discret"
+          multiligne
+          desactive={occupe}
+          enCours={telechargement !== null}
+          libelleEnCours="Téléchargement…"
+          onPress={actions.ouvrir}
+        />
+        <FeuilleBasse
+          visible={actions.visible}
+          titre="Actions sur ce CV"
+          sousTitre={`${libelle} · ${ligneDeCreation(exporte, maintenant)}`}
+          onFermer={actions.fermer}
+          apresFermeture={actions.apresFermeture}
+        >
+          <FormatsExport
+            pdf={exporte.pdf !== null}
+            word={exporte.docx !== null}
+            onTelecharger={(format) => actions.terminer(() => onTelecharger(format))}
           />
-          <Rond
-            icone="lettre"
+          <BoutonAction
             libelle={TEXTES_MES_CV.envoyer}
-            onPress={onEnvoyer}
-            desactive={occupe}
+            ton="secondaire"
+            multiligne
+            onPress={() => actions.terminer(onEnvoyer)}
           />
-          <Rond
-            icone="corbeille"
+          <BoutonAction
             libelle={TEXTES_MES_CV.supprimer}
-            onPress={onSupprimer}
-            desactive={occupe}
+            ton="discret"
+            multiligne
+            onPress={() => actions.terminer(onSupprimer)}
           />
-        </HStack>
+        </FeuilleBasse>
       </VStack>
     </Animated.View>
   );

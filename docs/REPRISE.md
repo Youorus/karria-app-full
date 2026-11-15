@@ -3,7 +3,38 @@
 > Document de passation. À lire en premier par toute personne ou IA qui
 > reprend le travail, avec `AGENTS.md`. Mis à jour à chaque fin de session.
 
-**Dernière mise à jour : 2026-11-06**
+**Dernière mise à jour : 2026-11-15**
+
+## 2026-11-15 — finitions de l’atelier et contrôle de l’export
+
+- « Mes CV » ferme sa feuille d’actions avant de présenter le partage, l’envoi ou la confirmation de suppression. « Finaliser » fait de même pour le choix du format. La question « As-tu candidaté ? » attend la fermeture après l’envoi. Elle ne suit plus un partage annulé sur iOS.
+- Le bouton principal et « Finaliser » passent à un bleu qui donne un contraste de 4,75:1 avec le blanc. Le conteneur de l’aperçu HTML ne porte plus un libellé unique qui regroupe le document pour le lecteur d’écran.
+- Sur iOS 26.5, les actions de « Mes CV » ouvrent l’envoi, le partage et la confirmation de suppression. Suppression annulée durant l’essai. Sur Android 16, la feuille PDF/Word et le partage PDF système ont été vus en simulation. TalkBack a été activé sur l’atelier pour un essai de navigation. La recette complète avec annonce et retour du focus reste à faire, notamment sous VoiceOver.
+- Sur Android 16, le sélecteur système a transmis un PDF fictif. Après la lecture simulée, « Vérifier mes coordonnées » a ouvert directement le formulaire des coordonnées.
+- `npm run check` vert avec 669 tests et `npm run bundle:check` vert. `make check` côté API a validé 3 892 tests sur PostgreSQL local. Vingt-deux essais couvrant MinIO ou des services externes sont restés ignorés.
+- Côté API, un CV fictif long a révélé une marge supprimée par Chromium à la coupure du PDF. Le moteur utilise maintenant un espace qui se conserve à l’impression. Le test Chromium vérifie le titre et son contenu sur la page 2. Le DOCX fictif s’ouvre aussi dans LibreOffice.
+
+## 2026-11-15 — vérification mobile et optimisation de l’aura
+
+- L’aura s’arrête quand le fond est masqué, quand l’écran perd le focus et quand l’app passe en arrière-plan. Le fil des offres et le panneau de Karria se passent la main. Le mouvement réduit s’applique en cours de session.
+- Au repos, les trois nappes visibles dérivent sans animer l’opacité ni l’échelle du groupe plein écran. Ce mouvement d’ensemble signale la dictée ou le travail de Karria sur les appareils du palier haut. Au palier bas, le fond reste fixe.
+- Les essais en simulation couvrent iOS 18.4 et 26.5 ainsi qu’Android 14 et 16. Les résultats par version figurent dans le [compte rendu de l’audit](AUDIT-UX-ATELIER.md#après-limplémentation).
+- Deux captures de Mon CV sur iOS 18.4, prises à trois secondes d’intervalle, confirment que le fond visible bouge encore. Sur Android 16 avec rendu logiciel, les deux essais de défilement ont une médiane de 150 ms par image et plus de 98 % d’images hors délai. Les blocages du système et l’absence de variation visible du fond sur cet émulateur rendent la comparaison inexploitable. Instruments ne prend pas en charge « Animation Hitches » sur le simulateur iOS. Le coût de l’aura reste à mesurer sur téléphone, notamment sur Android d’entrée de gamme.
+- `npm run check` a validé 92 suites et 668 tests, dont deux tests de régression de l’aura. `npm run bundle:check` a produit le paquet iOS avec l’optimisation.
+
+## 2026-11-14 — corrections UX de l’atelier CV appliquées
+
+- Le CV rempli propose **Mettre en page mon CV** ; l’import donne un accès direct aux coordonnées, le brouillon de création nomme son chapitre de reprise et les listes indiquent qu’elles s’enregistrent automatiquement.
+- L’atelier laisse le papier libre : modèle et couleur au-dessus, réglages de contenu derrière « Modifier le CV », annulation et rétablissement annoncés, deux pages toujours autorisées. Le modèle par défaut ne demande plus de confirmation. La lettre s’ajoute depuis Finaliser ou depuis le détail du dossier.
+- Le CV, le modèle, la couleur et la lettre attendent leur écriture avant un export. En cas d’échec, on peut réessayer sans exporter l’ancienne version. Finaliser donne la priorité à l’envoi, annonce les pièces jointes et distingue PDF et Word. Mes CV regroupe les actions ; Dossiers montre les images de l’export si le serveur les fournit, avec repli sur le lecteur.
+- Sur iPhone 17 en simulation : offre → atelier → Finaliser → confirmation d’envoi en **4 touchers** (hors premier accord IA), et retour sans lettre exercé. Lettre de test générée et affichée ; aperçu de l’atelier et verdict ATS revus en grand texte. [Avant/après en grand texte](/Users/marc./.codex/visualizations/2026/11/14/01a1d81c-5057-7441-9137-9ec5b5a45ae6/atelier-audit/apres/ios/avant-apres-grand-texte.png). `npm run check` vert, 91 suites et 666 tests ; `npm run bundle:check` vert sur la version finale.
+- Code et contrats de l’API inchangés. Le renommage d’exports et la conservation de leur CV source restent à décider séparément. Restent à vérifier : matrice exhaustive Android et iOS, VoiceOver/TalkBack, achat Premium, import et exports réels, mesures du zoom et du temps de rendu.
+
+## 2026-11-14 — audit UX de l’atelier CV et plan à valider
+
+- [Audit et plan](AUDIT-UX-ATELIER.md) : inventaire du parcours, constats par écran, captures de référence et proposition de premier lot. Sur iPhone 17 en simulation : six touchers d’une offre à l’envoi, dont la confirmation du modèle déjà appliqué et « Plus tard » pour la lettre. À la taille maximale iOS, la barre de l’atelier est rognée et le verdict ATS déborde.
+- Vu en simulation : CV fictif rempli, création (première question), édition Expériences, galerie, atelier libre et adapté, passage de la lettre, Finaliser, envoi simulé, Mes CV, lecteur PDF fictif et dossiers. `npm run check` : 665 tests ; `npm run bundle:check` : vert.
+- Reste : matrice clair/sombre, Android (bundle servi en IPv4, démarrage du Pixel 8 à terminer), VoiceOver et TalkBack en navigation réelle, et les états manquants recensés dans l’audit. Aucun changement d’interface ou de contrat. Valider le premier lot P0/P1 avec Marc avant tout code.
 
 ## 2026-11-13, 22 h — mise à jour obligatoire pour toute version en retard
 

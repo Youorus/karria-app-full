@@ -42,12 +42,12 @@ export function CarteOptimisation({ gain, enCours, onOptimiser }: Props) {
     <VStack className="gap-4 rounded-carte border-[1.5px] border-primary bg-surface-primary p-5">
       <HStack className="items-start gap-3">
         <Box className="h-10 w-10 items-center justify-center rounded-full bg-primary">
-          <Icone nom="etincelles" couleur={couleurs.surPrimaire} taille={18} />
+          <Icone nom="bouclier" couleur={couleurs.surPrimaire} taille={18} />
         </Box>
         <VStack className="flex-1 gap-1">
           <Texte
             accessibilityRole="header"
-            className="font-display text-title-sm leading-6 tracking-tight text-foreground"
+            className="font-display text-title-sm tracking-tight text-foreground"
           >
             {TEXTES.optimiserTitre}
           </Texte>
@@ -58,16 +58,12 @@ export function CarteOptimisation({ gain, enCours, onOptimiser }: Props) {
       </HStack>
       <BoutonAction
         libelle={TEXTES.optimiserBouton}
-        ton="principal"
+        ton="secondaire"
+        multiligne
         enCours={enCours}
         libelleEnCours="Karria optimise…"
         iconeFin={
-          <Icone
-            nom="suivant"
-            couleur={couleurs.surPrimaire}
-            taille={13}
-            graisse="bold"
-          />
+          <Icone nom="suivant" couleur={couleurs.texte} taille={13} graisse="bold" />
         }
         onPress={onOptimiser}
       />

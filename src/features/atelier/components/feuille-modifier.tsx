@@ -18,6 +18,7 @@
 
 import { Pressable } from "react-native";
 
+import { BoutonAction } from "@/components/bouton-action";
 import { Icone } from "@/components/icone";
 import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
@@ -161,6 +162,8 @@ interface Props {
   onSection: Parameters<typeof useEditionElement>[3];
   onElement: Parameters<typeof useEditionElement>[4];
   onChoisirCible: (c: Cible) => void;
+  onModifierTitre: () => void;
+  onOrganiser: () => void;
   onDecider: (p: Proposition, d: Decision) => void;
   onFermer: () => void;
 }
@@ -178,6 +181,8 @@ export function FeuilleModifier({
   onSection,
   onElement,
   onChoisirCible,
+  onModifierTitre,
+  onOrganiser,
   onDecider,
   onFermer,
 }: Props) {
@@ -202,7 +207,21 @@ export function FeuilleModifier({
       }
     >
       {sansCible && cv !== null ? (
-        <ListeDesSections cv={cv} onChoisir={onChoisirCible} />
+        <>
+          <BoutonAction
+            libelle="Changer le titre du CV"
+            ton="secondaire"
+            multiligne
+            onPress={onModifierTitre}
+          />
+          <BoutonAction
+            libelle="Réordonner ou masquer des éléments"
+            ton="secondaire"
+            multiligne
+            onPress={onOrganiser}
+          />
+          <ListeDesSections cv={cv} onChoisir={onChoisirCible} />
+        </>
       ) : (
         <>
           {edition.propositions.length > 0 ? (

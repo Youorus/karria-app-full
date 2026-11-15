@@ -76,7 +76,7 @@ function Page({
 }
 
 interface Props {
-  reprendre: boolean;
+  chapitreAReprendre: string | null;
   onCreer: () => void;
   onImporter: (source: SourceImport) => void;
 }
@@ -87,12 +87,13 @@ const SOURCES: {
   libelle: string;
   icone: "camera" | "importer" | "galerie";
 }[] = [
-  { source: "camera", libelle: "Photographier", icone: "camera" },
   { source: "fichier", libelle: "PDF ou Word", icone: "importer" },
+  { source: "camera", libelle: "Photographier", icone: "camera" },
   { source: "galerie", libelle: "Mes photos", icone: "galerie" },
 ];
 
-export function InvitationCv({ reprendre, onCreer, onImporter }: Props) {
+export function InvitationCv({ chapitreAReprendre, onCreer, onImporter }: Props) {
+  const reprendre = chapitreAReprendre !== null;
   const couleurs = useCouleurs();
   const reduit = useReducedMotion();
   const temps = useSharedValue(0);
@@ -123,8 +124,8 @@ export function InvitationCv({ reprendre, onCreer, onImporter }: Props) {
           </Texte>
           <Texte className="text-center text-body leading-6 text-muted-foreground">
             {reprendre
-              ? "Tout ce que tu m'as dit est gardé. On continue là où on s'était arrêtés."
-              : "Importe ou photographie ton CV actuel : j'en fais un CV compatible ATS, sur les modèles Karria. Plus rapide que de répondre à mes questions."}
+              ? "Tes réponses sont gardées. Tu peux reprendre là où tu t’es arrêté."
+              : "Ajoute ton CV actuel. Karria en récupère le contenu pour que tu puisses le relire et le mettre en page."}
           </Texte>
         </VStack>
       </Animated.View>
@@ -135,18 +136,19 @@ export function InvitationCv({ reprendre, onCreer, onImporter }: Props) {
       >
         {reprendre ? (
           <BoutonAction
-            libelle="Reprendre mon CV"
+            libelle={`Reprendre : ${chapitreAReprendre}`}
+            multiligne
             onPress={onCreer}
             icone={<Icone nom="micro" couleur={couleurs.surPrimaire} taille={16} />}
           />
         ) : null}
-        <HStack className="gap-2">
-          {SOURCES.map((s, i) => (
+        <HStack className="flex-wrap gap-2">
+          {SOURCES.map((s) => (
             <Pressable
               key={s.source}
               onPress={() => onImporter(s.source)}
-              className={`min-h-[72px] flex-1 items-center justify-center gap-1.5 rounded-carte px-2 py-3 ${
-                i === 0 && !reprendre
+              className={`min-h-[72px] min-w-24 flex-1 items-center justify-center gap-1.5 rounded-carte px-2 py-3 ${
+                s.source === "fichier" && !reprendre
                   ? "bg-primary"
                   : "border border-border-champ bg-card"
               }`}
@@ -155,12 +157,18 @@ export function InvitationCv({ reprendre, onCreer, onImporter }: Props) {
             >
               <Icone
                 nom={s.icone}
-                couleur={i === 0 && !reprendre ? couleurs.surPrimaire : couleurs.texte}
+                couleur={
+                  s.source === "fichier" && !reprendre
+                    ? couleurs.surPrimaire
+                    : couleurs.texte
+                }
                 taille={18}
               />
               <Texte
                 className={`text-center font-bold text-footnote ${
-                  i === 0 && !reprendre ? "text-primary-foreground" : "text-foreground"
+                  s.source === "fichier" && !reprendre
+                    ? "text-primary-foreground"
+                    : "text-foreground"
                 }`}
               >
                 {s.libelle}

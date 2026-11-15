@@ -34,6 +34,7 @@ import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 
+import { memoriserApercu } from "@/features/atelier/services/apercus";
 import { useOuvrirLecteur } from "@/features/atelier/hooks/use-ouvrir-lecteur";
 import { lireOffre } from "@/features/offres/api/offres.api";
 import { ErreurApi } from "@/lib/http";
@@ -84,6 +85,7 @@ export interface EcranDossier {
   ouvrirDocument: (document: DocumentDuDossier) => void;
   ouvrirExport: (exporte: ExportDossier) => void;
   ouvrirAtelier: () => void;
+  ouvrirLettre: () => void;
   supprimer: () => void;
   recharger: () => void;
   retour: () => void;
@@ -242,20 +244,35 @@ export function useDossier(): EcranDossier {
   const ouvrirExport = useCallback(
     (exporte: ExportDossier) => {
       const lien = exporte.pdf ?? exporte.docx;
-      if (lien === null || dossier === null) return;
+      if (dossier === null) return;
       const nom =
         `${dossier.cv.identite?.prenom ?? ""} ${dossier.cv.identite?.nom ?? ""}`.trim();
+      const complement = exporte.genre === "cv" ? nom || null : dossier.offre.entreprise;
+      const apercu = memoriserApercu({
+        id: exporte.id,
+        genre: exporte.genre,
+        titre: exporte.genre === "cv" ? "CV adapté" : "Lettre de motivation",
+        pages: exporte.apercus,
+        pdf: exporte.pdf,
+        modele: exporte.modele,
+        complement,
+        retour: TEXTES.retourDossier,
+      });
+      if (apercu !== null) {
+        pousser({ pathname: "/apercu-export", params: { id: apercu } });
+        return;
+      }
+      if (lien === null) return;
       ouvrirLecteur({
         id: exporte.id,
         url: lien,
         genre: exporte.genre,
-        complement:
-          exporte.genre === "cv" ? (nom === "" ? null : nom) : dossier.offre.entreprise,
+        complement,
         modele: exporte.modele,
         retour: TEXTES.retourDossier,
       });
     },
-    [dossier, ouvrirLecteur],
+    [dossier, ouvrirLecteur, pousser],
   );
 
   const ouvrirOffre = useCallback(() => {
@@ -313,6 +330,14 @@ export function useDossier(): EcranDossier {
     ouvrirExport,
     // La route de l'atelier est créée par l'atelier lui-même : le chemin est
     // écrit, pas typé — expo-router ne le connaît pas encore.
+    ouvrirLettre: useCallback(
+      () =>
+        pousser({
+          pathname: "/atelier/[dossierId]/lettre",
+          params: { dossierId: id, retour: "dossier" },
+        }),
+      [id, pousser],
+    ),
     ouvrirAtelier: useCallback(() => pousser(`/atelier/${id}` as Chemin), [pousser, id]),
     supprimer,
     recharger: useCallback(() => {

@@ -7,7 +7,7 @@
  * question après question.
  */
 
-import { ScrollView } from "react-native";
+import { ScrollView, useWindowDimensions } from "react-native";
 import Animated, { ZoomIn, useReducedMotion } from "react-native-reanimated";
 
 import { Icone } from "@/components/icone";
@@ -21,6 +21,7 @@ import type { Jet } from "../types/cv.types";
 export function MiniCv({ valides }: { valides: Jet[] }) {
   const couleurs = useCouleurs();
   const reduit = useReducedMotion();
+  const { fontScale } = useWindowDimensions();
   if (valides.length === 0) return null;
 
   return (
@@ -35,13 +36,16 @@ export function MiniCv({ valides }: { valides: Jet[] }) {
           key={`${jet.chapitre}-${i}`}
           entering={reduit ? undefined : ZoomIn.springify().damping(14)}
         >
-          <HStack className="max-w-[220px] items-center gap-1.5 rounded-full border border-border-subtle bg-verre py-1.5 pl-2 pr-3">
+          <HStack className="max-w-[240px] items-center gap-1.5 rounded-carte border border-border-subtle bg-verre px-3 py-2">
             <Icone
               nom={DEFINITIONS[jet.chapitre].icone}
               couleur={couleurs.primaire}
               taille={13}
             />
-            <Texte className="font-medium text-caption text-foreground" numberOfLines={1}>
+            <Texte
+              className="shrink font-medium text-footnote text-foreground"
+              numberOfLines={fontScale > 1.4 ? 3 : 2}
+            >
               {resumeDuJet(jet)}
             </Texte>
           </HStack>

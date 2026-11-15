@@ -74,7 +74,9 @@ function LigneExport({
       className="min-h-touch flex-row items-center gap-3 py-2"
       accessibilityRole="button"
       accessibilityLabel={`${exporte.genre === "cv" ? "CV" : "Lettre"} exporté ${quand ?? ""}, ${formats}`}
-      accessibilityHint="Ouvre le fichier"
+      accessibilityHint={
+        exporte.apercus.length > 0 ? "Affiche l’aperçu du PDF" : "Ouvre le fichier"
+      }
     >
       <Icone
         nom={exporte.genre === "cv" ? "cv" : "lettre"}
@@ -118,6 +120,7 @@ export function EcranDossier() {
     ouvrirDocument,
     ouvrirExport,
     ouvrirAtelier,
+    ouvrirLettre,
     supprimer,
     recharger,
     retour,
@@ -200,7 +203,7 @@ export function EcranDossier() {
                         ? "Quelques secondes"
                         : dossier.adaptation === "echouee"
                           ? "Relancer dans l'atelier"
-                          : "Lire le CV adapté"
+                          : "Lire le contenu du CV"
                     }
                     onPress={() =>
                       dossier.adaptation === "faite"
@@ -217,12 +220,10 @@ export function EcranDossier() {
                     }
                     lignes={apercuLettre}
                     action={
-                      dossier.lettre === null
-                        ? "L'écrire dans l'atelier"
-                        : "Lire la lettre"
+                      dossier.lettre === null ? "Ajouter une lettre" : "Lire la lettre"
                     }
                     onPress={() =>
-                      dossier.lettre === null ? ouvrirAtelier() : ouvrirDocument("lettre")
+                      dossier.lettre === null ? ouvrirLettre() : ouvrirDocument("lettre")
                     }
                   />
                 </HStack>
@@ -318,7 +319,8 @@ export function EcranDossier() {
 
             <PiedAction flottant>
               <BoutonAction
-                libelle={TEXTES.continuerAtelier}
+                libelle="Reprendre le dossier"
+                multiligne
                 ton="principal"
                 onPress={ouvrirAtelier}
                 iconeFin={

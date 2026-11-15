@@ -33,7 +33,7 @@ export function BoutonFormat({
     <Pressable
       onPress={onPress}
       disabled={desactive}
-      className={`h-10 flex-row items-center gap-1.5 rounded-full border-[1.5px] border-border-champ px-3.5 ${
+      className={`min-h-touch flex-row items-center gap-1.5 rounded-full border-[1.5px] border-border-champ px-3.5 ${
         desactive ? "opacity-40" : ""
       }`}
       accessibilityRole="button"

@@ -30,6 +30,7 @@ export interface EcranImportCv {
   /** Le libellé de ce qui part, pendant la lecture (« 2 pages photographiées »). */
   fermer: () => void;
   voirMonCv: () => void;
+  verifierCoordonnees: () => void;
   reessayer: () => void;
   changerDeSource: (source: SourceImport) => void;
   creerDeZero: () => void;
@@ -74,6 +75,11 @@ export function useEcranImportCv(): EcranImportCv {
     annonce,
     fermer,
     voirMonCv: fermer,
+    verifierCoordonnees: () =>
+      router.replace({
+        pathname: "/cv/modifier/[section]",
+        params: { section: "contact" },
+      }),
     reessayer: importation.reessayer,
     changerDeSource: importation.demarrer,
     creerDeZero: () => router.replace("/cv/creer"),

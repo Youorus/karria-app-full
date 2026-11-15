@@ -3,8 +3,8 @@
  *
  * ═══ Un rond de la couleur, un mot ═══
  *
- * Même capsule que la pastille du modèle, posée juste à sa droite sur la
- * feuille : un rond de la couleur **réelle** du décor du CV (celle qu'on a
+ * Même commande que la pastille du modèle, dans la rangée hors du
+ * papier : un rond de la couleur **réelle** du décor du CV (celle qu'on a
  * posée, sinon celle du modèle — ses bandes, filets et puces, pas son texte)
  * et le mot « Couleur ». Le rond dit l'état, le mot dit le geste ; ni l'un ni
  * l'autre n'a besoin d'une étiquette.
@@ -18,7 +18,6 @@ import { Pressable } from "react-native";
 import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
-import { useCouleurs } from "@/theme/use-couleurs";
 
 import { TEXTES } from "../services/presentation";
 
@@ -31,26 +30,20 @@ interface Props {
 }
 
 export function PastilleCouleur({ couleur, posee, onPress }: Props) {
-  const couleurs = useCouleurs();
   return (
     <Pressable
       onPress={onPress}
-      hitSlop={6}
-      className="h-9 flex-row items-center rounded-full border border-border-subtle bg-card pl-2.5 pr-3 shadow-sm active:opacity-80"
+      className="min-h-touch max-w-full flex-row items-center rounded-carte border border-border-subtle bg-card px-3 py-2 active:opacity-80"
       accessibilityRole="button"
       accessibilityLabel={`${TEXTES.couleur} du CV${posee ? ", choisie" : ", d'origine"}. ${TEXTES.modeleChanger}`}
       testID="pastille-couleur"
     >
       <HStack className="items-center gap-2">
         <Box
-          className="h-3.5 w-3.5 rounded-full"
-          style={
-            couleur === null
-              ? { borderWidth: 1.5, borderColor: couleurs.texte }
-              : { backgroundColor: couleur }
-          }
+          className="h-3.5 w-3.5 rounded-full border border-border-champ"
+          style={couleur === null ? undefined : { backgroundColor: couleur }}
         />
-        <Texte className="font-bold text-footnote text-foreground" numberOfLines={1}>
+        <Texte className="shrink font-bold text-footnote text-foreground">
           {TEXTES.couleur}
         </Texte>
       </HStack>

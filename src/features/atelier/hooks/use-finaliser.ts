@@ -72,6 +72,7 @@ import {
   exporterLettre,
   lireModeleChoisi,
 } from "../api/documents.api";
+import { useOuvrirLecteur } from "./use-ouvrir-lecteur";
 import { memoriserApercu } from "../services/apercus";
 import {
   brouillonPrime,
@@ -151,16 +152,19 @@ export interface EcranFinaliser {
   question: boolean;
   fermerQuestion: () => void;
   reessayer: () => void;
+  ouvrirLettre: () => void;
+  retourLibelle: string;
   retour: () => void;
   /** Libre : « Voir mes CV » — la liste, avec la nouvelle entrée. */
   terminer: () => void;
 }
 
 export function useFinaliser(libre = false): EcranFinaliser {
-  const params = useLocalSearchParams<{ dossierId?: string }>();
+  const params = useLocalSearchParams<{ dossierId?: string; origine?: string }>();
   const dossierId = libre ? CLE_BROUILLON_LIBRE : (params.dossierId ?? "");
   const router = useRouter();
   const { pousser } = useNavigationUnique();
+  const ouvrirLecteur = useOuvrirLecteur();
   // L'export porte le score ATS, expliqué par un modèle : le serveur exige
   // l'accord sur l'IA (`403 ai_consent_required`). Sans lui, la feuille
   // s'ouvre et la génération repart après « J'accepte et je continue ».
@@ -305,6 +309,8 @@ export function useFinaliser(libre = false): EcranFinaliser {
   const generer = libre ? genererLibre : genererDossier;
 
   const reessayer = useCallback(() => {
+    setExportCv(null);
+    setExportLettre(null);
     setGeneration(true);
     setErreur(null);
     setTentative((t) => t + 1);
@@ -369,8 +375,8 @@ export function useFinaliser(libre = false): EcranFinaliser {
       );
       void (async () => {
         try {
-          await telechargerEtPartager(url, nom, format);
-          if (vivant.current && !libre) setQuestion(true);
+          const partage = await telechargerEtPartager(url, nom, format);
+          if (partage && vivant.current && !libre) setQuestion(true);
         } catch (cause) {
           console.warn("[karria] téléchargement en échec", cause);
           if (vivant.current)
@@ -483,9 +489,23 @@ export function useFinaliser(libre = false): EcranFinaliser {
         complement: document === "cv" ? nom || null : (dossier?.offre.entreprise ?? null),
         retour: "Finaliser",
       });
-      if (id !== null) pousser({ pathname: "/apercu-export", params: { id } });
+      if (id !== null) {
+        pousser({ pathname: "/apercu-export", params: { id } });
+      } else {
+        const lien = exporte.pdf ?? exporte.docx;
+        if (lien !== null)
+          ouvrirLecteur({
+            id: exporte.id,
+            url: lien,
+            genre: exporte.genre,
+            modele: exporte.modele?.libelle ?? null,
+            complement:
+              document === "cv" ? nom || null : (dossier?.offre.entreprise ?? null),
+            retour: "Finaliser",
+          });
+      }
     },
-    [exportCv, exportLettre, dossier, cvLibre, libre, pousser],
+    [exportCv, exportLettre, dossier, cvLibre, libre, pousser, ouvrirLecteur],
   );
 
   const score = exportCv?.ats ?? null;
@@ -526,6 +546,14 @@ export function useFinaliser(libre = false): EcranFinaliser {
     question,
     fermerQuestion: useCallback(() => setQuestion(false), []),
     reessayer,
+    ouvrirLettre: useCallback(() => {
+      if (!libre)
+        pousser({
+          pathname: "/atelier/[dossierId]/lettre",
+          params: { dossierId, retour: "finaliser" },
+        });
+    }, [dossierId, libre, pousser]),
+    retourLibelle: params.origine === "lettre" ? "Lettre" : "Atelier",
     retour: useCallback(() => {
       if (router.canGoBack()) router.back();
       else if (libre) pousser("/atelier/libre");

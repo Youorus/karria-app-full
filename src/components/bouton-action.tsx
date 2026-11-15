@@ -17,7 +17,7 @@
  *
  * ═══ Trois tons, et un seul appelle au clic ═══
  *
- * `principal` porte l'orange Teranga. Il n'y en a **qu'un par écran** :
+ * `principal` utilise le bleu des actions. Il n'y en a **qu'un par écran** :
  * deux boutons qui appellent au clic, c'est aucun.
  *
  * `secondaire` est un contour : il propose sans insister — « Corriger »,
@@ -56,7 +56,7 @@ import { Texte } from "@/components/texte";
 type Ton = "principal" | "secondaire" | "discret" | "destructif" | "chaleur" | "premium";
 
 const FOND: Record<Ton, string> = {
-  principal: "bg-primary",
+  principal: "bg-action-primary",
   secondaire: "border-[1.5px] border-border-champ bg-card",
   discret: "",
   destructif: "bg-destructive",
@@ -91,6 +91,8 @@ export interface BoutonActionProps extends Omit<PressableProps, "children" | "st
   /** Occupe toute la largeur. Vrai par défaut : sur un téléphone, un
    *  bouton d'action pleine largeur est la cible la plus sûre. */
   pleineLargeur?: boolean;
+  /** Laisse le libellé revenir à la ligne aux grandes tailles système. */
+  multiligne?: boolean;
 }
 
 export function BoutonAction({
@@ -102,6 +104,7 @@ export function BoutonAction({
   icone,
   iconeFin,
   pleineLargeur = true,
+  multiligne = false,
   ...props
 }: BoutonActionProps) {
   const bloque = desactive || enCours;
@@ -111,7 +114,7 @@ export function BoutonAction({
   return (
     <Pressable
       disabled={bloque}
-      className={`h-champ justify-center rounded-full px-6 ${FOND[ton]} ${
+      className={`${multiligne ? "min-h-champ py-3" : "h-champ"} justify-center rounded-full px-6 ${FOND[ton]} ${
         pleineLargeur ? "w-full" : ""
       } ${bloque ? "opacity-50" : ""}`}
       accessibilityRole="button"
@@ -119,13 +122,22 @@ export function BoutonAction({
       accessibilityState={{ disabled: bloque, busy: enCours }}
       {...props}
     >
-      <HStack space="sm" className="items-center justify-center">
-        {enCours ? <Spinner size="small" /> : icone}
-        <Texte className={`font-bold text-callout ${TEXTE[ton]}`} numberOfLines={1}>
+      {multiligne && !enCours && icone == null && iconeFin == null ? (
+        <Texte className={`font-bold text-center text-callout ${TEXTE[ton]}`}>
           {libelleAffiche}
         </Texte>
-        {enCours ? null : iconeFin}
-      </HStack>
+      ) : (
+        <HStack space="sm" className="items-center justify-center">
+          {enCours ? <Spinner size="small" /> : icone}
+          <Texte
+            className={`font-bold text-callout ${multiligne ? "shrink text-center" : ""} ${TEXTE[ton]}`}
+            numberOfLines={multiligne ? undefined : 1}
+          >
+            {libelleAffiche}
+          </Texte>
+          {enCours ? null : iconeFin}
+        </HStack>
+      )}
     </Pressable>
   );
 }

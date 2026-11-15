@@ -101,6 +101,7 @@ export function PanneauAgent({ ouvert, onFermer, onRecherche }: Props) {
   return (
     <Box style={{ flex: 1 }} className="bg-background">
       <Aura
+        visible={ouvert}
         active={active}
         ecoute={dictee.ecoute}
         niveau={dictee.niveau}

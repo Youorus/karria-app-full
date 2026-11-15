@@ -73,7 +73,7 @@ import { FeuilleBasse } from "./feuille-basse";
 
 const PASTILLE = 44;
 const CURSEUR = 32;
-const PISTE = 44;
+const PISTE = 48;
 const PAS = 12;
 /** Quand ni le modèle ni la personne n'ont de couleur : un bleu sobre, pour partir. */
 const TEINTE_DE_DEPART = "#1F3A5F";
@@ -93,7 +93,7 @@ function Pastille({
   return (
     <Pressable
       onPress={onPress}
-      className="items-center gap-1.5"
+      className="min-h-touch items-center gap-1.5"
       style={{ width: PASTILLE + 12 }}
       accessibilityRole="button"
       accessibilityLabel={nom}
@@ -264,6 +264,7 @@ interface Props {
 function Contenu({ couleur, origine, onChoisir, onFermer }: Omit<Props, "visible">) {
   const courante = couleur ?? origine ?? TEINTE_DE_DEPART;
   const [code, setCode] = useState(courante);
+  const [avances, setAvances] = useState(false);
   const [derniere, setDerniere] = useState(courante);
 
   // Le champ suit la couleur quand elle vient d'ailleurs (pastille, curseur) ;
@@ -285,7 +286,7 @@ function Contenu({ couleur, origine, onChoisir, onFermer }: Omit<Props, "visible
       titre={TEXTES.couleurTitre}
       sousTitre={TEXTES.couleurSousTitre}
       onFermer={onFermer}
-      pied={<BoutonAction libelle={TEXTES.couleurGarder} onPress={onFermer} />}
+      pied={<BoutonAction libelle={TEXTES.couleurGarder} multiligne onPress={onFermer} />}
     >
       <ScrollView
         horizontal
@@ -304,32 +305,45 @@ function Contenu({ couleur, origine, onChoisir, onFermer }: Omit<Props, "visible
         ))}
       </ScrollView>
 
-      <VStack className="gap-2">
-        <Texte className="font-bold text-footnote text-foreground">
-          {TEXTES.couleurNuance}
-        </Texte>
-        <CurseurDeNuance
-          couleur={courante}
-          onNuance={(hex, fin) => onChoisir(hex, fin)}
-        />
-      </VStack>
-
-      <ChampTexte
-        libelle={TEXTES.couleurCode}
-        value={code}
-        onChangeText={(t) => {
-          setCode(t);
-          const hex = normaliserCode(t);
-          if (hex !== null) onChoisir(hex);
-        }}
-        erreur={erreurDeCode(code) ?? undefined}
-        aide={TEXTES.couleurCodeAide}
-        autoCapitalize="characters"
-        autoCorrect={false}
-        maxLength={7}
-        returnKeyType="done"
-        testID="champ-code-couleur"
+      <BoutonAction
+        libelle={
+          avances
+            ? "Masquer la nuance et le code couleur"
+            : "Ajuster la nuance ou saisir un code"
+        }
+        ton="discret"
+        multiligne
+        aria-expanded={avances}
+        onPress={() => setAvances((valeur) => !valeur)}
       />
+      {avances ? (
+        <VStack className="gap-2">
+          <Texte className="font-bold text-footnote text-foreground">
+            {TEXTES.couleurNuance}
+          </Texte>
+          <CurseurDeNuance
+            couleur={courante}
+            onNuance={(hex, fin) => onChoisir(hex, fin)}
+          />
+
+          <ChampTexte
+            libelle={TEXTES.couleurCode}
+            value={code}
+            onChangeText={(t) => {
+              setCode(t);
+              const hex = normaliserCode(t);
+              if (hex !== null) onChoisir(hex);
+            }}
+            erreur={erreurDeCode(code) ?? undefined}
+            aide={TEXTES.couleurCodeAide}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={7}
+            returnKeyType="done"
+            testID="champ-code-couleur"
+          />
+        </VStack>
+      ) : null}
 
       {couleur !== null ? (
         <BoutonAction

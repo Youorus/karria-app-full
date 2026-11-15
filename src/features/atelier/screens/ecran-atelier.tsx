@@ -1,33 +1,12 @@
 /**
- * L'atelier — l'écran, c'est le CV.
- *
- * ═══ L'anatomie ═══
- *
- * - en haut : « ‹ Offre », le nom de l'entreprise et le poste en petit,
- *   annuler / rétablir à droite ; l'état d'enregistrement en un mot ;
- * - la note discrète de Karria, si elle a déjà appliqué quelque chose ;
- * - la feuille, pleine largeur, pincer pour zoomer, défiler les pages ;
- *   dessus, en haut à gauche, la **pastille du modèle** (« Meridian ·
- *   Changer ») qui rouvre « Avec quel modèle ? » à tout moment, la **pastille
- *   de la couleur** (un rond de la couleur, « Couleur ») qui ouvre « Quelle
- *   couleur ? », et à droite le nombre de pages ;
- * - la barre basse en capsule : Modifier · Karria · Mise en avant ·
- *   Intitulé · Finaliser.
- *
- * Pendant l'adaptation : l'attente immersive remplace la feuille (orbe,
- * phrase honnête, annonce native), puis la feuille arrive. En échec :
- * « Réessayer » ou « Continuer à la main ».
- *
- * Les feuilles basses sont montées une fois, ouvertes par l'état du hook.
- *
- * En mode **libre** (`/atelier/libre`, « Nouveau CV ») : le même écran sur le
- * CV de base, sans Karria ni note, et « Finaliser » mène droit aux exports.
+ * L'atelier affiche le document tel qu'il sera exporté. Ses commandes
+ * natives sont en dehors du papier, même quand le texte est agrandi.
  */
 
-import { Pressable } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
+import { Pressable, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { BoutonAction } from "@/components/bouton-action";
 import { ChargeurKarria } from "@/components/chargeur-karria";
 import { Icone } from "@/components/icone";
 import { MessageErreur } from "@/components/message-erreur";
@@ -73,8 +52,7 @@ function BoutonRond({
     <Pressable
       onPress={onPress}
       disabled={desactive}
-      hitSlop={6}
-      className={`h-9 w-9 items-center justify-center rounded-full ${desactive ? "opacity-30" : ""}`}
+      className={`h-touch w-touch items-center justify-center rounded-full ${desactive ? "opacity-30" : ""}`}
       accessibilityRole="button"
       accessibilityLabel={libelle}
       accessibilityState={{ disabled: desactive }}
@@ -89,6 +67,7 @@ function BoutonRond({
 export function EcranAtelier({ libre = false }: { libre?: boolean }) {
   const couleurs = useCouleurs();
   const a = useAtelier(libre);
+  const { fontScale } = useWindowDimensions();
   const feuilleModifier = a.feuille?.type === "modifier" ? a.feuille : null;
   const choix = useChoixModele(
     a.feuille?.type === "modele",
@@ -107,7 +86,7 @@ export function EcranAtelier({ libre = false }: { libre?: boolean }) {
   return (
     <Box style={{ flex: 1 }} className="bg-background">
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
-        <HStack className="items-center justify-between px-3 pb-1 pt-1">
+        <HStack key={fontScale} className="items-center justify-between px-3 pb-1 pt-1">
           <Pressable
             onPress={a.retour}
             className="min-h-touch flex-1 flex-row items-center pr-3"
@@ -121,36 +100,15 @@ export function EcranAtelier({ libre = false }: { libre?: boolean }) {
               graisse="semibold"
             />
             <VStack className="flex-1">
-              <Texte
-                className="font-bold text-footnote text-foreground"
-                numberOfLines={1}
-              >
+              <Texte className="font-bold text-footnote text-foreground">
                 {a.dossier?.offre.entreprise ?? TEXTES.nouveauCv}
               </Texte>
-              <Texte className="text-caption text-muted-foreground" numberOfLines={1}>
+              <Texte className="text-caption text-muted-foreground">
                 {a.dossier?.offre.titre ?? TEXTES.nouveauCvSousTitre}
               </Texte>
             </VStack>
           </Pressable>
           <HStack className="items-center gap-1">
-            {a.enregistrement === "fait" ? (
-              <Animated.View entering={FadeIn.duration(200)}>
-                <HStack
-                  className="items-center gap-1 pr-1"
-                  accessibilityLiveRegion="polite"
-                >
-                  <Icone
-                    nom="coche"
-                    couleur={couleurs.succes}
-                    taille={11}
-                    graisse="bold"
-                  />
-                  <Texte className="text-caption text-success">Enregistré</Texte>
-                </HStack>
-              </Animated.View>
-            ) : a.enregistrement === "erreur" ? (
-              <Texte className="pr-1 text-caption text-destructive">Non enregistré</Texte>
-            ) : null}
             <BoutonRond
               icone="retour"
               libelle="Annuler"
@@ -166,6 +124,24 @@ export function EcranAtelier({ libre = false }: { libre?: boolean }) {
             />
           </HStack>
         </HStack>
+
+        {a.retourHistorique !== null ? (
+          <Texte
+            accessibilityLiveRegion="polite"
+            className="px-4 text-footnote text-muted-foreground"
+          >
+            {a.retourHistorique}
+          </Texte>
+        ) : null}
+        {a.enregistrement === "erreur" ? (
+          <Texte
+            accessibilityRole="alert"
+            className="px-4 py-1 text-footnote text-destructive"
+          >
+            Enregistrement impossible. Vérifie ta connexion et touche Finaliser pour
+            réessayer.
+          </Texte>
+        ) : null}
 
         {a.note !== null && !attente ? (
           <NoteKarria
@@ -205,10 +181,49 @@ export function EcranAtelier({ libre = false }: { libre?: boolean }) {
             onContinuer={a.continuerSansKarria}
           />
         ) : (
-          <Box style={{ flex: 1 }}>
+          <Box className="min-h-0 flex-1">
+            <VStack key={fontScale} className="gap-1 px-3 pb-2">
+              <HStack className="flex-wrap items-center gap-2">
+                <PastilleModele
+                  libelle={a.modele?.libelle ?? null}
+                  onPress={() => a.ouvrir({ type: "modele" })}
+                />
+                <PastilleCouleur
+                  couleur={a.couleur ?? a.couleurOrigine}
+                  posee={a.couleur !== null}
+                  onPress={() => a.ouvrir({ type: "couleur" })}
+                />
+              </HStack>
+              {a.erreurRendu !== null ? (
+                <VStack>
+                  <Texte
+                    accessibilityRole="alert"
+                    className="text-footnote text-destructive"
+                  >
+                    {a.erreurRendu}
+                  </Texte>
+                  <BoutonAction
+                    libelle="Réessayer l’aperçu"
+                    ton="secondaire"
+                    multiligne
+                    onPress={a.reessayerRendu}
+                  />
+                </VStack>
+              ) : (
+                <Texte className="text-footnote text-muted-foreground">
+                  Touche un élément du CV pour le modifier.
+                </Texte>
+              )}
+            </VStack>
             {a.html === null ? (
               <Box className="flex-1 items-center justify-center">
-                <ChargeurKarria libelle="Karria met en page…" />
+                <ChargeurKarria
+                  libelle={
+                    a.modeleId === null
+                      ? "Choisis un modèle pour voir ton CV."
+                      : "Karria met en page…"
+                  }
+                />
               </Box>
             ) : (
               <FeuilleCv
@@ -217,30 +232,6 @@ export function EcranAtelier({ libre = false }: { libre?: boolean }) {
                 onToucher={a.toucher}
                 onPages={a.surPages}
               />
-            )}
-            {a.erreurRendu !== null ? (
-              <Box className="absolute left-4 right-4 top-2 rounded-carte bg-card px-4 py-2 shadow-sm">
-                <Texte className="text-center text-footnote text-muted-foreground">
-                  {a.erreurRendu}
-                </Texte>
-              </Box>
-            ) : (
-              <HStack
-                className="absolute left-4 right-4 top-2 items-center justify-between"
-                pointerEvents="box-none"
-              >
-                <HStack className="shrink items-center gap-2">
-                  <PastilleModele
-                    libelle={a.modele?.libelle ?? null}
-                    onPress={() => a.ouvrir({ type: "modele" })}
-                  />
-                  <PastilleCouleur
-                    couleur={a.couleur ?? a.couleurOrigine}
-                    posee={a.couleur !== null}
-                    onPress={() => a.ouvrir({ type: "couleur" })}
-                  />
-                </HStack>
-              </HStack>
             )}
           </Box>
         )}
@@ -251,15 +242,19 @@ export function EcranAtelier({ libre = false }: { libre?: boolean }) {
           enAttente={a.enAttente}
           avecKarria={!a.libre}
           pages={a.erreurRendu === null ? a.pages : 1}
+          sauvegardeEnCours={a.enregistrement === "en-cours"}
+          finalisationIndisponible={
+            a.modeleId === null ||
+            a.html === null ||
+            a.renduEnCours ||
+            a.erreurRendu !== null ||
+            a.decision !== null
+          }
           onPages={() => a.ouvrir({ type: "une-page" })}
           onGeste={(geste) => {
-            // « Finaliser » passe d'abord par la lettre (« Et ta lettre ? »),
-            // qui mène à Finaliser ; on ne saute pas une étape du dossier.
-            // Sans dossier, il n'y a pas de lettre : droit aux exports.
-            if (geste === "finaliser")
-              void (a.libre ? a.allerAFinaliser : a.allerALaLettre)();
+            if (geste === "finaliser") void a.allerAFinaliser();
             else if (geste === "modifier") a.ouvrir({ type: "modifier", cible: null });
-            else a.ouvrir({ type: geste });
+            else a.ouvrir({ type: "karria" });
           }}
         />
       ) : null}
@@ -274,6 +269,8 @@ export function EcranAtelier({ libre = false }: { libre?: boolean }) {
         onSection={a.changerSection}
         onElement={a.changerElement}
         onChoisirCible={(cible) => a.ouvrir({ type: "modifier", cible })}
+        onModifierTitre={() => a.ouvrir({ type: "intitule" })}
+        onOrganiser={() => a.ouvrir({ type: "mise-en-avant" })}
         onDecider={(p, d) => a.decider(p.id, d)}
         onFermer={a.fermer}
       />

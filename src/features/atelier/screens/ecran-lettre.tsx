@@ -10,8 +10,8 @@
  * paragraphe ouvre la feuille basse : je modifie, ou Karria réécrit.
  */
 
-import { Pressable } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
+import { Pressable, ScrollView } from "react-native";
+import Animated, { FadeIn, ReduceMotion } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { BoutonAction } from "@/components/bouton-action";
@@ -20,7 +20,6 @@ import { Icone } from "@/components/icone";
 import { SymboleKarria } from "@/components/marque";
 import { MessageErreur } from "@/components/message-erreur";
 import { OrbeVivante } from "@/components/orbe-vivante";
-import { PiedFlottant } from "@/components/pied-flottant";
 import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
@@ -48,13 +47,13 @@ export function EcranLettre() {
 
   return (
     <Box style={{ flex: 1 }} className="bg-background">
-      <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+      <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
         <HStack className="items-center justify-between px-3 pb-1 pt-1">
           <Pressable
             onPress={l.retour}
             className="min-h-touch flex-1 flex-row items-center pr-3"
             accessibilityRole="button"
-            accessibilityLabel="Retour au CV"
+            accessibilityLabel={l.retourLibelle}
           >
             <Icone
               nom="retour"
@@ -75,7 +74,9 @@ export function EcranLettre() {
             </VStack>
           </Pressable>
           {l.enregistrement === "fait" ? (
-            <Animated.View entering={FadeIn.duration(200)}>
+            <Animated.View
+              entering={FadeIn.duration(200).reduceMotion(ReduceMotion.System)}
+            >
               <HStack
                 className="items-center gap-1 pr-2"
                 accessibilityLiveRegion="polite"
@@ -84,11 +85,17 @@ export function EcranLettre() {
                 <Texte className="text-caption text-success">Enregistré</Texte>
               </HStack>
             </Animated.View>
-          ) : l.enregistrement === "erreur" ? (
-            <Texte className="pr-2 text-caption text-destructive">Non enregistré</Texte>
           ) : null}
         </HStack>
 
+        {l.enregistrement === "erreur" ? (
+          <Texte
+            accessibilityRole="alert"
+            className="px-4 py-1 text-footnote text-destructive"
+          >
+            Lettre non enregistrée. Vérifie ta connexion et réessaie.
+          </Texte>
+        ) : null}
         {l.chargement ? (
           <Box className="flex-1 items-center justify-center">
             <ChargeurKarria />
@@ -102,7 +109,10 @@ export function EcranLettre() {
             />
           </Box>
         ) : l.lettre === null ? (
-          <Box className="flex-1 justify-center gap-8 px-6 pb-8">
+          <ScrollView
+            contentContainerClassName="grow justify-center gap-8 px-6 py-5"
+            showsVerticalScrollIndicator={false}
+          >
             <VStack className="items-center gap-6">
               <OrbeVivante taille={120} active={l.ebauche}>
                 <SymboleKarria taille={44} teinte="reflet" />
@@ -122,38 +132,32 @@ export function EcranLettre() {
             <VStack className="gap-3">
               <BoutonAction
                 libelle={TEXTES.lettreEbaucher}
+                multiligne
                 onPress={l.ecrireAvecKarria}
                 enCours={l.ebauche}
                 libelleEnCours={TEXTES.lettreEbauche}
               />
               <BoutonAction
-                libelle={TEXTES.lettrePasser}
+                libelle={
+                  l.depuisFinaliser ? "Revenir sans lettre" : "Continuer sans lettre"
+                }
+                multiligne
                 ton="discret"
                 onPress={l.passer}
                 desactive={l.ebauche}
               />
             </VStack>
-          </Box>
+          </ScrollView>
         ) : (
-          <Box style={{ flex: 1 }}>
-            {l.html === null ? (
-              <Box className="flex-1 items-center justify-center">
-                <ChargeurKarria libelle="Karria met en page…" />
-              </Box>
-            ) : (
-              <FeuilleCv html={l.html} onPoignee={l.poserFeuille} onToucher={l.toucher} />
-            )}
+          <Box className="min-h-0 flex-1">
             {l.erreurRendu !== null ? (
-              <Box className="absolute left-4 right-4 top-2 rounded-carte bg-card px-4 py-2 shadow-sm">
+              <Box className="mx-3 mb-2 rounded-carte bg-card px-4 py-2">
                 <Texte className="text-center text-footnote text-muted-foreground">
                   {l.erreurRendu}
                 </Texte>
               </Box>
             ) : (
-              <HStack
-                className="absolute left-4 right-4 top-2 items-center gap-2"
-                pointerEvents="box-none"
-              >
+              <HStack className="flex-wrap items-center gap-2 px-3 pb-2">
                 <PastilleModele
                   libelle={l.modele?.libelle ?? null}
                   onPress={l.ouvrirModele}
@@ -166,15 +170,36 @@ export function EcranLettre() {
                 ) : null}
               </HStack>
             )}
+            {l.html === null ? (
+              <Box className="flex-1 items-center justify-center">
+                <ChargeurKarria libelle="Karria met en page…" />
+              </Box>
+            ) : (
+              <FeuilleCv html={l.html} onPoignee={l.poserFeuille} onToucher={l.toucher} />
+            )}
           </Box>
         )}
-      </SafeAreaView>
 
-      {l.lettre !== null && !l.chargement ? (
-        <PiedFlottant aide={l.conseils[0] ?? null}>
-          <BoutonAction libelle="Continuer" onPress={l.continuer} />
-        </PiedFlottant>
-      ) : null}
+        {l.lettre !== null && !l.chargement ? (
+          <VStack className="gap-2 border-t border-border-subtle bg-background px-5 py-3">
+            {l.conseils[0] ? (
+              <Texte className="text-footnote text-muted-foreground">
+                {l.conseils[0]}
+              </Texte>
+            ) : null}
+            <BoutonAction
+              libelle={
+                l.depuisFinaliser ? "Retour aux documents" : "Finaliser les documents"
+              }
+              multiligne
+              onPress={l.continuer}
+              enCours={l.enregistrement === "en-cours"}
+              libelleEnCours="Enregistrement…"
+              desactive={l.reecritureEnCours}
+            />
+          </VStack>
+        ) : null}
+      </SafeAreaView>
 
       <FeuilleParagraphe
         key={

@@ -22,7 +22,6 @@ import { BoutonAction } from "@/components/bouton-action";
 import { ChargeurKarria } from "@/components/chargeur-karria";
 import { EnTeteRetour } from "@/components/en-tete-retour";
 import { MessageErreur } from "@/components/message-erreur";
-import { HAUTEUR_PIED_FLOTTANT, PiedFlottant } from "@/components/pied-flottant";
 import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
 import { VStack } from "@/components/ui/vstack";
@@ -32,7 +31,6 @@ import { CarteAnnonce } from "@/features/publicite/components/carte-annonce";
 
 import { CarteExportCv } from "../components/carte-export-cv";
 import { FeuilleEnvoi } from "../components/feuille-envoi";
-import { useOuvrirAtelierAvecModele } from "../hooks/use-atelier-avec-modele";
 import { useMesCv } from "../hooks/use-mes-cv";
 import { TEXTES_MES_CV } from "../services/mes-cv";
 
@@ -76,11 +74,10 @@ function EtatVide({
 
 export function EcranMesCv() {
   const m = useMesCv();
-  const ouvrirAvecModele = useOuvrirAtelierAvecModele();
 
   return (
     <Box style={{ flex: 1 }} className="bg-background">
-      <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+      <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
         <EnTeteRetour retour={TEXTES_MES_CV.retour} onRetour={m.retour} />
         <VStack className="px-5 pb-3 pt-1">
           <Texte
@@ -126,15 +123,6 @@ export function EcranMesCv() {
                   onTelecharger={(format) => m.telecharger(item.exporte, format)}
                   onEnvoyer={() => m.ouvrirEnvoi(item.exporte)}
                   onSupprimer={() => m.supprimer(item.exporte)}
-                  onAutreModele={() =>
-                    item.exporte.modele !== null &&
-                    ouvrirAvecModele({
-                      modeleId: item.exporte.modele.id,
-                      couleur: item.exporte.couleur,
-                      feuille: "modele",
-                      libre: true,
-                    })
-                  }
                 />
               ) : (
                 <CarteAnnonce annonce={item.annonce} />
@@ -147,18 +135,20 @@ export function EcranMesCv() {
                 onSeConnecter={m.seConnecter}
               />
             }
-            contentContainerClassName="gap-3 px-5 pt-1"
-            contentContainerStyle={{ paddingBottom: HAUTEUR_PIED_FLOTTANT, flexGrow: 1 }}
+            contentContainerClassName="grow gap-3 px-5 pb-5 pt-1"
             showsVerticalScrollIndicator={false}
           />
         )}
+        {!m.chargement && !m.invite ? (
+          <VStack className="border-t border-border-subtle bg-background px-5 py-3">
+            <BoutonAction
+              libelle="Mettre en page mon CV actuel"
+              multiligne
+              onPress={m.nouveau}
+            />
+          </VStack>
+        ) : null}
       </SafeAreaView>
-
-      {!m.chargement && !m.invite ? (
-        <PiedFlottant>
-          <BoutonAction libelle={TEXTES_MES_CV.nouveau} onPress={m.nouveau} />
-        </PiedFlottant>
-      ) : null}
 
       <FeuilleEnvoi
         visible={m.envoi.exporte !== null}

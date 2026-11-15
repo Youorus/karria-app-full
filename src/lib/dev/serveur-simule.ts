@@ -202,7 +202,11 @@ export async function repondreEnSimulation(requete: RequeteSimulee): Promise<Res
   // L'atelier (module `documents` : rendu ancré, exports, envoi, modèle
   // choisi) — **avant** le CV : tout `/cv/me/generated-cvs` (la liste, un
   // export, sa suppression) est à lui, dossiers compris.
-  if (estUneRouteAtelier(methode, chemin)) return repondreAtelier(methode, chemin, corps);
+  if (estUneRouteAtelier(methode, chemin)) {
+    // La confirmation de l'envoi reprend la même adresse que GET /auth/me.
+    const compte = jeton === null ? undefined : etat.sessions.get(jeton);
+    return repondreAtelier(methode, chemin, corps, Date.now(), compte?.email);
+  }
   if (estUneRouteCandidature(chemin)) return repondreCandidatures(methode, chemin, corps);
   if (estUneRouteCv(chemin)) return repondreCv(methode, chemin, corps);
   // La porte de mise à jour : « ok » sauf forçage par l'environnement.

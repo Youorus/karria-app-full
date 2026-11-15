@@ -172,6 +172,7 @@ export interface ExportBrut {
   created_at: string;
   pdf_url?: string | null;
   docx_url?: string | null;
+  preview_urls?: string[] | null;
 }
 
 export interface ListeExportsBrute {
@@ -288,4 +289,5 @@ export interface ExportDossier {
   /** URL signée (1 h), ou `null` si le format n'a pas été demandé. */
   pdf: string | null;
   docx: string | null;
+  apercus: string[];
 }

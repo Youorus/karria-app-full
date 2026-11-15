@@ -9,7 +9,7 @@
  * où écrire un mot.
  */
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Pressable } from "react-native";
 
 import { BoutonAction } from "@/components/bouton-action";
@@ -34,6 +34,7 @@ interface Props {
   erreur: string | null;
   onEnvoyer: (a: string | null) => void;
   onFermer: () => void;
+  apresFermeture?: () => void;
 }
 
 function Choix({
@@ -69,9 +70,7 @@ function Choix({
       <VStack className="flex-1">
         <Texte className="font-bold text-body text-foreground">{libelle}</Texte>
         {detail ? (
-          <Texte className="text-footnote text-muted-foreground" numberOfLines={1}>
-            {detail}
-          </Texte>
+          <Texte className="text-footnote text-muted-foreground">{detail}</Texte>
         ) : null}
       </VStack>
       {actif ? null : <Icone nom="suivant" couleur={couleurs.estompe} taille={14} />}
@@ -79,31 +78,41 @@ function Choix({
   );
 }
 
-function Contenu({
+export function FeuilleEnvoi({
+  visible,
   adresseDuCompte,
   documents,
   enCours,
   erreur,
   onEnvoyer,
   onFermer,
+  apresFermeture,
 }: Props) {
-  const [autre, setAutre] = useState(adresseDuCompte === null);
+  const [autreAdresseDemandee, setAutre] = useState(false);
   const [adresse, setAdresse] = useState("");
+  const autre = autreAdresseDemandee || adresseDuCompte === null;
+  const fermerFormulaire = useCallback(() => {
+    setAutre(false);
+    setAdresse("");
+    apresFermeture?.();
+  }, [apresFermeture]);
   const cible = autre ? adresse.trim() : adresseDuCompte;
   const valide = cible !== null && cible !== "" && emailValide(cible);
 
   return (
     <FeuilleBasse
-      visible
+      visible={visible}
       hauteur="pleine"
       titre={TEXTES.envoyerParEmail}
-      sousTitre={`${documents === 2 ? "Ton CV et ta lettre, en deux pièces jointes" : "Ton CV, en pièce jointe"}, dans un message signé de ton nom.`}
+      sousTitre="Karria prépare le message et le signe de ton nom. Tu choisis l’adresse, le message est déjà rédigé."
       onFermer={onFermer}
+      apresFermeture={fermerFormulaire}
       pied={
         <BoutonAction
           libelle={
             valide && cible !== null ? `Envoyer à ${cible}` : TEXTES.confirmerEnvoi
           }
+          multiligne
           desactive={!valide}
           enCours={enCours}
           libelleEnCours="Envoi…"
@@ -111,6 +120,14 @@ function Contenu({
         />
       }
     >
+      <VStack className="gap-1 rounded-carte border border-border-subtle bg-card px-4 py-3">
+        <Texte accessibilityRole="header" className="font-bold text-body text-foreground">
+          {documents === 2 ? "Pièces jointes" : "Pièce jointe"}
+        </Texte>
+        <Texte className="text-body text-muted-foreground">
+          {documents === 2 ? "Ton CV et ta lettre de motivation" : "Ton CV"}
+        </Texte>
+      </VStack>
       {adresseDuCompte !== null ? (
         <Choix
           actif={!autre}
@@ -157,10 +174,4 @@ function Contenu({
       ) : null}
     </FeuilleBasse>
   );
-}
-
-/** Montée à l'ouverture : le choix part de l'adresse du compte, sans effet. */
-export function FeuilleEnvoi(props: Props) {
-  if (!props.visible) return null;
-  return <Contenu {...props} />;
 }

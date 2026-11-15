@@ -108,7 +108,19 @@ export function EcranImportCv() {
                     formations sont à jour.
                   </Texte>
                 </VStack>
-                <BoutonAction libelle="Voir mon CV" onPress={e.voirMonCv} />
+                <VStack className="gap-2">
+                  <BoutonAction
+                    libelle="Vérifier mes coordonnées"
+                    multiligne
+                    onPress={e.verifierCoordonnees}
+                  />
+                  <BoutonAction
+                    libelle="Voir mon CV"
+                    ton="secondaire"
+                    multiligne
+                    onPress={e.voirMonCv}
+                  />
+                </VStack>
               </VStack>
             </Animated.View>
           ) : null}

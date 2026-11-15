@@ -90,7 +90,7 @@ export function EcranOffres() {
     <Box style={{ flex: 1 }} className="bg-background">
       <RideauAgent ouvert={agentOuvert} onFermer={fermerAgent} onRecherche={surRecherche}>
         <Box style={{ flex: 1 }} className="bg-background">
-          <Aura />
+          <Aura visible={!agentOuvert} />
           <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
             <EnTeteKarria
               titre="Pour toi"

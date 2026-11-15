@@ -203,6 +203,7 @@ export function versExport(b: ExportBrut): ExportDossier {
     creeLe: b.created_at,
     pdf: b.pdf_url ?? null,
     docx: b.docx_url ?? null,
+    apercus: (b.preview_urls ?? []).filter((u) => typeof u === "string"),
   };
 }
 

@@ -156,7 +156,9 @@ export function FeuilleCv({ html, onPoignee, onToucher, onPages, onPret }: Props
       javaScriptEnabled
       domStorageEnabled={false}
       textZoom={100}
-      accessibilityLabel="Ton CV, tel qu'il sera exporté. Touche un élément pour le modifier."
+      // Le contenu HTML fournit ses propres éléments accessibles. Un
+      // libellé sur le conteneur fait de toute la WebView une seule cible.
+      accessible={false}
     />
   );
 }

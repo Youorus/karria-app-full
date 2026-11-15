@@ -133,6 +133,10 @@ import { poserDossierEnCours } from "../services/dossier-en-cours";
 import { cvAvecElement, cvAvecIntitule, cvAvecSection } from "../services/edition";
 import { creerFileDeRendu } from "../services/file-de-rendu";
 import {
+  creerFileDeSauvegarde,
+  type Enregistrement,
+} from "../services/file-de-sauvegarde";
+import {
   annuler as annulerH,
   historiqueDe,
   peutAnnuler,
@@ -152,8 +156,6 @@ import { messageDeRendu, TEXTES } from "../services/presentation";
 
 /** La relecture pendant l'adaptation, comme le contrat le suggère. */
 export const RELECTURE_MS = 2_000;
-/** La sauvegarde différée : une frappe n'est pas une décision. */
-export const DELAI_SAUVEGARDE_MS = 1_500;
 
 export type FeuilleOuverte =
   | { type: "modifier"; cible: Cible | null }
@@ -163,8 +165,6 @@ export type FeuilleOuverte =
   | { type: "intitule" }
   | { type: "modele" }
   | { type: "couleur" };
-
-export type Enregistrement = "repos" | "en-cours" | "fait" | "erreur";
 
 export interface NoteKarria {
   texte: string;
@@ -188,6 +188,7 @@ export interface Atelier {
   pages: number;
   renduEnCours: boolean;
   erreurRendu: string | null;
+  reessayerRendu: () => void;
   avertissements: string[];
   /** La référence de rappel à poser sur `<FeuilleCv ref>` — jamais l'objet
    *  lui-même : un objet de référence rendu par un hook contamine tout ce qui
@@ -200,6 +201,7 @@ export interface Atelier {
   surPages: (pages: number | null) => void;
   cheminChoisi: string | null;
   enregistrement: Enregistrement;
+  retourHistorique: string | null;
   changerSection: (valeur: ValeurSection) => void;
   changerElement: (
     section: "experiences" | "educations",
@@ -243,7 +245,6 @@ export interface Atelier {
     montrer: (rubrique: RubriqueEnListe, cle: string) => void;
     masques: (rubrique: RubriqueEnListe) => ReturnType<typeof elementsMasques>;
   };
-  allerALaLettre: () => Promise<void>;
   allerAFinaliser: () => Promise<void>;
   retour: () => void;
 }
@@ -360,6 +361,7 @@ export function useAtelier(libre = false): Atelier {
   const [feuille, setFeuille] = useState<FeuilleOuverte | null>(null);
   const [cheminChoisi, setCheminChoisi] = useState<string | null>(null);
   const [enregistrement, setEnregistrement] = useState<Enregistrement>("repos");
+  const [retourHistorique, setRetourHistorique] = useState<string | null>(null);
   const [decision, setDecision] = useState<string | null>(null);
   const [note, setNote] = useState<NoteKarria | null>(null);
   const [relance, setRelance] = useState(false);
@@ -373,15 +375,12 @@ export function useAtelier(libre = false): Atelier {
   const couleurOuverte = useRef<string | null>(null);
   const cheminRef = useRef<string | null>(null);
   const vivant = useRef(true);
-  /** Vrai tant que la feuille du modèle doit s'ouvrir d'elle-même (première visite). */
-  const premiereVisite = useRef(false);
   const feuilleDemandee = useRef<FeuilleOuverte | null>(
     feuilleDemandeePar(cibleDemandee),
   );
-  const sauvegarde = useRef<{
-    minuterie: ReturnType<typeof setTimeout> | null;
-    cv: Cv | null;
-  }>({ minuterie: null, cv: null });
+  const passageEnCours = useRef(false);
+  const [sauvegarde] = useState(creerFileDeSauvegarde);
+  const sauverMaintenant = sauvegarde.vider;
 
   const cv = historique?.present ?? null;
 
@@ -413,15 +412,15 @@ export function useAtelier(libre = false): Atelier {
   );
 
   useEffect(() => {
+    const desabonner = sauvegarde.abonner(setEnregistrement);
     vivant.current = true;
     if (!libre) poserDossierEnCours(dossierId);
-    const s = sauvegarde.current;
     return () => {
       vivant.current = false;
       file.arreter();
-      if (s.minuterie !== null) clearTimeout(s.minuterie);
+      desabonner();
     };
-  }, [dossierId, file, libre]);
+  }, [dossierId, file, libre, sauvegarde]);
 
   const rendre = useCallback(
     (immediat: boolean) => {
@@ -449,19 +448,12 @@ export function useAtelier(libre = false): Atelier {
     setNote(noteDe(lu));
   }, []);
 
-  /** Ce qui s'ouvre une fois la feuille prête : ce que l'adresse demande,
-   *  ou le choix du modèle à la première visite. */
-  const ouvrirLaSuite = useCallback((lu: Dossier) => {
+  /** Le modèle déjà appliqué suffit ; seul un choix demandé ou manquant interrompt. */
+  const ouvrirLaSuite = useCallback(() => {
     const demandee = feuilleDemandee.current;
     feuilleDemandee.current = null;
-    if (demandee !== null) {
-      setFeuille(demandee);
-      return;
-    }
-    if (premiereVisite.current && lu.modeleId === null) {
-      premiereVisite.current = false;
-      setFeuille({ type: "modele" });
-    }
+    if (demandee !== null) setFeuille(demandee);
+    else if (modeleRef.current === null) setFeuille({ type: "modele" });
   }, []);
 
   // ── Le brouillon local ─────────────────────────────────────────────────
@@ -482,103 +474,58 @@ export function useAtelier(libre = false): Atelier {
 
   // ── La sauvegarde différée ─────────────────────────────────────────────
 
-  const sauverMaintenant = useCallback(async (): Promise<void> => {
-    if (libre) return;
-    const s = sauvegarde.current;
-    if (s.minuterie !== null) {
-      clearTimeout(s.minuterie);
-      s.minuterie = null;
-    }
-    const aSauver = s.cv;
-    if (aSauver === null) return;
-    s.cv = null;
-    setEnregistrement("en-cours");
-    try {
-      const lu = await modifierCvDuDossier(dossierId, aSauver);
-      if (!vivant.current) return;
-      // Le CV local garde la main ; la couverture et les propositions suivent.
-      poserDossier(lu);
-      setEnregistrement("fait");
-    } catch (cause) {
-      console.warn("[karria] CV du dossier non enregistré", cause);
-      if (!vivant.current) return;
-      if (cause instanceof ErreurApi && cause.raison === "adaptation_in_progress") {
-        // Karria travaille encore : on réessaiera quand elle aura fini.
-        s.cv = aSauver;
-        setEnregistrement("repos");
-        return;
-      }
-      s.cv ??= aSauver;
-      setEnregistrement("erreur");
-    }
-  }, [libre, dossierId, poserDossier]);
-
   const planifierSauvegarde = useCallback(
     (courant: Cv) => {
-      // Libre : le brouillon local (`retenir`) est la seule mémoire ; on ne
-      // sauve rien sur le serveur, et l'en-tête ne dit pas « Enregistré ».
       if (libre) return;
-      const s = sauvegarde.current;
-      s.cv = courant;
-      if (s.minuterie !== null) clearTimeout(s.minuterie);
-      setEnregistrement("repos");
-      s.minuterie = setTimeout(() => {
-        s.minuterie = null;
-        void sauverMaintenant();
-      }, DELAI_SAUVEGARDE_MS);
+      sauvegarde.demander("cv", async () => {
+        const lu = await modifierCvDuDossier(dossierId, courant);
+        if (vivant.current) poserDossier(lu);
+      });
     },
-    [libre, sauverMaintenant],
+    [dossierId, libre, poserDossier, sauvegarde],
   );
 
-  // ── Le modèle du dossier ───────────────────────────────────────────────
-
-  /** Le modèle part au dossier (`PUT /{id}/template`) ; le dossier rendu
-   *  remplace le nôtre (propositions, couverture, `template_id`), jamais le CV
-   *  local. Refusé `template_locked` : on remet `precedent` et on le dit ;
-   *  autre panne : le choix reste à l'écran et dans le brouillon. */
   const retenirSurLeDossier = useCallback(
     (id: string, precedent: string | null) => {
       if (libre) return;
-      changerModeleDuDossier(dossierId, id)
-        .then((lu) => {
-          if (vivant.current) poserDossier(lu);
-        })
-        .catch((cause: unknown) => {
-          console.warn("[karria] modèle du dossier non retenu", cause);
-          if (!vivant.current) return;
-          if (cause instanceof ErreurApi && cause.raison === "template_locked") {
-            modeleRef.current = precedent;
-            setModeleId(precedent);
-            rendre(true);
-            Alert.alert(TEXTES.modeleVerrouille);
-            return;
+      sauvegarde.demander(
+        "modele",
+        async () => {
+          try {
+            const lu = await changerModeleDuDossier(dossierId, id);
+            if (vivant.current) poserDossier(lu);
+          } catch (cause) {
+            if (!(cause instanceof ErreurApi && cause.raison === "template_locked"))
+              throw cause;
+            if (vivant.current && modeleRef.current === id) {
+              modeleRef.current = precedent;
+              setModeleId(precedent);
+              const courant = cvRef.current;
+              if (courant !== null) retenir(courant);
+              rendre(true);
+              Alert.alert(TEXTES.modeleVerrouille);
+            }
           }
-          Alert.alert(TEXTES.modeleNonRetenu);
-        });
+        },
+        true,
+      );
     },
-    [libre, dossierId, poserDossier, rendre],
+    [libre, dossierId, poserDossier, rendre, retenir, sauvegarde],
   );
 
-  // ── La couleur, au serveur ─────────────────────────────────────────────
-
-  /** Dossier : `PUT /{id}/color` ; libre : le choix par défaut, avec le modèle
-   *  courant. Une panne ne défait rien : la couleur reste à l'écran et dans le
-   *  brouillon, le prochain « Garder » la renverra. */
   const retenirCouleurSurLeServeur = useCallback(
     (c: string | null) => {
-      // Sans dossier, la couleur reste dans le brouillon de ce CV : on ne
-      // l'impose pas aux CV suivants (le choix du modèle, lui, se retient).
-      const envoi = libre
-        ? Promise.resolve()
-        : changerCouleurDuDossier(dossierId, c).then((lu) => {
-            if (vivant.current) poserDossier(lu);
-          });
-      envoi.catch((cause: unknown) => {
-        console.warn("[karria] couleur non retenue", cause);
-        if (vivant.current) Alert.alert(TEXTES.couleurNonRetenue);
-      });
+      if (libre) return;
+      sauvegarde.demander(
+        "couleur",
+        async () => {
+          const lu = await changerCouleurDuDossier(dossierId, c);
+          if (vivant.current) poserDossier(lu);
+        },
+        true,
+      );
     },
-    [libre, dossierId, poserDossier],
+    [libre, dossierId, poserDossier, sauvegarde],
   );
 
   // ── Le chargement ──────────────────────────────────────────────────────
@@ -644,14 +591,8 @@ export function useAtelier(libre = false): Atelier {
         }
         setErreur(null);
         rendre(true);
-        if (demande !== null || demandeC !== null) retenir(cvInitial);
-        // Première étape : le modèle — sauf si l'adresse demande autre chose
-        // (« Je corrige »), si elle apporte déjà un modèle, ou si l'on
-        // reprend un brouillon.
-        const demandee = feuilleDemandee.current;
-        feuilleDemandee.current = null;
-        if (demandee !== null) setFeuille(demandee);
-        else if (!reprise && demande === null) setFeuille({ type: "modele" });
+        retenir(cvInitial);
+        ouvrirLaSuite();
       })
       .catch((cause: unknown) => {
         console.warn("[karria] atelier libre : CV illisible", cause);
@@ -663,7 +604,7 @@ export function useAtelier(libre = false): Atelier {
     return () => {
       actif = false;
     };
-  }, [libre, rendre, retenir]);
+  }, [libre, rendre, retenir, ouvrirLaSuite]);
 
   useEffect(() => {
     if (libre) return undefined;
@@ -712,7 +653,10 @@ export function useAtelier(libre = false): Atelier {
         setModeleId(modele);
         // Venu de la galerie avec un modèle : le dossier le retient tout de suite.
         if (demande !== null && demande !== lu.modeleId)
-          retenirSurLeDossier(demande, null);
+          retenirSurLeDossier(
+            demande,
+            lu.modeleId ?? choisi?.modeleId ?? gratuits[0]?.id ?? null,
+          );
         // La couleur : celle de l'adresse, sinon le dossier (il survit au
         // changement d'appareil), sinon le brouillon (posée hors réseau).
         const demandeC = couleurDemandee.current;
@@ -721,17 +665,16 @@ export function useAtelier(libre = false): Atelier {
         couleurRef.current = c;
         setCouleur(c);
         if (c !== lu.couleur) retenirCouleurSurLeServeur(c);
-        premiereVisite.current =
-          lu.modeleId === null && brouillon === null && demande === null;
         if (reprise && brouillon.dernierChemin !== null) {
           cheminRef.current = brouillon.dernierChemin;
           setCheminChoisi(brouillon.dernierChemin);
         }
+        if (reprise && lu.adaptation !== "en_cours") planifierSauvegarde(cvInitial);
         setNote(noteDe(lu));
         setErreur(null);
         if (lu.adaptation !== "en_cours") {
           rendre(true);
-          ouvrirLaSuite(lu);
+          ouvrirLaSuite();
         }
       })
       .catch((cause: unknown) => {
@@ -752,6 +695,7 @@ export function useAtelier(libre = false): Atelier {
     ouvrirLaSuite,
     retenirSurLeDossier,
     retenirCouleurSurLeServeur,
+    planifierSauvegarde,
   ]);
 
   // Tant que Karria adapte : relecture toutes les deux secondes.
@@ -767,10 +711,9 @@ export function useAtelier(libre = false): Atelier {
           // Karria a rejoué ses propositions sur nos retouches : son CV a raison.
           poserCvDuServeur(lu);
           rendre(true);
-          ouvrirLaSuite(lu);
+          ouvrirLaSuite();
           // Ce qu'on n'avait pas pu enregistrer pendant qu'elle travaillait.
-          if (lu.adaptation === "faite" && sauvegarde.current.cv !== null)
-            void sauverMaintenant();
+          if (lu.adaptation === "faite") void sauverMaintenant();
         },
         (cause: unknown) => console.warn("[karria] relecture du dossier échouée", cause),
       );
@@ -792,6 +735,7 @@ export function useAtelier(libre = false): Atelier {
     (suivant: Cv) => {
       const courant = cvRef.current;
       if (courant === null) return;
+      setRetourHistorique(null);
       feuilleCv.current?.patcher(differences(courant, suivant));
       cvRef.current = suivant;
       setHistorique((h) => (h === null ? historiqueDe(suivant) : pousser(h, suivant)));
@@ -818,11 +762,13 @@ export function useAtelier(libre = false): Atelier {
   const annuler = useCallback(() => {
     if (historique === null || !peutAnnuler(historique)) return;
     remplacerDepuisHistorique(annulerH(historique));
+    setRetourHistorique("Modification annulée");
   }, [historique, remplacerDepuisHistorique]);
 
   const retablir = useCallback(() => {
     if (historique === null || !peutRetablir(historique)) return;
     remplacerDepuisHistorique(retablirH(historique));
+    setRetourHistorique("Modification rétablie");
   }, [historique, remplacerDepuisHistorique]);
 
   // ── Karria ─────────────────────────────────────────────────────────────
@@ -843,7 +789,7 @@ export function useAtelier(libre = false): Atelier {
       setDecision(propositionId);
       void (async () => {
         try {
-          await sauverMaintenant();
+          if (!(await sauverMaintenant())) return;
           const lu = await deciderProposition(dossierId, propositionId, choix);
           if (vivant.current) poserDossierEtCv(lu);
         } catch (cause) {
@@ -872,7 +818,7 @@ export function useAtelier(libre = false): Atelier {
     setDecision("toutes");
     void (async () => {
       try {
-        await sauverMaintenant();
+        if (!(await sauverMaintenant())) return;
         let dernier: Dossier | null = null;
         for (const p of aAccepter) {
           dernier = await deciderProposition(dossierId, p.id, "accepter");
@@ -929,7 +875,7 @@ export function useAtelier(libre = false): Atelier {
   const continuerSansKarria = useCallback(() => {
     setContinuerALaMain(true);
     rendre(true);
-    if (dossier !== null) ouvrirLaSuite(dossier);
+    if (dossier !== null) ouvrirLaSuite();
   }, [rendre, dossier, ouvrirLaSuite]);
 
   // ── Les gestes ─────────────────────────────────────────────────────────
@@ -1012,7 +958,7 @@ export function useAtelier(libre = false): Atelier {
     // Le choix fait à la première visite (sans geste) va aussi au dossier.
     const modele = modeleRef.current;
     if (!libre && modele !== null && dossier !== null && dossier.modeleId !== modele)
-      retenirSurLeDossier(modele, null);
+      retenirSurLeDossier(modele, dossier.modeleId);
     setFeuille(null);
   }, [libre, dossier, retenir, retenirSurLeDossier]);
 
@@ -1083,9 +1029,23 @@ export function useAtelier(libre = false): Atelier {
   );
 
   const retour = useCallback(() => {
-    void sauverMaintenant();
-    if (router.canGoBack()) router.back();
-    else router.replace(libre ? "/cv/mes-cv" : "/dossiers");
+    const quitter = () => {
+      if (router.canGoBack()) router.back();
+      else router.replace(libre ? "/cv/mes-cv" : "/dossiers");
+    };
+    void sauverMaintenant().then((fait) => {
+      if (!vivant.current) return;
+      if (fait) quitter();
+      else
+        Alert.alert(
+          "Ton CV n'a pas été synchronisé",
+          "Ta retouche reste dans le brouillon de ce téléphone.",
+          [
+            { text: "Rester", style: "cancel" },
+            { text: "Quitter", onPress: quitter },
+          ],
+        );
+    });
   }, [router, sauverMaintenant, libre]);
 
   const poserFeuille = useCallback((poignee: FeuilleCvHandle | null) => {
@@ -1100,27 +1060,26 @@ export function useAtelier(libre = false): Atelier {
     if (p !== null) setPages(p);
   }, []);
 
-  // Finaliser et la lettre relisent le dossier **sur le serveur** : on attend
-  // que la sauvegarde y soit avant de partir, sinon l'export rendrait le CV
-  // d'avant la dernière retouche (Marc, 13/11 : « ce n'est pas ce que j'ai
-  // finalisé »).
-  const allerALaLettre = useCallback(async () => {
-    await sauverMaintenant();
-    pousserRoute({ pathname: "/atelier/[dossierId]/lettre", params: { dossierId } });
-  }, [sauverMaintenant, pousserRoute, dossierId]);
-
+  // L'export relit le dossier : il attend le CV, le modèle et la couleur.
   const allerAFinaliser = useCallback(async () => {
-    await sauverMaintenant();
-    // Venu de Finaliser : on y redescend, et il régénère puisque le brouillon
-    // a bougé — l'analyse d'avant n'est pas perdue en chemin, elle se refait.
-    if (revenirAFinaliser && router.canGoBack()) {
-      marquerBrouillonsModifies();
-      router.back();
-      return;
+    if (passageEnCours.current || modeleRef.current === null) return;
+    passageEnCours.current = true;
+    try {
+      if (!(await sauverMaintenant()) || !vivant.current) return;
+      if (revenirAFinaliser && router.canGoBack()) {
+        marquerBrouillonsModifies();
+        router.back();
+      } else if (libre) {
+        pousserRoute("/atelier/libre/finaliser");
+      } else {
+        pousserRoute({
+          pathname: "/atelier/[dossierId]/finaliser",
+          params: { dossierId },
+        });
+      }
+    } finally {
+      passageEnCours.current = false;
     }
-    if (libre) pousserRoute("/atelier/libre/finaliser");
-    else
-      pousserRoute({ pathname: "/atelier/[dossierId]/finaliser", params: { dossierId } });
   }, [sauverMaintenant, pousserRoute, dossierId, libre, revenirAFinaliser, router]);
 
   return {
@@ -1138,6 +1097,7 @@ export function useAtelier(libre = false): Atelier {
     pages,
     renduEnCours,
     erreurRendu,
+    reessayerRendu: useCallback(() => rendre(true), [rendre]),
     avertissements,
     poserFeuille,
     feuille,
@@ -1147,6 +1107,7 @@ export function useAtelier(libre = false): Atelier {
     surPages,
     cheminChoisi,
     enregistrement,
+    retourHistorique,
     changerSection,
     changerElement,
     changerIntitule,
@@ -1174,7 +1135,6 @@ export function useAtelier(libre = false): Atelier {
     choisirCouleur,
     garderCouleur,
     miseEnAvant,
-    allerALaLettre,
     allerAFinaliser,
     retour,
   };

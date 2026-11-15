@@ -27,6 +27,7 @@ import type { NativeAd } from "@/features/publicite/api/publicite.api";
 import { useAnnonceEmplacement } from "@/features/publicite/hooks/use-annonce-emplacement";
 import { ErreurApi } from "@/lib/http";
 
+import { DEFINITIONS } from "../services/chapitres";
 import { lireBrouillon, lireMonCv } from "../api/cv.api";
 import {
   effacerVerification,
@@ -39,7 +40,8 @@ import type { SourceImport } from "./use-choix-fichiers";
 export interface EcranCv {
   cv: Cv | null;
   /** Un CV commencé avec Karria et pas encore fini : on propose de le reprendre. */
-  brouillonEnCours: boolean;
+  chapitreAReprendre: string | null;
+  rempli: boolean;
   chargement: boolean;
   erreur: string | null;
   creer: () => void;
@@ -47,9 +49,8 @@ export interface EcranCv {
   modifier: (section: CleChapitre) => void;
   /** L'en-tête : « Mes CV », les CV déjà mis en page (`/cv/mes-cv`). */
   ouvrirMesCv: () => void;
-  /** Le « + » de l'en-tête : un nouveau CV. Avec un CV, l'atelier libre
-   *  (`/atelier/libre`) ; sans CV, le créer d'abord (`/cv/creer`). */
-  nouveauCv: () => void;
+  /** Le CV rempli peut être mis en page dans l’atelier libre. */
+  mettreEnPage: () => void;
   /** Après un import : les sections à relire, coordonnées d'abord. */
   aVerifier: readonly CleChapitre[];
   importRecent: boolean;
@@ -69,7 +70,7 @@ export function useEcranCv(): EcranCv {
   const router = useRouter();
   const { exiger, invite } = usePorte();
   const [cv, setCv] = useState<Cv | null>(null);
-  const [brouillonEnCours, setBrouillonEnCours] = useState(false);
+  const [chapitreAReprendre, setChapitreAReprendre] = useState<string | null>(null);
   const [chargement, setChargement] = useState(!invite);
   const [erreur, setErreur] = useState<string | null>(null);
   const verification = useVerification();
@@ -86,7 +87,9 @@ export function useEcranCv(): EcranCv {
       .then(([lu, brouillon]) => {
         if (!vivant) return;
         setCv(lu);
-        setBrouillonEnCours(brouillon !== null);
+        setChapitreAReprendre(
+          brouillon === null ? null : DEFINITIONS[brouillon.chapitreCourant].titre,
+        );
         setErreur(null);
       })
       .catch((cause: unknown) => {
@@ -132,13 +135,9 @@ export function useEcranCv(): EcranCv {
     if (exiger("cv", { cle: "cv.mes-cv" })) router.push("/cv/mes-cv");
   }, [exiger, router]);
   const rempli = cv !== null && !cv.vide;
-  const nouveauCv = useCallback(() => {
-    if (!rempli) {
-      creer();
-      return;
-    }
-    if (exiger("cv", { cle: "cv.nouveau" })) router.push("/atelier/libre");
-  }, [rempli, creer, exiger, router]);
+  const mettreEnPage = useCallback(() => {
+    if (rempli && exiger("cv", { cle: "cv.nouveau" })) router.push("/atelier/libre");
+  }, [rempli, exiger, router]);
   useReprise("cv.creer", () => router.push("/cv/creer"));
   useReprise("cv.mes-cv", () => router.push("/cv/mes-cv"));
   useReprise("cv.nouveau", () => router.push("/atelier/libre"));
@@ -149,14 +148,15 @@ export function useEcranCv(): EcranCv {
 
   return {
     cv,
-    brouillonEnCours,
+    chapitreAReprendre,
+    rempli,
     chargement,
     erreur,
     creer,
     importer,
     modifier,
     ouvrirMesCv,
-    nouveauCv,
+    mettreEnPage,
     aVerifier: verification.aVerifier,
     importRecent: verification.importRecent,
     manquants: cv === null || cv.vide ? [] : manquantsDuCv(cv),

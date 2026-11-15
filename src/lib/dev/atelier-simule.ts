@@ -742,6 +742,7 @@ export function repondreAtelier(
   chemin: string,
   corps: unknown,
   maintenant: number = Date.now(),
+  adresseDuCompte = ADRESSE_DU_COMPTE,
 ): Response {
   const [cheminSeul, requete = ""] = chemin.split("?");
   const route = `${methode} ${cheminSeul}`;
@@ -981,8 +982,8 @@ export function repondreAtelier(
     ) {
       return erreur(422, "recipient_invalid", "Adresse mal formée.", { field: "to" });
     }
-    const adresse = typeof to === "string" ? to : ADRESSE_DU_COMPTE;
-    const tiers = adresse !== ADRESSE_DU_COMPTE;
+    const adresse = typeof to === "string" ? to : adresseDuCompte;
+    const tiers = adresse !== adresseDuCompte;
     const aujourdHui = jourUtc(new Date(maintenant).toISOString());
     const duJour = [...etat.envois.values()].filter(
       (e) => jourUtc(e.created_at) === aujourdHui,

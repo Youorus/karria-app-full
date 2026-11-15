@@ -38,7 +38,8 @@
  * discrets sous la feuille (`services/presentation.ts › conseilsDe`).
  */
 
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import { usePreventRemove } from "expo-router/react-navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 
@@ -68,14 +69,19 @@ import { useNavigationUnique } from "@/lib/navigation";
 
 import { lireModeleChoisi, rendreLettre } from "../api/documents.api";
 import type { FeuilleCvHandle } from "../components/feuille-cv";
-import { lireBrouillonAtelier } from "../services/brouillon-atelier";
+import {
+  lireBrouillonAtelier,
+  marquerBrouillonsModifies,
+} from "../services/brouillon-atelier";
 import { cibleDeLettre, type CibleLettre } from "../services/chemins";
 import { creerFileDeRendu } from "../services/file-de-rendu";
+import {
+  creerFileDeSauvegarde,
+  type Enregistrement,
+} from "../services/file-de-sauvegarde";
 import { differencesDeLettre, documentDeLettre } from "../services/lettre";
 import { modeleDuDossier } from "../services/modele";
 import { conseilsDe, messageDeRendu, TEXTES } from "../services/presentation";
-
-const DELAI_SAUVEGARDE_MS = 1_500;
 
 export interface Reecriture {
   index: number;
@@ -107,7 +113,9 @@ export interface EcranLettre {
   reecriture: Reecriture | null;
   garderNouveau: () => void;
   garderAncien: () => void;
-  enregistrement: "repos" | "en-cours" | "fait" | "erreur";
+  enregistrement: Enregistrement;
+  depuisFinaliser: boolean;
+  retourLibelle: string;
   /** Le modèle : le même geste que dans l'atelier, à la même place. */
   modeleId: string | null;
   modele: Modele | null;
@@ -147,7 +155,13 @@ interface EntreeDeRendu {
 }
 
 export function useLettre(): EcranLettre {
-  const { dossierId } = useLocalSearchParams<{ dossierId: string }>();
+  const { dossierId, retour: origine } = useLocalSearchParams<{
+    dossierId: string;
+    retour?: string;
+  }>();
+  const depuisFinaliser = origine === "finaliser";
+  const depuisDossier = origine === "dossier";
+  const navigation = useNavigation();
   const router = useRouter();
   const { pousser } = useNavigationUnique();
   const { avecConsentement, rejouerSiConsentementRequis } = useActionIa();
@@ -182,10 +196,10 @@ export function useLettre(): EcranLettre {
   const modeleRef = useRef<string | null>(null);
   const styleRef = useRef<StyleLettre | null>(styleChoisi);
   const vivant = useRef(true);
-  const sauvegarde = useRef<{
-    minuterie: ReturnType<typeof setTimeout> | null;
-    lettre: Lettre | null;
-  }>({ minuterie: null, lettre: null });
+  const passageEnCours = useRef(false);
+  const modifiee = useRef(false);
+  const [sauvegarde] = useState(creerFileDeSauvegarde);
+  const sauverMaintenant = sauvegarde.vider;
 
   const [file] = useState(() =>
     creerFileDeRendu<EntreeDeRendu, Awaited<ReturnType<typeof rendreLettre>>>({
@@ -211,14 +225,14 @@ export function useLettre(): EcranLettre {
   );
 
   useEffect(() => {
+    const desabonner = sauvegarde.abonner(setEnregistrement);
     vivant.current = true;
-    const s = sauvegarde.current;
     return () => {
       vivant.current = false;
       file.arreter();
-      if (s.minuterie !== null) clearTimeout(s.minuterie);
+      desabonner();
     };
-  }, [file]);
+  }, [file, sauvegarde]);
 
   const rendre = useCallback(
     (immediat: boolean) => {
@@ -288,29 +302,6 @@ export function useLettre(): EcranLettre {
 
   // ── La sauvegarde différée ─────────────────────────────────────────────
 
-  const sauverMaintenant = useCallback(async () => {
-    const s = sauvegarde.current;
-    if (s.minuterie !== null) {
-      clearTimeout(s.minuterie);
-      s.minuterie = null;
-    }
-    const aSauver = s.lettre;
-    if (aSauver === null) return;
-    s.lettre = null;
-    setEnregistrement("en-cours");
-    try {
-      const lu = await modifierLettre(dossierId, aSauver);
-      if (!vivant.current) return;
-      poserDossier(lu);
-      setEnregistrement("fait");
-    } catch (cause) {
-      console.warn("[karria] lettre non enregistrée", cause);
-      if (!vivant.current) return;
-      s.lettre ??= aSauver;
-      setEnregistrement("erreur");
-    }
-  }, [dossierId, poserDossier]);
-
   const appliquer = useCallback(
     (suivante: Lettre) => {
       const courante = lettreRef.current;
@@ -318,16 +309,13 @@ export function useLettre(): EcranLettre {
         feuilleCv.current?.patcher(differencesDeLettre(courante, suivante));
       poserLettre(suivante);
       rendre(false);
-      const s = sauvegarde.current;
-      s.lettre = suivante;
-      if (s.minuterie !== null) clearTimeout(s.minuterie);
-      setEnregistrement("repos");
-      s.minuterie = setTimeout(() => {
-        s.minuterie = null;
-        void sauverMaintenant();
-      }, DELAI_SAUVEGARDE_MS);
+      modifiee.current = true;
+      sauvegarde.demander("lettre", async () => {
+        const lu = await modifierLettre(dossierId, suivante);
+        if (vivant.current) poserDossier(lu);
+      });
     },
-    [poserLettre, rendre, sauverMaintenant],
+    [dossierId, poserDossier, poserLettre, rendre, sauvegarde],
   );
 
   // ── Karria ─────────────────────────────────────────────────────────────
@@ -340,6 +328,7 @@ export function useLettre(): EcranLettre {
         .then((lu) => {
           if (!vivant.current) return;
           poserDossier(lu);
+          modifiee.current = true;
           poserLettre(lu.lettre);
           rendre(true);
         })
@@ -380,7 +369,7 @@ export function useLettre(): EcranLettre {
         setReecritureEnCours(true);
         void (async () => {
           try {
-            await sauverMaintenant();
+            if (!(await sauverMaintenant())) return;
             const lu = await regenererParagraphe(
               dossierId,
               c.index,
@@ -389,6 +378,7 @@ export function useLettre(): EcranLettre {
             if (!vivant.current) return;
             poserDossier(lu);
             if (lu.lettre !== null) {
+              modifiee.current = true;
               const apres = lu.lettre.paragraphes[c.index]?.texte ?? avant;
               lettreRef.current = lu.lettre;
               setLettre(lu.lettre);
@@ -464,24 +454,28 @@ export function useLettre(): EcranLettre {
       setModeleId(id);
       setPossedes((p) => (p.has(id) ? p : new Set([...p, id])));
       rendre(true);
-      changerModeleDuDossier(dossierId, id)
-        .then((lu) => {
-          if (vivant.current) poserDossier(lu);
-        })
-        .catch((cause: unknown) => {
-          console.warn("[karria] modèle du dossier non retenu (lettre)", cause);
-          if (!vivant.current) return;
-          if (cause instanceof ErreurApi && cause.raison === "template_locked") {
-            modeleRef.current = precedent;
-            setModeleId(precedent);
-            rendre(true);
-            Alert.alert(TEXTES.modeleVerrouille);
-            return;
+      modifiee.current = true;
+      sauvegarde.demander(
+        "modele",
+        async () => {
+          try {
+            const lu = await changerModeleDuDossier(dossierId, id);
+            if (vivant.current) poserDossier(lu);
+          } catch (cause) {
+            if (!(cause instanceof ErreurApi && cause.raison === "template_locked"))
+              throw cause;
+            if (vivant.current && modeleRef.current === id) {
+              modeleRef.current = precedent;
+              setModeleId(precedent);
+              rendre(true);
+              Alert.alert(TEXTES.modeleVerrouille);
+            }
           }
-          Alert.alert(TEXTES.modeleNonRetenu);
-        });
+        },
+        true,
+      );
     },
-    [dossierId, poserDossier, rendre],
+    [dossierId, poserDossier, rendre, sauvegarde],
   );
 
   const ouvrirModele = useCallback(() => setFeuilleModele(true), []);
@@ -497,16 +491,17 @@ export function useLettre(): EcranLettre {
       styleRef.current = style;
       setStyleChoisi(style);
       rendre(true);
-      changerStyleDeLettreDuDossier(dossierId, style)
-        .then((lu) => {
+      modifiee.current = true;
+      sauvegarde.demander(
+        "style",
+        async () => {
+          const lu = await changerStyleDeLettreDuDossier(dossierId, style);
           if (vivant.current) poserDossier(lu);
-        })
-        .catch((cause: unknown) => {
-          console.warn("[karria] style de lettre non retenu", cause);
-          if (vivant.current) Alert.alert(TEXTES.lettreStyleNonRetenu);
-        });
+        },
+        true,
+      );
     },
-    [dossierId, poserDossier, rendre],
+    [dossierId, poserDossier, rendre, sauvegarde],
   );
 
   // ── Les gestes ─────────────────────────────────────────────────────────
@@ -602,16 +597,48 @@ export function useLettre(): EcranLettre {
     setCible(null);
   }, [cible, cheminDeCible, texteDeCible]);
 
-  const continuer = useCallback(() => {
-    void sauverMaintenant();
-    pousser({ pathname: "/atelier/[dossierId]/finaliser", params: { dossierId } });
-  }, [sauverMaintenant, pousser, dossierId]);
-
+  const sortir = useCallback(
+    (finaliser: boolean) => {
+      if (passageEnCours.current) return;
+      passageEnCours.current = true;
+      void (async () => {
+        try {
+          if (!(await sauverMaintenant()) || !vivant.current) return;
+          if (depuisFinaliser || !finaliser) {
+            if (router.canGoBack()) router.back();
+            else router.replace("/dossiers");
+          } else {
+            pousser({
+              pathname: "/atelier/[dossierId]/finaliser",
+              params: { dossierId, origine: "lettre" },
+            });
+          }
+        } finally {
+          passageEnCours.current = false;
+        }
+      })();
+    },
+    [depuisFinaliser, dossierId, pousser, router, sauverMaintenant],
+  );
+  // Le geste système et le bouton Retour suivent la même règle : une
+  // lettre modifiée doit être enregistrée avant de quitter son éditeur.
+  usePreventRemove(true, ({ data }) => {
+    if (ebauche || reecritureEnCours) return;
+    void sauverMaintenant().then((fait) => {
+      if (!fait || !vivant.current) return;
+      if (depuisFinaliser && modifiee.current) {
+        modifiee.current = false;
+        marquerBrouillonsModifies();
+      }
+      navigation.dispatch(data.action);
+    });
+  });
+  const continuer = useCallback(() => sortir(true), [sortir]);
   const retour = useCallback(() => {
-    void sauverMaintenant();
+    if (ebauche || reecritureEnCours) return;
     if (router.canGoBack()) router.back();
-    else router.replace("/dossiers");
-  }, [router, sauverMaintenant]);
+    else sortir(false);
+  }, [ebauche, reecritureEnCours, router, sortir]);
 
   const poserFeuille = useCallback((poignee: FeuilleCvHandle | null) => {
     feuilleCv.current = poignee;
@@ -642,6 +669,12 @@ export function useLettre(): EcranLettre {
     garderNouveau,
     garderAncien,
     enregistrement,
+    depuisFinaliser,
+    retourLibelle: depuisFinaliser
+      ? "Retour à Finaliser"
+      : depuisDossier
+        ? "Retour au dossier"
+        : "Retour au CV",
     modeleId,
     modele,
     modeles,

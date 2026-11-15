@@ -231,6 +231,7 @@ describe("La traduction d'un dossier", () => {
         kind: "letter",
         created_at: "2026-11-06T10:00:00Z",
         pdf_url: "https://s/lettre.pdf",
+        preview_urls: ["https://s/page-1.png", "https://s/page-2.png"],
         template: { id: "t", label: "Meridian", version: 1 },
       }),
     ).toEqual({
@@ -240,7 +241,10 @@ describe("La traduction d'un dossier", () => {
       creeLe: "2026-11-06T10:00:00Z",
       pdf: "https://s/lettre.pdf",
       docx: null,
+      apercus: ["https://s/page-1.png", "https://s/page-2.png"],
     });
-    expect(versExport({ id: "e2", created_at: "2026-11-06T10:00:00Z" }).genre).toBe("cv");
+    const ancien = versExport({ id: "e2", created_at: "2026-11-06T10:00:00Z" });
+    expect(ancien.genre).toBe("cv");
+    expect(ancien.apercus).toEqual([]);
   });
 });

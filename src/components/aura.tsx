@@ -29,16 +29,11 @@
  * ═══ Ce que ça coûte, et ce qu'on s'autorise par appareil ═══
  *
  * Chaque nappe est un dégradé radial dessiné une fois puis déplacé par le
- * compositeur ; leur rayon dépasse la largeur de l'écran — deux à trois
- * fois la surface de l'écran à fusionner à chaque image — et le calque qui les porte change d'opacité et
- * d'échelle, ce qui force le compositeur à le dessiner hors écran puis à
- * le recomposer. Sur un Android d'entrée de gamme, ce seul fond prend la
- * moitié du budget de 16 ms. Le palier visuel (`hooks/qualite-visuelle.ts`)
- * tranche : **haut**, tout ; **moyen**, la dérive mais plus de souffle
- * (opacité et échelle fixes, donc pas de calque hors écran) ; **bas**, une
- * image fixe. Et quel que soit le palier, l'aura ne bouge que si son écran
- * est au premier plan : les cinq onglets portent chacun la leur, et quatre
- * fonds animés hors écran coûtaient autant que le cinquième.
+ * compositeur. Au repos, les nappes dérivent sans animer l'opacité
+ * ni l'échelle de leur groupe plein écran. Ce souffle est réservé au
+ * travail de l'IA et à la dictée, au palier haut. Au palier bas, le fond
+ * reste immobile. Un panneau qui partage sa route avec un autre écran
+ * indique aussi si son fond est visible.
  *
  * ═══ Pourquoi des `style` ici ═══
  *
@@ -52,6 +47,7 @@ import { useEffect } from "react";
 import { useWindowDimensions } from "react-native";
 import Animated, {
   Easing,
+  ReduceMotion,
   cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
@@ -140,6 +136,8 @@ interface Props {
   niveau?: SharedValue<number>;
   /** Fondu vers le fond en bas d'écran, pour asseoir un contenu. */
   assise?: boolean;
+  /** Faux si le fond est celui d'un panneau masqué ou recouvert. */
+  visible?: boolean;
 }
 
 /**
@@ -175,6 +173,8 @@ function NappeAnimee({
       withTiming(1, { duration: nappe.periode, easing: Easing.inOut(Easing.sin) }),
       -1,
       true,
+      undefined,
+      ReduceMotion.Never,
     );
     return () => cancelAnimation(t);
   }, [immobile, nappe.periode, t]);
@@ -224,45 +224,44 @@ function NappeAnimee({
   );
 }
 
-export function Aura({ active = false, ecoute = false, niveau, assise = false }: Props) {
+export function Aura({
+  active = false,
+  ecoute = false,
+  niveau,
+  assise = false,
+  visible = true,
+}: Props) {
   const { width: largeur, height: hauteur } = useWindowDimensions();
   const { mode } = useCouleurs();
   const palier = useQualiteVisuelle();
-  const anime = useAnimationActive();
-  const intensite = INTENSITE[mode];
-  // Les nappes dérivent sauf en bas de gamme ; le souffle (opacité et
-  // échelle du calque entier) est réservé au haut de gamme.
+  // Le hook écoute le système en direct. Reanimated, lui, peut garder
+  // la préférence du démarrage, que les répétitions ignorent ici.
+  const anime = useAnimationActive(visible);
   const derive = anime && palier !== "bas";
-  const souffleAnime = anime && palier === "haut";
+  const souffleAnime = anime && palier === "haut" && (active || ecoute);
+  // Au repos l'opacité est portée par chaque dégradé. Leur groupe
+  // plein écran n'a donc pas d'opacité à recomposer.
+  const intensite = INTENSITE[mode] * (souffleAnime || active ? 1 : 0.85);
 
-  // L'intensité globale : une respiration lente au repos, plus ample et
-  // plus rapide quand l'IA travaille, entre les deux quand elle écoute.
   const souffle = useSharedValue(0.85);
   useEffect(() => {
     if (!souffleAnime) {
       cancelAnimation(souffle);
-      souffle.value = withTiming(active ? 1 : 0.85, { duration: 400 });
+      souffle.value = 0.85;
       return;
     }
-    souffle.value = active
-      ? withRepeat(
-          withTiming(1.15, { duration: 900, easing: Easing.inOut(Easing.quad) }),
-          -1,
-          true,
-        )
-      : ecoute
-        ? withRepeat(
-            withTiming(1.02, { duration: 1_600, easing: Easing.inOut(Easing.quad) }),
-            -1,
-            true,
-          )
-        : withRepeat(
-            withTiming(1, { duration: 4_200, easing: Easing.inOut(Easing.quad) }),
-            -1,
-            true,
-          );
+    souffle.value = withRepeat(
+      withTiming(active ? 1.15 : 1.02, {
+        duration: active ? 900 : 1_600,
+        easing: Easing.inOut(Easing.quad),
+      }),
+      -1,
+      true,
+      undefined,
+      ReduceMotion.Never,
+    );
     return () => cancelAnimation(souffle);
-  }, [active, ecoute, souffleAnime, souffle]);
+  }, [active, souffleAnime, souffle]);
 
   // La voix ne gonfle le calque que là où le souffle est déjà animé : en
   // dessous, le calque hors écran qu'elle forcerait coûte trop cher.
@@ -279,7 +278,7 @@ export function Aura({ active = false, ecoute = false, niveau, assise = false }:
 
   return (
     <Box pointerEvents="none" className="absolute inset-0">
-      <Animated.View style={[PLEIN_ECRAN, styleSouffle]}>
+      <Animated.View style={[PLEIN_ECRAN, souffleAnime ? styleSouffle : null]}>
         {NAPPES.map((nappe) => (
           <NappeAnimee
             key={nappe.id}

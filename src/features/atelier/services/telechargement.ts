@@ -138,18 +138,18 @@ export async function partagerFichier(
   genre: Genre,
 ): Promise<boolean> {
   if (Platform.OS !== "ios") return enregistrerFichier(fichier, nom, format);
-  await Share.share(
+  const resultat = await Share.share(
     { url: fichier.uri, message: messageDePartageDocument(genre) },
     { subject: nom },
   );
-  return true;
+  return resultat.action === Share.sharedAction;
 }
 
 /**
  * Télécharge `url` sous `nom`, ouvre la feuille de partage (avec la phrase
- * Karria sur iOS), puis efface le fichier. Rend vrai si la feuille a pu
- * s'ouvrir (faux : le partage n'est pas disponible sur cet appareil —
- * rien n'a été montré).
+ * Karria sur iOS), puis efface le fichier. Sur iOS, un partage annulé
+ * rend faux. Sur Android, le système signale seulement que la feuille
+ * a pu s'ouvrir.
  */
 export async function telechargerEtPartager(
   url: string,

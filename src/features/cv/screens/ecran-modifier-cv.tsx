@@ -132,7 +132,7 @@ export function EcranModifierCv() {
           style={{ flex: 1 }}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <HStack className="h-[52px] items-center justify-between px-4">
+          <HStack className="min-h-touch flex-wrap items-center justify-between gap-2 px-4 py-2">
             <Pressable
               onPress={m.annuler}
               className="min-h-touch min-w-[72px] justify-center"
@@ -142,7 +142,9 @@ export function EcranModifierCv() {
                 {simple && m.modifie ? "Annuler" : "Fermer"}
               </Texte>
             </Pressable>
-            <Texte className="font-bold text-body text-foreground">{m.titre}</Texte>
+            <Texte className="shrink font-bold text-body text-foreground">
+              {m.titre}
+            </Texte>
             <Box className="min-w-[72px] items-end">
               {m.enregistrement === "fait" ? (
                 <Animated.View entering={FadeIn.duration(200)}>
@@ -194,6 +196,12 @@ export function EcranModifierCv() {
                     </Texte>
                   </HStack>
                 ) : null}
+                {m.enListe ? (
+                  <Texte className="text-body text-muted-foreground">
+                    Chaque ajout, modification ou changement d’ordre s’enregistre
+                    automatiquement.
+                  </Texte>
+                ) : null}
                 <Formulaire v={m.valeur} m={m} />
                 {m.probleme !== null ? (
                   <Texte
@@ -217,6 +225,7 @@ export function EcranModifierCv() {
                 <VStack className="px-5 pb-2 pt-2">
                   <BoutonAction
                     libelle="Enregistrer"
+                    multiligne
                     onPress={m.enregistrer}
                     enCours={m.enregistrement === "en-cours"}
                     libelleEnCours="Enregistrement…"
