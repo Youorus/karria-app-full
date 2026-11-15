@@ -74,6 +74,13 @@ export function versCatalogue(brut: CatalogueBrut, plateforme: string): Catalogu
     cafes: brut.coffees
       .filter((c) => estTasses(c.count))
       .map((c) => ({ tasses: c.count as Tasses, prixCentimes: c.amount_cents })),
+    cafePersonnalise:
+      brut.coffee_custom === undefined
+        ? undefined
+        : {
+            minimumCentimes: brut.coffee_custom.minimum_cents,
+            maximumCentimes: brut.coffee_custom.maximum_cents,
+          },
     modeles: new Map(brut.templates.map((t) => [t.template_id, t.amount_cents])),
     actif: actifIci(brut.enabled, plateforme),
   };
@@ -129,11 +136,15 @@ export async function ouvrirAbonnement(
   );
 }
 
-export async function ouvrirCafe(tasses: Tasses): Promise<SessionPaiement> {
+export async function ouvrirCafe(
+  choix: { tasses: Tasses } | { montantCentimes: number },
+): Promise<SessionPaiement> {
   return versSession(
     await http.post<SessionPaiementBrute>("/payments/checkout-session", {
       payment_type: "coffee",
-      coffee_count: tasses,
+      ...("tasses" in choix
+        ? { coffee_count: choix.tasses }
+        : { coffee_amount_cents: choix.montantCentimes }),
       return_url: RETOUR,
     }),
   );

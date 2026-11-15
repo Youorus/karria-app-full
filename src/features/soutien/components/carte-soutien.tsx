@@ -1,29 +1,4 @@
-/**
- * La section « Soutenir Karria » du profil : deux surfaces, chacune une
- * proposition.
- *
- * ═══ Le parti pris (refonte du 2026-11-04) ═══
- *
- * L'ancienne carte empilait un mot de l'équipe, l'abonnement, les cafés et
- * Stripe dans une seule enveloppe : « tout bourré en un » (Marc). Ici, un
- * titre de section et une phrase, puis :
- *
- * - **« Karria sans pub »** (`surface-sans-pub.tsx`), dorée : la carte
- *   vedette, avec son prix et son bouton d'or, qui ouvre la feuille
- *   (`feuille-sans-pub.tsx`) ; ou, quand on l'est, l'état « Tu es sans pub » ;
- * - **« Nous offrir un café »** (`surface-cafe.tsx`), crème et caramel : un
- *   geste à part, ludique, en deux touchers.
- *
- * Le hook `use-soutien.ts` et l'API ne changent pas : seule la présentation
- * bouge. La feuille est un état purement visuel de cette carte.
- *
- * ═══ Les états ═══
- *
- * - squelette tant que le catalogue n'est pas lu ;
- * - interrupteur du serveur éteint : le titre et une phrase, sans paiement ;
- * - une erreur (page qui ne s'ouvre pas, paiement non confirmé) s'affiche
- *   sous les surfaces, avec « Compris ».
- */
+/** Présente Karria sans pub et le café, avec les états de paiement du profil. */
 
 import { useState } from "react";
 
@@ -38,7 +13,7 @@ import { FeuilleSansPub } from "./feuille-sans-pub";
 import { SurfaceCafe } from "./surface-cafe";
 import { SurfaceSansPub } from "./surface-sans-pub";
 
-function Intro({ phrase }: { phrase: string }) {
+function Intro({ phrase }: { phrase?: string }) {
   return (
     <VStack className="gap-1.5 px-1">
       <Texte
@@ -47,7 +22,9 @@ function Intro({ phrase }: { phrase: string }) {
       >
         {TEXTES.sectionTitre}
       </Texte>
-      <Texte className="text-footnote leading-5 text-muted-foreground">{phrase}</Texte>
+      {phrase === undefined ? null : (
+        <Texte className="text-footnote leading-5 text-muted-foreground">{phrase}</Texte>
+      )}
     </VStack>
   );
 }
@@ -78,8 +55,8 @@ export function CarteSoutien({ soutien, ouvrirOffre = false, onOffreOuverte }: P
     return (
       <VStack className="gap-4">
         <Box className="h-6 w-40 rounded-full bg-remplissage-doux" />
-        <Box className="h-80 w-full rounded-carte bg-surface-premium" />
-        <Box className="h-56 w-full rounded-carte bg-surface-chaleur" />
+        <Box className="h-52 w-full rounded-carte bg-surface-premium" />
+        <Box className="h-16 w-full rounded-carte bg-surface-chaleur" />
       </VStack>
     );
   }
@@ -90,7 +67,7 @@ export function CarteSoutien({ soutien, ouvrirOffre = false, onOffreOuverte }: P
 
   return (
     <VStack className="gap-4">
-      <Intro phrase={TEXTES.sectionPhrase} />
+      <Intro />
       <SurfaceSansPub soutien={soutien} onVoir={() => setFeuille(true)} />
       <SurfaceCafe soutien={soutien} />
       {erreur !== null ? (

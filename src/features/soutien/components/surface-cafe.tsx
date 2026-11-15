@@ -1,52 +1,20 @@
-/**
- * « Nous offrir un café » : un geste chaleureux, à part de l'abonnement.
- *
- * ═══ Secondaire, et replié (refonte du 2026-11-13) ═══
- *
- * Deux offres de même poids se disputent l'attention et ralentissent la
- * décision (loi de Hick). Le café est donc une **ligne neutre** sous la
- * carte sans pub : la tasse, le titre, « dès 2,99 € », un chevron. Un
- * toucher la déplie sur les tuiles et le bouton caramel ; elle reste
- * dépliée pendant un paiement.
- *
- * ═══ Choisir sa tasse doit être un plaisir ═══
- *
- * Quatre tuiles, une par palier du serveur (1, 2, 3, 5) : un grand chiffre,
- * le mot « café(s) » et le prix. La tuile choisie se pose sur la crème, se
- * cerne de caramel et **respire** d'un ressort court — le mouvement répond
- * au doigt, il ne décore pas. Pas d'émoji : la matière est la typographie
- * et l'icône de tasse du système.
- *
- * Un seul bouton, caramel plein (`ton="chaleur"`) : « Offrir deux cafés ·
- * 4,99 € ». Deux gestes depuis le profil : la tasse, puis le bouton.
- *
- * ═══ Après le café ═══
- *
- * Le cœur caramel, un merci, et « En offrir un autre » — en fondu, le
- * temps de lire. Mouvement réduit : tout est là d'un coup.
- */
+/** Soutien ponctuel par un palier ou un montant libre annoncé par le catalogue. */
 
-import { useEffect, useState } from "react";
-import { Pressable } from "react-native";
-import Animated, {
-  FadeIn,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
+import { useState } from "react";
+import { Keyboard, Pressable } from "react-native";
 
 import { BoutonAction } from "@/components/bouton-action";
+import { ChampTexte } from "@/components/champ-texte";
 import { Icone } from "@/components/icone";
 import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
-import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
 import { euros } from "@/lib/monnaie";
 import { CHALEUR, SUR_CHALEUR } from "@/theme";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import type { Soutien } from "../hooks/use-soutien";
+import { lireMontantCafe } from "../services/montant-cafe";
 import {
   cafesDejaOfferts,
   libelleDOffre,
@@ -59,84 +27,71 @@ import type { OffreDeCafe } from "../types/soutien.types";
 function Tuile({
   offre,
   choisie,
-  reduit,
   onPress,
 }: {
   offre: OffreDeCafe;
   choisie: boolean;
-  reduit: boolean;
   onPress: () => void;
 }) {
-  const echelle = useSharedValue(1);
-  useEffect(() => {
-    echelle.value = reduit
-      ? 1
-      : withSpring(choisie ? 1.06 : 1, { damping: 14, stiffness: 260 });
-  }, [choisie, reduit, echelle]);
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: echelle.value }] }));
-
   return (
-    <Animated.View style={[{ flex: 1 }, style]}>
-      <Pressable
-        onPress={onPress}
-        className={`h-[88px] items-center justify-center rounded-tuile border-[1.5px] ${
-          choisie
-            ? "border-chaleur bg-surface-chaleur"
-            : "border-transparent bg-remplissage-doux"
-        }`}
-        accessibilityRole="radio"
-        accessibilityState={{ selected: choisie, checked: choisie }}
-        accessibilityLabel={`${nomDesTasses(offre.tasses)}, ${euros(offre.prixCentimes)}`}
+    <Pressable
+      onPress={onPress}
+      className={`min-h-touch grow basis-[44%] items-center justify-center rounded-tuile border px-2 py-2 ${
+        choisie
+          ? "border-chaleur bg-surface-chaleur"
+          : "border-transparent bg-remplissage-doux"
+      }`}
+      accessibilityRole="radio"
+      accessibilityState={{ selected: choisie, checked: choisie }}
+      accessibilityLabel={`${nomDesTasses(offre.tasses)}, ${euros(offre.prixCentimes)}`}
+    >
+      <Texte
+        className={`font-bold text-body ${choisie ? "text-chaleur" : "text-foreground"}`}
       >
-        <Texte
-          className={`font-display text-title leading-7 ${choisie ? "text-chaleur" : "text-foreground"}`}
-        >
-          {offre.tasses}
-        </Texte>
-        <Texte className="text-caption text-muted-foreground">
-          {motCafe(offre.tasses)}
-        </Texte>
-        <Texte
-          className={`pt-1 font-bold text-footnote ${choisie ? "text-chaleur" : "text-muted-foreground"}`}
-          numberOfLines={1}
-        >
-          {euros(offre.prixCentimes)}
-        </Texte>
-      </Pressable>
-    </Animated.View>
+        {offre.tasses} {motCafe(offre.tasses)}
+      </Texte>
+      <Texte
+        className={`pt-1 font-bold text-footnote ${choisie ? "text-chaleur" : "text-muted-foreground"}`}
+      >
+        {euros(offre.prixCentimes)}
+      </Texte>
+    </Pressable>
   );
 }
 
 export function SurfaceCafe({ soutien }: { soutien: Soutien }) {
   const couleurs = useCouleurs();
-  const reduit = useReducedMotion();
   const chaleur = CHALEUR[couleurs.mode];
   const { catalogue, choix, offreChoisie, phase } = soutien;
   // Replié par défaut : le café est le geste secondaire de la section.
   const [ouvert, setOuvert] = useState(false);
+  const [personnalise, setPersonnalise] = useState(false);
+  const [saisie, setSaisie] = useState("");
   if (catalogue === null) return null;
 
   if (soutien.merci) {
     return (
-      <Animated.View entering={reduit ? undefined : FadeIn.duration(320)}>
-        <VStack className="items-center gap-3 rounded-carte border border-border-subtle bg-card px-5 py-7">
-          <Icone nom="coeurPlein" couleur={chaleur} taille={30} />
-          <Texte
-            accessibilityRole="header"
-            className="text-center font-display text-title-sm text-foreground"
-          >
-            {TEXTES.merciTitre}
-          </Texte>
-          <Texte className="text-center text-body leading-6 text-muted-foreground">
-            {TEXTES.merciTexte}
-          </Texte>
-          <BoutonAction
-            libelle={TEXTES.encoreUn}
-            ton="discret"
-            onPress={soutien.recommencer}
-          />
-        </VStack>
-      </Animated.View>
+      <VStack className="items-center gap-3 rounded-carte border border-border-subtle bg-card px-5 py-7">
+        <Icone nom="coeurPlein" couleur={chaleur} taille={30} />
+        <Texte
+          accessibilityRole="header"
+          className="text-center font-display text-title-sm text-foreground"
+        >
+          {TEXTES.merciTitre}
+        </Texte>
+        <Texte className="text-center text-body leading-6 text-muted-foreground">
+          {TEXTES.merciTexte}
+        </Texte>
+        <BoutonAction
+          libelle={TEXTES.encoreUn}
+          ton="discret"
+          onPress={() => {
+            setPersonnalise(false);
+            setSaisie("");
+            soutien.recommencer();
+          }}
+        />
+      </VStack>
     );
   }
 
@@ -144,6 +99,26 @@ export function SurfaceCafe({ soutien }: { soutien: Soutien }) {
   // Un fait du serveur, pas une incitation inventée : ce que tu as déjà offert.
   const deja = cafesDejaOfferts(soutien.facturation?.cafes.nombre ?? 0);
   const deplie = ouvert || enCours;
+  const limites = catalogue.cafePersonnalise;
+  const libre = personnalise && limites !== undefined;
+  const centimes = lireMontantCafe(saisie);
+  const valide =
+    limites !== undefined &&
+    centimes !== null &&
+    centimes >= limites.minimumCentimes &&
+    centimes <= limites.maximumCentimes;
+  const aide =
+    limites === undefined
+      ? undefined
+      : `Montant minimum : ${euros(limites.minimumCentimes)}.`;
+  const erreurMontant =
+    saisie.trim() !== "" && !valide
+      ? centimes === null
+        ? "Saisis un montant avec deux décimales au maximum."
+        : limites !== undefined && centimes > limites.maximumCentimes
+          ? "Ce montant dépasse la limite de paiement."
+          : aide
+      : undefined;
   const moinsCher = catalogue.cafes.reduce<number | null>(
     (min, c) => (min === null || c.prixCentimes < min ? c.prixCentimes : min),
     null,
@@ -167,7 +142,7 @@ export function SurfaceCafe({ soutien }: { soutien: Soutien }) {
           <Texte className="font-bold text-body text-foreground">
             {TEXTES.cafeTitre}
           </Texte>
-          <Texte className="text-caption text-muted-foreground" numberOfLines={1}>
+          <Texte className="text-caption text-muted-foreground">
             {deja ??
               (moinsCher === null
                 ? TEXTES.cafeCourt
@@ -180,37 +155,77 @@ export function SurfaceCafe({ soutien }: { soutien: Soutien }) {
       </Pressable>
 
       {deplie ? (
-        <Animated.View entering={reduit ? undefined : FadeIn.duration(220)}>
-          <VStack className="gap-4 border-t border-border-subtle px-5 pb-5 pt-4">
-            <Texte className="text-footnote leading-5 text-muted-foreground">
-              {TEXTES.cafeDetail}
-            </Texte>
-            <HStack className="gap-2 py-1" accessibilityRole="radiogroup">
-              {catalogue.cafes.map((offre) => (
-                <Tuile
-                  key={offre.tasses}
-                  offre={offre}
-                  choisie={offre.tasses === choix}
-                  reduit={reduit}
-                  onPress={() => soutien.choisir(offre.tasses)}
+        <VStack className="gap-4 border-t border-border-subtle px-5 pb-5 pt-4">
+          <Texte className="text-footnote leading-5 text-muted-foreground">
+            {TEXTES.cafeDetail}
+          </Texte>
+          <Box className="flex-row flex-wrap gap-2" accessibilityRole="radiogroup">
+            {catalogue.cafes.map((offre) => (
+              <Tuile
+                key={offre.tasses}
+                offre={offre}
+                choisie={!libre && offre.tasses === choix}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setPersonnalise(false);
+                  soutien.choisir(offre.tasses);
+                }}
+              />
+            ))}
+          </Box>
+          {limites === undefined ? null : (
+            <VStack className="gap-2">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Autre montant"
+                accessibilityState={{ expanded: libre }}
+                className="min-h-touch flex-row items-center gap-2 self-start"
+                disabled={phase !== "repos"}
+                onPress={() => setPersonnalise((v) => !v)}
+              >
+                <Icone nom="crayon" couleur={chaleur} taille={15} />
+                <Texte className="font-bold text-footnote text-chaleur">
+                  Autre montant
+                </Texte>
+              </Pressable>
+              {libre ? (
+                <ChampTexte
+                  libelle="Montant en euros"
+                  value={saisie}
+                  onChangeText={setSaisie}
+                  keyboardType="decimal-pad"
+                  placeholder="0,00"
+                  maxLength={9}
+                  editable={phase === "repos"}
+                  aide={aide}
+                  erreur={erreurMontant}
+                  accessoire={
+                    <Texte className="text-body text-muted-foreground">€</Texte>
+                  }
                 />
-              ))}
-            </HStack>
-            <BoutonAction
-              libelle={libelleDOffre(offreChoisie)}
-              ton="chaleur"
-              icone={
-                <Icone nom="tasse" couleur={SUR_CHALEUR[couleurs.mode]} taille={16} />
-              }
-              enCours={enCours}
-              libelleEnCours={
-                phase === "confirmation" ? TEXTES.attente : TEXTES.ouverture
-              }
-              desactive={phase !== "repos" || offreChoisie === null}
-              onPress={soutien.offrir}
-            />
-          </VStack>
-        </Animated.View>
+              ) : null}
+            </VStack>
+          )}
+          <BoutonAction
+            libelle={
+              libre
+                ? valide
+                  ? `Offrir ${euros(centimes)}`
+                  : "Offrir ce montant"
+                : libelleDOffre(offreChoisie)
+            }
+            ton="chaleur"
+            icone={<Icone nom="tasse" couleur={SUR_CHALEUR[couleurs.mode]} taille={16} />}
+            enCours={enCours}
+            libelleEnCours={phase === "confirmation" ? TEXTES.attente : TEXTES.ouverture}
+            desactive={phase !== "repos" || (libre ? !valide : offreChoisie === null)}
+            onPress={() => {
+              Keyboard.dismiss();
+              if (!libre) soutien.offrir();
+              else if (valide) soutien.offrir(centimes);
+            }}
+          />
+        </VStack>
       ) : null}
     </VStack>
   );

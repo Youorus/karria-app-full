@@ -1,40 +1,4 @@
-/**
- * La feuille « Karria sans pub » : l'offre, en plein format.
- *
- * ═══ Ce qu'on attend d'un bon écran d'abonnement ═══
- *
- * Refonte du 2026-11-13, sur le modèle des écrans d'abonnement qui
- * convertissent le mieux, lus de haut en bas sans effort :
- *
- * 1. **La démonstration** : le mini-fil en grand, sur l'or, où l'annonce
- *    pâlit et se barre sous les yeux à l'ouverture ;
- * 2. **la promesse** : un titre-bénéfice, une phrase qui rassure (« tu
- *    gardes tout ») ;
- * 3. **le comparatif** Gratuit / Sans pub : il montre qu'on ne perd rien
- *    en restant gratuit, et exactement ce que l'on gagne ;
- * 4. **la formule**, cochée, prix en grand et ramené au jour ;
- * 5. **trois garanties** courtes, puis, en pied fixe, **un seul** bouton
- *    d'or qui dit le prix, « Pas maintenant », et les mentions.
- *
- * Ce qu'on s'interdit, parce que ça se retourne contre la confiance : un
- * faux compte à rebours, une fausse réduction, un chiffre d'utilisateurs
- * inventé, une croix de fermeture cachée.
- *
- * ═══ La feuille native du système ═══
- *
- * `pageSheet`, comme les filtres : elle suit le geste de fermeture d'iOS
- * et le retour d'Android, sans dépendance.
- *
- * ═══ Le paiement se lance une fois la feuille refermée ═══
- *
- * La page Stripe s'ouvre dans une session du navigateur, présentée par le
- * système au-dessus de l'application. L'ouvrir pendant que la feuille se
- * ferme, c'est deux présentations qui se disputent — et sur iOS, l'une des
- * deux est refusée en silence. On ferme donc d'abord, et `onDismiss`
- * (iOS, après l'animation) lance le paiement ; Android n'a pas cet
- * événement et ne présente pas de la même façon : il lance aussitôt. La
- * surface du profil, derrière, montre l'attente.
- */
+/** Choisit la formule, puis attend la fermeture native iOS avant d’ouvrir Stripe. */
 
 import { useRef, useState } from "react";
 import { Modal, Platform, Pressable, ScrollView } from "react-native";
@@ -57,11 +21,9 @@ import {
   moisOfferts,
   prixAnnuel,
   prixMensuel,
-  prixParJour,
   TEXTES,
 } from "../services/presentation";
 import type { Formule } from "../types/soutien.types";
-import { MiniFil } from "./mini-fil";
 
 /** Une formule à cocher : titre, pastille éventuelle, prix et prix ramené. */
 function CarteFormule({
@@ -135,19 +97,18 @@ export function FeuilleSansPub({ visible, soutien, onFermer }: Props) {
   const or = PREMIUM_TEXTE[couleurs.mode];
   const { catalogue } = soutien;
   // Le geste choisi dans la feuille, joué quand elle a disparu (iOS).
-  const aLancer = useRef(false);
+  const aLancer = useRef<Formule | null>(null);
   // Un appui, pas deux : le bouton se grise jusqu'à la fermeture.
   const [lance, setLance] = useState(false);
-  // L'annuel d'office quand il existe : l'ancre qui rend le mensuel lisible.
-  const [formule, setFormule] = useState<Formule>("annuel");
+  const [formule, setFormule] = useState<Formule>("mensuel");
   const formuleEffective: Formule =
     catalogue?.sansPubAnnuel == null ? "mensuel" : formule;
 
   const passer = () => {
-    if (lance) return;
-    setLance(true);
+    if (aLancer.current !== null) return;
     if (Platform.OS === "ios") {
-      aLancer.current = true;
+      aLancer.current = formuleEffective;
+      setLance(true);
       onFermer();
     } else {
       onFermer();
@@ -157,10 +118,9 @@ export function FeuilleSansPub({ visible, soutien, onFermer }: Props) {
 
   const apresFermeture = () => {
     setLance(false);
-    if (aLancer.current) {
-      aLancer.current = false;
-      soutien.passerSansPub(formuleEffective);
-    }
+    const choisie = aLancer.current;
+    aLancer.current = null;
+    if (choisie !== null) soutien.passerSansPub(choisie);
   };
 
   if (catalogue === null) return null;
@@ -182,7 +142,7 @@ export function FeuilleSansPub({ visible, soutien, onFermer }: Props) {
           <HStack className="items-center justify-end px-4 pt-3">
             <Pressable
               onPress={onFermer}
-              className="h-10 w-10 items-center justify-center rounded-full bg-remplissage"
+              className="h-touch w-touch items-center justify-center rounded-full bg-remplissage"
               accessibilityRole="button"
               accessibilityLabel="Fermer"
             >
@@ -191,84 +151,42 @@ export function FeuilleSansPub({ visible, soutien, onFermer }: Props) {
           </HStack>
 
           <ScrollView
-            contentContainerClassName="gap-7 px-6 pb-8 pt-2"
+            contentContainerClassName="gap-5 px-6 pb-6 pt-2"
             showsVerticalScrollIndicator={false}
           >
-            {/* 1. La démonstration */}
-            <VStack className="gap-4 rounded-carte border border-border-premium bg-surface-premium px-5 pb-6 pt-5">
-              <HStack className="items-center gap-1.5 self-center rounded-full bg-card px-3 py-1">
-                <Icone nom="couronne" couleur={or} taille={12} graisse="bold" />
-                <Texte className="text-caption font-bold uppercase tracking-wide text-premium-texte">
-                  {TEXTES.sansPubEtiquette}
-                </Texte>
-              </HStack>
-              <MiniFil grande anime={visible} />
-            </VStack>
-
-            {/* 2. La promesse */}
-            <VStack className="gap-2">
+            <VStack className="gap-3 rounded-carte border border-border-premium bg-surface-premium p-5">
+              <Box className="h-10 w-10 items-center justify-center rounded-full bg-card">
+                <Icone nom="couronne" couleur={or} taille={19} />
+              </Box>
               <Texte
                 accessibilityRole="header"
-                className="font-display text-title-lg leading-9 tracking-tight text-foreground"
+                className="font-display text-title leading-8 text-foreground"
               >
-                {TEXTES.sansPubTitre}
+                {TEXTES.sansPubEtiquette}
               </Texte>
-              <Texte className="text-callout leading-6 text-muted-foreground">
-                {TEXTES.sansPubPhrase}
-              </Texte>
-            </VStack>
-
-            {/* 3. Le comparatif */}
-            <VStack className="rounded-carte border border-border-subtle bg-card">
-              <HStack className="items-center px-4 pb-2 pt-3">
-                <Box className="flex-1" />
-                <Texte className="w-16 text-center text-caption font-bold text-muted-foreground">
-                  {TEXTES.comparatifColonnes.gratuit}
-                </Texte>
-                <Texte className="w-16 text-center text-caption font-bold text-premium-texte">
-                  {TEXTES.comparatifColonnes.sansPub}
+              <HStack className="items-center gap-2">
+                <Icone nom="coche" couleur={or} taille={16} />
+                <Texte className="flex-1 text-body text-foreground">
+                  Aucune annonce dans ton fil
                 </Texte>
               </HStack>
-              {TEXTES.comparatif.map((ligne) => (
-                <HStack
-                  key={ligne.libelle}
-                  className="items-center border-t border-border-subtle px-4 py-3"
-                  accessible
-                  accessibilityLabel={`${ligne.libelle} : ${
-                    ligne.gratuit ? "inclus dans les deux" : "seulement sans pub"
-                  }`}
-                >
-                  <Texte className="flex-1 pr-2 text-footnote leading-5 text-foreground">
-                    {ligne.libelle}
-                  </Texte>
-                  <Box className="w-16 items-center">
-                    {ligne.gratuit ? (
-                      <Icone
-                        nom="coche"
-                        couleur={couleurs.estompe}
-                        taille={13}
-                        graisse="bold"
-                      />
-                    ) : (
-                      <Box className="h-0.5 w-3 rounded-full bg-track" />
-                    )}
-                  </Box>
-                  <Box className="w-16 items-center">
-                    <Box className="h-6 w-6 items-center justify-center rounded-full bg-premium">
-                      <Icone
-                        nom="coche"
-                        couleur={SUR_PREMIUM[couleurs.mode]}
-                        taille={11}
-                        graisse="bold"
-                      />
-                    </Box>
-                  </Box>
-                </HStack>
-              ))}
+              <HStack className="items-center gap-2">
+                <Icone nom="coeur" couleur={or} taille={16} />
+                <Texte className="flex-1 text-body text-foreground">
+                  Soutien direct à l’équipe Karria
+                </Texte>
+              </HStack>
             </VStack>
 
-            {/* 4. La formule : l'annuel en tête, coché d'office, quand il existe */}
             <VStack className="gap-3" accessibilityRole="radiogroup">
+              <CarteFormule
+                choisie={formuleEffective === "mensuel"}
+                onPress={() => setFormule("mensuel")}
+                titre={TEXTES.sansPubFormule}
+                pastille={null}
+                prix={prixMensuel(mensuel)}
+                detail="Facturé chaque mois"
+              />
               {annuel !== null ? (
                 <CarteFormule
                   choisie={formuleEffective === "annuel"}
@@ -279,34 +197,7 @@ export function FeuilleSansPub({ visible, soutien, onFermer }: Props) {
                   detail={annuelParMois(annuel)}
                 />
               ) : null}
-              <CarteFormule
-                choisie={formuleEffective === "mensuel"}
-                onPress={() => setFormule("mensuel")}
-                titre={TEXTES.sansPubFormule}
-                pastille={null}
-                prix={prixMensuel(mensuel)}
-                detail={prixParJour(mensuel)}
-              />
-              <Texte className="text-center text-caption text-muted-foreground">
-                {TEXTES.sansPubPromesse}
-              </Texte>
             </VStack>
-
-            {/* 5. Les garanties */}
-            <HStack className="justify-between gap-2">
-              {TEXTES.garanties.map((garantie, i) => (
-                <VStack key={garantie} className="flex-1 items-center gap-1.5">
-                  <Icone
-                    nom={(["calendrier", "eclair", "cadenas"] as const)[i] ?? "coche"}
-                    couleur={or}
-                    taille={18}
-                  />
-                  <Texte className="text-center text-caption leading-4 text-muted-foreground">
-                    {garantie}
-                  </Texte>
-                </VStack>
-              ))}
-            </HStack>
           </ScrollView>
 
           <VStack className="gap-2 border-t border-border-subtle px-6 pb-2 pt-4">
@@ -326,8 +217,11 @@ export function FeuilleSansPub({ visible, soutien, onFermer }: Props) {
                 {TEXTES.pasMaintenant}
               </Texte>
             </Pressable>
-            <Texte className="px-2 text-center text-caption leading-4 text-foreground-faint">
-              {TEXTES.sansPubMentions}
+            <Texte className="px-2 text-center text-caption leading-4 text-muted-foreground">
+              {formuleEffective === "annuel"
+                ? "Renouvelé chaque année."
+                : "Renouvelé chaque mois."}{" "}
+              Résiliable depuis ton profil à tout moment. Paiement sécurisé par Stripe.
             </Texte>
           </VStack>
         </SafeAreaView>

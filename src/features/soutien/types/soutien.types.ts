@@ -37,6 +37,7 @@ export interface CatalogueBrut {
   /** Absent d'un serveur plus ancien : l'app ne propose alors que le mensuel. */
   ad_free_yearly?: PrixBrut;
   coffees: (PrixBrut & { count: number })[];
+  coffee_custom?: { minimum_cents: number; maximum_cents: number };
   templates: { template_id: string; label: string; amount_cents: number }[];
   enabled: { ios: boolean; android: boolean };
 }
@@ -84,6 +85,7 @@ export interface Catalogue {
   /** L'annuel, quand le serveur le vend ; `null` sinon. */
   sansPubAnnuel: { prixCentimes: number } | null;
   cafes: OffreDeCafe[];
+  cafePersonnalise?: { minimumCentimes: number; maximumCentimes: number };
   /** Les modèles Premium en vente, par identifiant → prix en centimes. */
   modeles: Map<string, number>;
   /** Faux : l'app ne montre aucun paiement (interrupteur du serveur). */

@@ -13,7 +13,6 @@ import {
   prixAnnuel,
   cafesDejaOfferts,
   libelleAbonnement,
-  prixParJour,
   etatSansPub,
   libelleDOffre,
   motCafe,
@@ -118,16 +117,11 @@ describe("Les mots", () => {
   });
 
   it("promet trois bénéfices lisibles, sans engagement, et la rassurance Stripe", () => {
-    expect(TEXTES.comparatif).toHaveLength(3);
-    expect(TEXTES.garanties).toHaveLength(3);
-    expect(TEXTES.sansPubPromesse).toMatch(/sans engagement/i);
-    expect(TEXTES.sansPubPromesse).toMatch(/résiliable à tout moment/i);
+    expect(TEXTES.sansPubAccroche).toMatch(/retire les annonces.*soutiens l’équipe/i);
     expect(TEXTES.stripe).toMatch(/Stripe/);
   });
 
-  it("ramène le prix au jour sans l'embellir, et rappelle les cafés offerts", () => {
-    expect(prixParJour(499)).toBe("moins de 0,17 € par jour");
-    expect(prixParJour(300)).toBe("soit 0,10 € par jour");
+  it("affiche le montant et la cadence, et rappelle les cafés offerts", () => {
     expect(libelleAbonnement(499)).toBe("S'abonner pour 4,99 € / mois");
     expect(prixAnnuel(4990)).toBe("49,90 € / an");
     expect(annuelParMois(4990)).toBe("moins de 4,16 € par mois");

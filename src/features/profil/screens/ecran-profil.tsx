@@ -101,6 +101,9 @@ export function EcranProfil() {
         ) : (
           <ScrollView
             contentContainerClassName="gap-8 px-6 pb-56 pt-2"
+            automaticallyAdjustKeyboardInsets
+            keyboardDismissMode="on-drag"
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
             <Animated.View entering={entree(0)}>

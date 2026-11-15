@@ -30,50 +30,26 @@ import type { Facturation, Formule, OffreDeCafe, Tasses } from "../types/soutien
 export const TEXTES = {
   // ── La section du profil ──
   sectionTitre: "Soutenir Karria",
-  sectionPhrase:
-    "Karria est gratuite grâce à quelques annonces. Si elle t'aide, voici deux façons de nous le rendre.",
   sectionSansPaiement:
     "Une petite équipe, une app gratuite grâce à quelques annonces. Merci d'être là.",
 
   // ── Sans pub ──
-  /** La petite étiquette dorée, au-dessus du titre. */
   sansPubEtiquette: "Karria sans pub",
-  sansPubTitre: "Ton fil, sans aucune annonce.",
-  /** Sous le titre de l'entrée du profil. */
-  sansPubAccroche: "Rien ne s'intercale plus entre toi et tes offres.",
-  /** Sous le titre de la feuille. */
-  sansPubPhrase: "Le même Karria, en plus calme. Tu gardes tout, on retire les annonces.",
-  /** Le comparatif de la feuille : ce que chaque formule contient. */
-  comparatifColonnes: { gratuit: "Gratuit", sansPub: "Sans pub" },
-  comparatif: [
-    { libelle: "Toutes les offres, l'atelier CV, les candidatures", gratuit: true },
-    { libelle: "Aucune annonce dans ton fil", gratuit: false },
-    { libelle: "Une petite équipe soutenue directement", gratuit: false },
-  ],
+  sansPubAccroche: "Retire les annonces de ton fil et soutiens l’équipe qui crée Karria.",
   sansPubFormule: "Mensuel",
   formuleAnnuel: "Annuel",
-  sansPubPromesse: "Sans engagement, résiliable à tout moment.",
-  garanties: ["Sans engagement", "Arrêt en un geste", "Paiement Stripe"],
-  sansPubMentions:
-    "Renouvelé chaque mois. Tu l'arrêtes quand tu veux depuis ton profil. Paiement sécurisé par Stripe, dans ton navigateur.",
-  sansPubBouton: "Passer sans pub",
+  sansPubBouton: "Voir les formules",
   pasMaintenant: "Pas maintenant",
   /** Sous chaque annonce du fil : l'accès à l'offre, au moment de la gêne. */
   masquerAnnonces: "Masquer les annonces",
   sansPubActifTitre: "Tu es sans pub",
   sansPubActifMerci: "Merci. Ton fil est à toi, et l'équipe te doit un café.",
   sansPubGerer: "Gérer mon abonnement",
-  /** Au-dessus du mini-fil : la rangée qui s'efface. */
-  annonce: "Sponsorisé",
-  /** L'annonce du dessin : générique, sans marque. */
-  annoncePub: "L’appli dont tout le monde parle",
-  annonceSousTitre: "Publicité",
-
   // ── Le café ──
   cafeTitre: "Nous offrir un café",
   /** Sous le titre replié. */
   cafeCourt: "Un merci, sans abonnement",
-  cafeDetail: "Un merci qui compte. Ça ne débloque rien — ça nous donne de l'élan.",
+  cafeDetail: "Un soutien ponctuel à l’équipe Karria.",
   merciTitre: "Merci, vraiment.",
   merciTexte:
     "Ton café est bien arrivé. Il nous donne de l'élan pour rendre Karria encore meilleur. Bonne chance pour ta recherche.",
@@ -162,17 +138,6 @@ export function libelleAbonnementFormule(
   return formule === "annuel" && annuel !== null
     ? `S'abonner pour ${prixAnnuel(annuel)}`
     : libelleAbonnement(mensuel);
-}
-
-/**
- * Le prix ramené au jour, sur trente jours : « moins de 0,17 € par jour ».
- * Arrondi au centime supérieur, d'où « moins de » ; « soit » quand le
- * compte tombe juste. Une vérité arithmétique, pas une promotion.
- */
-export function prixParJour(centimes: number): string {
-  const exact = centimes % 30 === 0;
-  const parJour = Math.ceil(centimes / 30);
-  return `${exact ? "soit" : "moins de"} ${euros(parJour)} par jour`;
 }
 
 /** « Tu nous as déjà offert trois cafés. Merci ! » — rien sous un café. */

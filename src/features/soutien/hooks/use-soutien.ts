@@ -15,7 +15,7 @@
  *
  * - `catalogue` et `facturation` valent `null` tant qu'on ne sait pas : la
  *   carte montre un squelette plutôt qu'un prix qui clignoterait.
- * - Deux tasses sont choisies d'office : le milieu, ni radin ni pressant.
+ * - Le palier minimum est choisi à l'ouverture.
  * - Le merci reste jusqu'à « En offrir un autre ».
  * - Dès que la facturation est lue, le drapeau « sans pub » de toute
  *   l'application est recopié (`lib/sans-pub.ts`) : la publicité s'arrête.
@@ -93,7 +93,7 @@ export interface Soutien {
   erreur: string | null;
   choisir: (tasses: Tasses) => void;
   passerSansPub: (formule?: Formule) => void;
-  offrir: () => void;
+  offrir: (montantCentimes?: number) => void;
   gerer: () => void;
   recommencer: () => void;
   effacerErreur: () => void;
@@ -117,7 +117,7 @@ async function ouvrirDansLeNavigateur(session: SessionPaiement): Promise<void> {
 export function useSoutien(actif = true): Soutien {
   const [catalogue, setCatalogue] = useState<Catalogue | null>(null);
   const [facturation, setFacturation] = useState<Facturation | null>(null);
-  const [choix, setChoix] = useState<Tasses>(2);
+  const [choix, setChoix] = useState<Tasses>(1);
   const [phase, setPhase] = useState<PhaseSoutien>("repos");
   const [cafeEnCours, setCafeEnCours] = useState(false);
   const [merci, setMerci] = useState(false);
@@ -238,16 +238,30 @@ export function useSoutien(actif = true): Soutien {
     [payer],
   );
 
-  const offrir = useCallback(() => {
-    if (offreChoisie === null) return;
-    const tasses = offreChoisie.tasses;
-    setCafeEnCours(true);
-    void payer(
-      () => ouvrirCafe(tasses),
-      (statut) => statut.livre,
-      () => setMerci(true),
-    );
-  }, [payer, offreChoisie]);
+  const offrir = useCallback(
+    (montantCentimes?: number) => {
+      if (enVol.current) return;
+      const limites = catalogue?.cafePersonnalise;
+      if (
+        montantCentimes !== undefined &&
+        (limites === undefined ||
+          !Number.isSafeInteger(montantCentimes) ||
+          montantCentimes < limites.minimumCentimes ||
+          montantCentimes > limites.maximumCentimes)
+      )
+        return;
+      if (montantCentimes === undefined && offreChoisie === null) return;
+      const commande =
+        montantCentimes === undefined ? { tasses: choix } : { montantCentimes };
+      setCafeEnCours(true);
+      void payer(
+        () => ouvrirCafe(commande),
+        (statut) => statut.livre,
+        () => setMerci(true),
+      );
+    },
+    [catalogue, choix, payer, offreChoisie],
+  );
 
   const gerer = useCallback(async () => {
     if (enVol.current) return;

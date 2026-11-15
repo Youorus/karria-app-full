@@ -73,12 +73,10 @@ describe("CarteSoutien", () => {
     render(<CarteSoutien soutien={soutien()} />);
 
     expect(screen.getByRole("header", { name: "Soutenir Karria" })).toBeTruthy();
-    expect(
-      screen.getByRole("header", { name: "Ton fil, sans aucune annonce." }),
-    ).toBeTruthy();
-    expect(screen.getAllByText("4,99 €").length).toBeGreaterThan(0);
-    expect(screen.getByText("moins de 0,17 € par jour")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Passer sans pub" })).toBeTruthy();
+    expect(screen.getByRole("header", { name: "Karria sans pub" })).toBeTruthy();
+    expect(screen.getByText(/4,99 € \/ mois/)).toBeTruthy();
+    expect(screen.getByText(/soutiens l’équipe/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Voir les formules" })).toBeTruthy();
     // Le café est secondaire : une ligne repliée, sans tuiles visibles.
     expect(screen.getByRole("button", { name: "Nous offrir un café" })).toBeTruthy();
     expect(screen.queryByRole("radiogroup")).toBeNull();
@@ -99,13 +97,34 @@ describe("CarteSoutien", () => {
     expect(s.offrir).toHaveBeenCalledTimes(1);
   });
 
+  it("valide le montant libre en euros et le transmet en centimes", () => {
+    const s = soutien({
+      catalogue: {
+        ...CATALOGUE,
+        cafePersonnalise: { minimumCentimes: 299, maximumCentimes: 10000 },
+      },
+    });
+    render(<CarteSoutien soutien={s} />);
+    fireEvent.press(screen.getByRole("button", { name: "Nous offrir un café" }));
+    fireEvent.press(screen.getByRole("button", { name: "Autre montant" }));
+    const montant = screen.getByLabelText("Montant en euros");
+    for (const invalide of ["2,98", "100,01", "7,345", "-8"]) {
+      fireEvent.changeText(montant, invalide);
+      expect(screen.getByRole("button", { name: "Offrir ce montant" })).toBeDisabled();
+    }
+    expect(s.offrir).not.toHaveBeenCalled();
+    fireEvent.changeText(montant, "7,34");
+    fireEvent.press(screen.getByRole("button", { name: "Offrir 7,34 €" }));
+    expect(s.offrir).toHaveBeenCalledWith(734);
+  });
+
   it("ouvre la feuille de l'offre depuis l'entrée, et la feuille ferme sur « Fermer »", () => {
     render(<CarteSoutien soutien={soutien()} />);
     expect(
       screen.queryByRole("button", { name: "S'abonner pour 4,99 € / mois" }),
     ).toBeNull();
 
-    fireEvent.press(screen.getByRole("button", { name: "Passer sans pub" }));
+    fireEvent.press(screen.getByRole("button", { name: "Voir les formules" }));
 
     expect(
       screen.getByRole("button", { name: "S'abonner pour 4,99 € / mois" }),
@@ -132,7 +151,7 @@ describe("CarteSoutien", () => {
 
     expect(screen.getByRole("header", { name: "Tu es sans pub" })).toBeTruthy();
     expect(screen.getByText(/Prochain renouvellement le 28 novembre 2026/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Passer sans pub" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Voir les formules" })).toBeNull();
     fireEvent.press(screen.getByRole("button", { name: "Gérer mon abonnement" }));
     expect(s.gerer).toHaveBeenCalledTimes(1);
   });
@@ -217,12 +236,14 @@ describe("FeuilleSansPub, avec la formule annuelle", () => {
   const avecAnnuel = () =>
     soutien({ catalogue: { ...CATALOGUE, sansPubAnnuel: { prixCentimes: 4990 } } });
 
-  it("coche l'annuel d'office, avec ses deux mois offerts", () => {
+  it("sélectionne le mensuel et affiche l’économie de l’annuel", () => {
     render(<FeuilleSansPub visible soutien={avecAnnuel()} onFermer={jest.fn()} />);
     const annuel = screen.getByRole("radio", {
       name: /^Annuel, 2 mois offerts, 49,90 € \/ an/,
     });
-    expect(annuel.props.accessibilityState.checked).toBe(true);
+    expect(annuel.props.accessibilityState.checked).toBe(false);
+    fireEvent.press(annuel);
+    expect(screen.getByText(/Renouvelé chaque année/)).toBeTruthy();
     expect(
       screen.getByRole("button", { name: "S'abonner pour 49,90 € / an" }),
     ).toBeTruthy();
@@ -231,10 +252,10 @@ describe("FeuilleSansPub, avec la formule annuelle", () => {
   it("lance la formule choisie", () => {
     const s = avecAnnuel();
     render(<FeuilleSansPub visible soutien={s} onFermer={jest.fn()} />);
-    fireEvent.press(screen.getByRole("radio", { name: /^Mensuel/ }));
-    fireEvent.press(screen.getByRole("button", { name: "S'abonner pour 4,99 € / mois" }));
+    fireEvent.press(screen.getByRole("radio", { name: /^Annuel/ }));
+    fireEvent.press(screen.getByRole("button", { name: "S'abonner pour 49,90 € / an" }));
     fireEvent(screen.UNSAFE_getByType(Modal), "dismiss");
-    expect(s.passerSansPub).toHaveBeenCalledWith("mensuel");
+    expect(s.passerSansPub).toHaveBeenCalledWith("annuel");
   });
 });
 

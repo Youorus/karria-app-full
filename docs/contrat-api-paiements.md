@@ -41,6 +41,7 @@ Les prix sont ceux du serveur, en **centimes TTC** : l'app n'en écrit aucun.
     "currency": "eur",
     "interval": "year"
   },
+  "coffee_custom": { "minimum_cents": 299, "maximum_cents": 99999999 },
   "coffees": [
     {
       "count": 1,
@@ -99,7 +100,7 @@ premier plan, et au focus du profil.
 {
   "payment_type": "ad_free", // | "coffee" | "template"
   "plan": "yearly", // ad_free : "monthly" (défaut) ou "yearly"
-  "coffee_count": 2, // coffee : 1, 2, 3 ou 5
+  "coffee_count": 2, // coffee : 1, 2, 3 ou 5 (exclu pour un montant libre)
   "template_id": "6f1c…", // template
   "return_url": "karria://paiement/retour", // ou https://karria.fr/…
 }
@@ -117,9 +118,20 @@ premier plan, et au focus du profil.
 ```
 
 Refus : `422` `return_url_not_allowed` | `coffee_count_out_of_bounds` |
+`coffee_amount_out_of_bounds` | `coffee_amount_not_applicable` |
 `template_id_required` ; `404` `template_not_found` (inconnu, non publié ou
 gratuit) ; `409` `subscription_already_active` (avec `details.payment_failed`) |
 `template_already_owned` ; `503` `dependency_failure` (pas de prestataire).
+
+Le catalogue expose `coffee_custom: { minimum_cents, maximum_cents }`.
+Quand le champ est présent, le client permet un montant libre en centimes
+entiers TTC (au moins 299, dans la limite acceptée par Stripe). Sans le champ, il affiche les
+paliers. Voici la requête pour offrir 7,34 €. Le paiement confirmé par Stripe
+compte comme un café.
+
+```json
+{ "payment_type": "coffee", "coffee_amount_cents": 734 }
+```
 
 ## `GET /payments/status/{session_id}` → `200`
 

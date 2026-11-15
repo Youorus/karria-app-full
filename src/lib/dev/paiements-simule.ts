@@ -28,11 +28,14 @@ const PRIX_SANS_PUB = 499;
 /** La lecture du statut à laquelle le faux serveur livre. */
 const LIVRAISON_APRES = 2;
 const CAFES: Record<number, number> = { 1: 299, 2: 499, 3: 799, 5: 1299 };
+const CAFE_LIBRE = { minimum_cents: CAFES[1], maximum_cents: 99_999_999 };
+const PRIX_SANS_PUB_ANNUEL = 4990;
 
 interface Session {
   type: "ad_free" | "coffee" | "template";
   lectures: number;
   tasses?: number;
+  montant?: number;
   modeleId?: string;
 }
 
@@ -40,6 +43,7 @@ const etat = {
   sessions: new Map<string, Session>(),
   sansPub: false,
   cafes: 0,
+  montantCafes: 0,
   dernierCafe: null as string | null,
   resiliation: false,
   livraisonApres: LIVRAISON_APRES,
@@ -73,7 +77,12 @@ function champ(corps: unknown, nom: string): unknown {
     : undefined;
 }
 
-function prix(lookupKey: string, label: string, centimes: number, interval?: "month") {
+function prix(
+  lookupKey: string,
+  label: string,
+  centimes: number,
+  interval?: "month" | "year",
+) {
   return {
     lookup_key: lookupKey,
     label,
@@ -87,10 +96,17 @@ function catalogue() {
   return {
     currency: "eur",
     ad_free: prix("karria_ad_free_monthly", "Karria sans pub", PRIX_SANS_PUB, "month"),
+    ad_free_yearly: prix(
+      "karria_ad_free_yearly",
+      "Karria sans pub (annuel)",
+      PRIX_SANS_PUB_ANNUEL,
+      "year",
+    ),
     coffees: Object.entries(CAFES).map(([n, c]) => ({
       count: Number(n),
       ...prix(`karria_coffee_${n}`, `${n} café${Number(n) > 1 ? "s" : ""}`, c),
     })),
+    coffee_custom: CAFE_LIBRE,
     templates: [
       {
         template_id: trouverModele("premium")?.id ?? "",
@@ -112,7 +128,11 @@ function droits() {
       cancel_at_period_end: etat.sansPub && etat.resiliation,
       manageable: etat.sansPub || etat.cafes > 0,
     },
-    thanks: { coffees: etat.cafes, total_cents: 0, last_at: etat.dernierCafe },
+    thanks: {
+      coffees: etat.cafes,
+      total_cents: etat.montantCafes,
+      last_at: etat.dernierCafe,
+    },
     enabled: { ios: true, android: true },
   };
 }
@@ -135,6 +155,7 @@ function livrer(session: Session): void {
   if (session.type === "ad_free") etat.sansPub = true;
   if (session.type === "coffee") {
     etat.cafes += session.tasses ?? 1;
+    etat.montantCafes += session.montant ?? 0;
     etat.dernierCafe = new Date().toISOString();
   }
   if (session.type === "template" && session.modeleId !== undefined) {
@@ -166,13 +187,36 @@ export function repondrePaiements(
 
   if (route === "POST /payments/checkout-session") {
     const type = champ(corps, "payment_type");
+    const montantLibre = champ(corps, "coffee_amount_cents");
+    if (montantLibre != null) {
+      const details = { field: "coffee_amount_cents" };
+      if (type !== "coffee" || champ(corps, "coffee_count") != null) {
+        return erreur(
+          422,
+          "coffee_amount_not_applicable",
+          "Montant incompatible.",
+          details,
+        );
+      }
+      if (
+        typeof montantLibre !== "number" ||
+        !Number.isInteger(montantLibre) ||
+        montantLibre < CAFE_LIBRE.minimum_cents ||
+        montantLibre > CAFE_LIBRE.maximum_cents
+      ) {
+        return erreur(422, "coffee_amount_out_of_bounds", "Montant invalide.", details);
+      }
+      return ouvrir({ type: "coffee", lectures: 0, montant: montantLibre }, montantLibre);
+    }
     if (type === "ad_free") {
       if (etat.sansPub) {
         return erreur(409, "subscription_already_active", "Déjà abonné.", {
           payment_failed: false,
         });
       }
-      return ouvrir({ type: "ad_free", lectures: 0 }, PRIX_SANS_PUB);
+      const montant =
+        champ(corps, "plan") === "yearly" ? PRIX_SANS_PUB_ANNUEL : PRIX_SANS_PUB;
+      return ouvrir({ type: "ad_free", lectures: 0 }, montant);
     }
     if (type === "coffee") {
       const tasses = Number(champ(corps, "coffee_count") ?? 1);
@@ -182,7 +226,7 @@ export function repondrePaiements(
           field: "coffee_count",
         });
       }
-      return ouvrir({ type: "coffee", lectures: 0, tasses }, montant);
+      return ouvrir({ type: "coffee", lectures: 0, tasses, montant }, montant);
     }
     if (type === "template") {
       const id = String(champ(corps, "template_id") ?? "");
