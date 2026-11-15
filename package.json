@@ -1,7 +1,7 @@
 {
   "name": "karria_app",
   "main": "expo-router/entry",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "dependencies": {
     "@expo-google-fonts/manrope": "^0.4.2",
     "@expo/html-elements": "^57.0.0",
