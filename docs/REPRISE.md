@@ -7,7 +7,7 @@
 
 ## 2026-11-16 (soir) — prêt pour les revues d’Apple et de Google
 
-- Accès de démonstration côté API (ADR-0039) : `appreview@karria.fr` + code fixe (chez Marc, `~/.karria/app-review-demo.txt`). Compte préparé avec un CV fictif. Paiements Stripe coupés côté serveur (iOS et Android) : l’app masque l’abonnement, les cafés, « Masquer les annonces » ; l’alerte de quota ne propose l’offre que si elle est ouverte (commit `efd32c7`).
+- Accès de démonstration côté API (ADR-0039) : `appreview@karria.fr` + code fixe (chez Marc, `~/.karria/app-review-demo.txt`). Compte préparé avec un CV fictif. Paiements Stripe coupés puis **rouverts à la demande de Marc** (soumission avec Stripe, risque de refus connu) ; l’app suit le réglage serveur sans nouvelle build, et l’alerte de quota ne propose l’offre que si elle est ouverte (commit `efd32c7`).
 - iOS **1.1.0 (10)** installée et lancée sur l’iPhone de Marc ; archive `~/Library/Developer/Xcode/Archives/2026-11-16/Karria 1.1.0 (10).xcarchive` ouverte dans l’Organizer. Numéro de build iOS distant EAS passé à 10 (la prochaine build EAS prendra 11).
 - Android : build EAS production `bba66e4c-00fd-4a31-a550-2d7e18f24bf6` (1.1.0, versionCode 8) lancée, en file au moment d’écrire.
 - Instructions App Store Connect et Play Console : dans la conversation du 2026-11-16 (accès démo, parcours, « no in-app purchases »).
