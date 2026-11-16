@@ -85,12 +85,37 @@ export function cvSimule(): Record<string, unknown> | null {
  *  brouillon ne retient que `image_id` et recalcule l'adresse. */
 const photos = new Map<string, string>();
 
+/** Les portraits retravaillés du mois, comme le vrai serveur (ADR-0038 de
+ *  l'API) : trois, puis `429 portrait_quota_exceeded`. La simulation compte
+ *  depuis le lancement de l'application, pas par mois civil. */
+const LIMITE_PORTRAITS = 3;
+let portraitsRendus = 0;
+
+/** Le début du mois suivant, à minuit UTC : quand le compteur repart. */
+function debutDuMoisSuivant(): string {
+  const maintenant = new Date();
+  return new Date(
+    Date.UTC(maintenant.getUTCFullYear(), maintenant.getUTCMonth() + 1, 1),
+  ).toISOString();
+}
+
+function quotaPortraits(): Response {
+  return json(200, {
+    subscriber: false,
+    limit: LIMITE_PORTRAITS,
+    used: portraitsRendus,
+    remaining: Math.max(LIMITE_PORTRAITS - portraitsRendus, 0),
+    resets_at: debutDuMoisSuivant(),
+  });
+}
+
 /** La forme d'erreur du socle : le code général d'après le statut, la
  *  raison fine dans `details.reason`. */
 const CODES: Record<number, string> = {
   404: "not_found",
   409: "rule_violation",
   422: "invalid_input",
+  429: "rate_limited",
   503: "dependency_failure",
 };
 
@@ -742,6 +767,21 @@ const ROUTES_IA = new Set([
  *  même image sous un nouvel identifiant marqué `enhanced` — assez pour
  *  éprouver la comparaison et le choix, jamais pour juger le rendu. */
 function photoAmelioree(image: string): Response {
+  if (portraitsRendus >= LIMITE_PORTRAITS) {
+    const repart = debutDuMoisSuivant();
+    return erreur(
+      429,
+      "portrait_quota_exceeded",
+      `Tu as utilisé tes ${LIMITE_PORTRAITS} portraits du mois. Tu pourras en générer de nouveaux le mois prochain.`,
+      {
+        limit: LIMITE_PORTRAITS,
+        subscriber: false,
+        resets_at: repart,
+        retry_after: Math.max(Math.round((Date.parse(repart) - Date.now()) / 1000), 1),
+      },
+    );
+  }
+  portraitsRendus += 1;
   const id = `img_${photos.size + 1}`;
   photos.set(id, image);
   return json(201, { image_id: id, image_url: image, enhanced: true });
@@ -853,6 +893,8 @@ export function repondreCv(methode: string, chemin: string, corps: unknown): Res
   if (ROUTES_IA.has(route) && !consentementIaAccorde()) return porteIa();
 
   if (route === "GET /cv/me") return json(200, etat.cv ?? cvVide());
+
+  if (route === "GET /cv/me/photo/quota") return quotaPortraits();
 
   if (route === "GET /cv/draft") {
     return etat.brouillon === null

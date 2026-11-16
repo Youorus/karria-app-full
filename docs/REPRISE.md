@@ -3,7 +3,14 @@
 > Document de passation. À lire en premier par toute personne ou IA qui
 > reprend le travail, avec `AGENTS.md`. Mis à jour à chaque fin de session.
 
-**Dernière mise à jour : 2026-11-15**
+**Dernière mise à jour : 2026-11-16**
+
+## 2026-11-16 — quotas d’IA et « sans limite » avec Karria sans pub
+
+- Trois portraits retravaillés par mois pour le gratuit (ADR-0038 de l’API). `usePortraits` lit `GET /cv/me/photo/quota` sur la section photo de l’édition et dans l’étape photo de la création. Sous le bouton : « 2 portraits retravaillés restants ce mois-ci. ». À zéro, le bouton se désactive, « Garder l’originale » devient le geste principal, et le texte donne la date de retour. Un abonné n’a pas de compteur, sauf au garde-fou de l’usage raisonnable (30).
+- Les autres plafonds de l’API (imports, dossiers, lettres, paragraphes, chat) se lisent au refus : le message du serveur est affiché. À l’ouverture d’un dossier, l’alerte propose « Voir Karria sans pub » (`services/quotas.ts` de `soutien`), jamais à un abonné.
+- Offre « Karria sans pub » : « sans limite* » dans l’accroche et dans la feuille des formules, avec la mention « usage raisonnable ». Prix inchangé (4,99 €).
+- `npm run check` vert, 688 tests. **Non vu sur appareil ni en simulateur.**
 
 ## 2026-11-15 — finitions de l’atelier et contrôle de l’export
 

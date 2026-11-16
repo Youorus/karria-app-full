@@ -117,7 +117,10 @@ describe("Les mots", () => {
   });
 
   it("promet trois bénéfices lisibles, sans engagement, et la rassurance Stripe", () => {
-    expect(TEXTES.sansPubAccroche).toMatch(/retire les annonces.*soutiens l’équipe/i);
+    expect(TEXTES.sansPubAccroche).toMatch(
+      /retire les annonces.*sans limite\*.*soutiens l’équipe/i,
+    );
+    expect(TEXTES.sansPubUsageRaisonnable).toMatch(/usage raisonnable/);
     expect(TEXTES.stripe).toMatch(/Stripe/);
   });
 
@@ -135,7 +138,8 @@ describe("Les mots", () => {
   it("dit l'état de l'abonnement et quoi faire", () => {
     const base = versFacturation(FACTURATION, "ios").sansPub;
     expect(etatSansPub(base)).toEqual({
-      texte: "Aucune annonce dans ton fil. Prochain renouvellement le 28 novembre 2026.",
+      texte:
+        "Aucune annonce et pas de limite. Prochain renouvellement le 28 novembre 2026.",
       alerte: false,
     });
     expect(etatSansPub({ ...base, resiliationEnFinDePeriode: true }).texte).toMatch(

@@ -64,6 +64,8 @@ export function messageDImport(cause: unknown): string {
     }
     const precis = cause.raison === undefined ? undefined : MESSAGES[cause.raison];
     if (precis !== undefined) return precis;
+    // Les imports du mois sont épuisés : le serveur dit pourquoi, et l'issue.
+    if (cause.raison === "import_quota_exceeded") return cause.message;
     if (cause.statut === 503) {
       return "Karria n'arrive pas à lire les CV pour le moment. Réessaie dans quelques minutes, ou crée ton CV de zéro.";
     }

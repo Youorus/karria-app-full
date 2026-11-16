@@ -130,6 +130,7 @@ describe("CarteSoutien", () => {
       screen.getByRole("button", { name: "S'abonner pour 4,99 € / mois" }),
     ).toBeTruthy();
     expect(screen.getByText("Aucune annonce dans ton fil")).toBeTruthy();
+    expect(screen.getByText("Karria sans limite*")).toBeTruthy();
     expect(screen.getByText("4,99 € / mois")).toBeTruthy();
     expect(screen.getAllByText(/Paiement sécurisé par Stripe/).length).toBeGreaterThan(0);
   });

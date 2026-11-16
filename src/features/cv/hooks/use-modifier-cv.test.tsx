@@ -16,7 +16,7 @@ import {
   marquerImporte,
   useVerification,
 } from "../services/verification";
-import type { CleChapitre, Cv, Jet } from "../types/cv.types";
+import type { CleChapitre, Cv, Jet, QuotaPortraits } from "../types/cv.types";
 import { useModifierCv, valeurDuCv, versContenu } from "./use-modifier-cv";
 
 const mockLireMonCv = jest.fn<() => Promise<Cv>>();
@@ -35,6 +35,7 @@ const mockAmeliorerActuelle =
 const mockChoisir = jest.fn<(source: string) => Promise<string | null>>();
 const mockRejouer =
   jest.fn<(cause: unknown, usage: string, action: () => void) => boolean>();
+const mockLireQuota = jest.fn<() => Promise<QuotaPortraits>>();
 let mockSection = "identity";
 
 jest.mock("../api/cv.api", () => ({
@@ -43,6 +44,7 @@ jest.mock("../api/cv.api", () => ({
     mockModifier(c, contenu),
   televerserPhoto: (uri: string, ameliorer: boolean) => mockTeleverser(uri, ameliorer),
   ameliorerPhotoActuelle: () => mockAmeliorerActuelle(),
+  lireQuotaPortraits: () => mockLireQuota(),
 }));
 jest.mock("@/features/auth/hooks/use-action-ia", () => ({
   useActionIa: () => ({
@@ -330,6 +332,13 @@ describe("La photo : la changer, et la rendre plus pro", () => {
 
   beforeEach(() => {
     mockSection = "photo";
+    mockLireQuota.mockReset().mockResolvedValue({
+      abonne: false,
+      limite: 3,
+      utilises: 0,
+      restants: 3,
+      repartLe: "2026-12-01T00:00:00Z",
+    });
     mockLireMonCv.mockReset();
     mockModifier.mockReset();
     mockTeleverser.mockReset();
@@ -437,6 +446,48 @@ describe("La photo : la changer, et la rendre plus pro", () => {
     expect(result.current.photo.etape).toEqual({ nom: "repos" });
     expect(mockModifier).not.toHaveBeenCalled();
     expect(mockTeleverser).not.toHaveBeenCalled();
+  });
+
+  it("lit les portraits du mois, et les relit après une tentative", async () => {
+    mockLireMonCv.mockResolvedValue(avecPhoto);
+    const quota = {
+      abonne: false,
+      limite: 3,
+      utilises: 2,
+      restants: 1,
+      repartLe: "2026-12-01T00:00:00Z",
+    };
+    mockLireQuota
+      .mockResolvedValueOnce(quota)
+      .mockResolvedValueOnce({ ...quota, utilises: 3, restants: 0 });
+    mockAmeliorerActuelle.mockResolvedValue({
+      image: "https://s/retravaillee.jpg",
+      imageId: "img_9",
+      amelioree: true,
+    });
+    const { result } = renderHook(() => useModifierCv());
+    await waitFor(() =>
+      expect(result.current.photo.portraits.mention).toBe(
+        "1 portrait retravaillé restant ce mois-ci.",
+      ),
+    );
+    expect(result.current.photo.portraits.epuises).toBe(false);
+
+    act(() => result.current.photo.ameliorerActuelle());
+
+    await waitFor(() => expect(result.current.photo.portraits.epuises).toBe(true));
+    expect(result.current.photo.portraits.mention).toMatch(/le 1er décembre/);
+    expect(mockLireQuota).toHaveBeenCalledTimes(2);
+  });
+
+  it("ne lit pas le compteur hors de la section photo", async () => {
+    mockSection = "identity";
+    mockLireMonCv.mockResolvedValue(cv);
+    const { result } = renderHook(() => useModifierCv());
+    await waitFor(() => expect(result.current.chargement).toBe(false));
+
+    expect(mockLireQuota).not.toHaveBeenCalled();
+    expect(result.current.photo.portraits).toEqual({ mention: null, epuises: false });
   });
 
   it("dit avec des mots un refus du générateur et laisse l'originale", async () => {

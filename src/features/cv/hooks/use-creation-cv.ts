@@ -65,8 +65,10 @@ import {
   validerChapitre,
 } from "../api/cv.api";
 import { DEFINITIONS, veutPasser, type DefinitionChapitre } from "../services/chapitres";
+import { messageDAmelioration } from "../services/photo";
 import { CHAPITRES, type Brouillon, type CleChapitre, type Jet } from "../types/cv.types";
 import { useChoixPhoto } from "./use-choix-photo";
+import { usePortraits } from "./use-portraits";
 
 const PAROLE_PROPOSITION = "Voici ce que j'ai lu dans ton CV. C'est bon, ou je corrige ?";
 const PAROLE_PROPOSITION_SUIVANTE = "Et celle-ci, c'est bon ?";
@@ -125,6 +127,8 @@ export interface CreationCv {
     choisir: (source: "camera" | "galerie") => void;
     ameliorer: (oui: boolean) => void;
     garder: (image: string) => void;
+    /** Les portraits retravaillés qui restent ce mois-ci (trois par mois). */
+    portraits: { mention: string | null; epuises: boolean };
   };
   /** « J'ai déjà un CV » : proposé tant que rien n'est validé ; ouvre l'écran d'import. */
   importation: {
@@ -173,6 +177,9 @@ export function useCreationCv(): CreationCv {
   const rejouerPhoto = useRef<(image: string) => void>(() => undefined);
   const [brouillon, setBrouillon] = useState<Brouillon | null>(null);
   const [phase, setPhase] = useState<Phase>({ nom: "chargement" });
+  // Le compteur se lit en entrant dans l'étape photo, et se relit à chaque
+  // retour dans l'une de ses phases — donc après chaque tentative (`envoi`).
+  const portraits = usePortraits(phase.nom.startsWith("photo-"));
   const [texte, setTexte] = useState("");
   // Ce que la dictée a entendu s'ajoute à ce qui est déjà écrit : on relit
   // le tout avant d'envoyer.
@@ -411,7 +418,11 @@ export function useCreationCv(): CreationCv {
           }
           if (ameliorer) {
             // L'amélioration a échoué : l'originale reste un très bon choix.
-            setProbleme(lisible(cause, "Je n'ai pas pu améliorer ta photo."));
+            setProbleme(
+              cause instanceof ErreurApi && cause.raison === "portrait_quota_exceeded"
+                ? messageDAmelioration(cause)
+                : lisible(cause, "Je n'ai pas pu améliorer ta photo."),
+            );
             setPhase({
               nom: "photo-comparaison",
               originale: image,
@@ -500,6 +511,7 @@ export function useCreationCv(): CreationCv {
           envoyerPhoto(image, false);
         }
       },
+      portraits: { mention: portraits.mention, epuises: portraits.epuises },
     },
     importation: {
       possible:

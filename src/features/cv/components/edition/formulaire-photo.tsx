@@ -15,6 +15,10 @@
  *   deux mots : « Garder cette version » / « Garder l'originale ». Si
  *   l'amélioration a échoué, l'originale seule et le mot qui explique.
  *
+ * Sous le geste « Rendre ma photo professionnelle », le compteur des
+ * portraits du mois (trois par mois) ; à zéro, le geste se désactive et le
+ * compteur dit quand il revient. Changer ou garder sa photo n'est jamais limité.
+ *
  * L'état d'attente vit sur le bouton qui l'a déclenché ; l'enregistrement
  * se lit dans la barre de l'écran. Aucune logique ici : le hook décide.
  */
@@ -45,6 +49,15 @@ interface Props {
   onAmeliorerActuelle: () => void;
   onGarder: (choix: "originale" | "amelioree") => void;
   onRetirer: () => void;
+  portraits: { mention: string | null; epuises: boolean };
+}
+
+/** Le compteur des portraits du mois, discret, sous le geste qui en consomme un. */
+function Compteur({ texte }: { texte: string | null }) {
+  if (texte === null) return null;
+  return (
+    <Texte className="text-center text-footnote text-muted-foreground">{texte}</Texte>
+  );
 }
 
 function Probleme({ texte }: { texte: string | null }) {
@@ -69,6 +82,7 @@ export function FormulairePhoto({
   onAmeliorerActuelle,
   onGarder,
   onRetirer,
+  portraits,
 }: Props) {
   const couleurs = useCouleurs();
   const reduit = useReducedMotion();
@@ -89,11 +103,13 @@ export function FormulairePhoto({
               libelle={TEXTES_PHOTO.action}
               onPress={() => onAmeliorer(true)}
               enCours={enCours}
+              desactive={portraits.epuises}
               libelleEnCours={TEXTES_PHOTO.enCours}
             />
+            <Compteur texte={portraits.mention} />
             <BoutonAction
               libelle={TEXTES_PHOTO.garderOriginale}
-              ton="secondaire"
+              ton={portraits.epuises ? "principal" : "secondaire"}
               onPress={() => onAmeliorer(false)}
               desactive={enCours}
             />
@@ -167,12 +183,16 @@ export function FormulairePhoto({
       </Box>
       <VStack className="w-full gap-3">
         {avecPhoto ? (
-          <BoutonAction
-            libelle={TEXTES_PHOTO.action}
-            onPress={onAmeliorerActuelle}
-            enCours={enCours}
-            libelleEnCours={TEXTES_PHOTO.enCours}
-          />
+          <VStack className="gap-2">
+            <BoutonAction
+              libelle={TEXTES_PHOTO.action}
+              onPress={onAmeliorerActuelle}
+              enCours={enCours}
+              desactive={portraits.epuises}
+              libelleEnCours={TEXTES_PHOTO.enCours}
+            />
+            <Compteur texte={portraits.mention} />
+          </VStack>
         ) : null}
         <BoutonAction
           libelle="Prendre une photo"

@@ -11,7 +11,9 @@
  *    celle qu'on préfère, d'un toucher.
  *
  * Rien ne part au serveur sans geste de l'utilisateur, et l'amélioration
- * jamais sans son accord explicite. La promesse et le portrait sont ceux
+ * jamais sans son accord explicite. Sous « Oui, améliore-la », le compteur
+ * des portraits du mois (trois par mois) ; à zéro, le oui se désactive et
+ * garder sa photo devient le geste principal. La promesse et le portrait sont ceux
  * de l'édition aussi (`services/photo.ts`, `portrait-photo.tsx`).
  */
 
@@ -36,6 +38,7 @@ interface Props {
   onChoisir: (source: "camera" | "galerie") => void;
   onAmeliorer: (oui: boolean) => void;
   onGarder: (image: string) => void;
+  portraits: { mention: string | null; epuises: boolean };
 }
 
 export function EtapePhoto({
@@ -45,6 +48,7 @@ export function EtapePhoto({
   onChoisir,
   onAmeliorer,
   onGarder,
+  portraits,
 }: Props) {
   const couleurs = useCouleurs();
   const reduit = useReducedMotion();
@@ -116,12 +120,18 @@ export function EtapePhoto({
             libelle="Oui, améliore-la"
             onPress={() => onAmeliorer(true)}
             enCours={occupe}
+            desactive={portraits.epuises}
             libelleEnCours={TEXTES_PHOTO.enCours}
             icone={<Icone nom="etincelles" couleur={couleurs.surPrimaire} taille={16} />}
           />
+          {portraits.mention !== null ? (
+            <Texte className="text-center text-footnote text-muted-foreground">
+              {portraits.mention}
+            </Texte>
+          ) : null}
           <BoutonAction
             libelle="Non, je garde la mienne"
-            ton="secondaire"
+            ton={portraits.epuises ? "principal" : "secondaire"}
             onPress={() => onAmeliorer(false)}
             desactive={occupe}
           />

@@ -98,6 +98,7 @@ import {
   type Presentation,
 } from "../types/cv.types";
 import { useChoixPhoto } from "./use-choix-photo";
+import { usePortraits } from "./use-portraits";
 
 export type ValeurSection =
   | { section: "identity"; valeur: Identite }
@@ -197,6 +198,8 @@ export interface ModifierCv {
     retirer: () => void;
     enCours: boolean;
     probleme: string | null;
+    /** Les portraits retravaillés qui restent ce mois-ci (trois par mois). */
+    portraits: { mention: string | null; epuises: boolean };
   };
 }
 
@@ -347,6 +350,8 @@ export function useModifierCv(): ModifierCv {
   /** Ce qui a échoué autour de la photo — amélioration surtout. */
   const [problemePhoto, setProblemePhoto] = useState<string | null>(null);
   const choixPhoto = useChoixPhoto();
+  const portraits = usePortraits(section === "photo");
+  const rafraichirPortraits = portraits.rafraichir;
   const { avecConsentement, rejouerSiConsentementRequis } = useActionIa();
   // Le rejeu après l'accord passe par une référence : la fonction se cite
   // elle-même, et React refuse qu'une valeur soit lue avant sa déclaration.
@@ -602,9 +607,11 @@ export function useModifierCv(): ModifierCv {
         })
         .finally(() => {
           if (vivant.current) setPhotoEnCours(false);
+          // Réussie ou refusée, la tentative a pu changer le compteur.
+          rafraichirPortraits();
         });
     },
-    [valeur, rejouerSiConsentementRequis],
+    [valeur, rejouerSiConsentementRequis, rafraichirPortraits],
   );
   useEffect(() => {
     rejouerAmelioration.current = ameliorerDepuis;
@@ -724,6 +731,7 @@ export function useModifierCv(): ModifierCv {
       },
       enCours: photoEnCours,
       probleme: choixPhoto.probleme ?? problemePhoto,
+      portraits: { mention: portraits.mention, epuises: portraits.epuises },
     },
   };
 }

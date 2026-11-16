@@ -85,6 +85,7 @@ function Formulaire({ v, m }: { v: ValeurSection; m: ReturnType<typeof useModifi
           onAmeliorerActuelle={m.photo.ameliorerActuelle}
           onGarder={m.photo.garder}
           onRetirer={m.photo.retirer}
+          portraits={m.photo.portraits}
         />
       );
     case "experiences":

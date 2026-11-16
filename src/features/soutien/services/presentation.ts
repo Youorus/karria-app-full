@@ -35,7 +35,11 @@ export const TEXTES = {
 
   // ── Sans pub ──
   sansPubEtiquette: "Karria sans pub",
-  sansPubAccroche: "Retire les annonces de ton fil et soutiens l’équipe qui crée Karria.",
+  sansPubAccroche:
+    "Retire les annonces de ton fil, profite de Karria sans limite* et soutiens l’équipe qui crée Karria.",
+  /** Sous l'accroche : « sans limite » sans mention n'est pas défendable (ADR-0038 de l'API). */
+  sansPubUsageRaisonnable:
+    "* Portraits, dossiers, lettres et messages à Karria sans les limites du compte gratuit, dans un usage raisonnable.",
   sansPubFormule: "Mensuel",
   formuleAnnuel: "Annuel",
   sansPubBouton: "Voir les formules",
@@ -188,8 +192,8 @@ export function etatSansPub(f: Facturation["sansPub"]): {
   return {
     texte:
       f.jusquAu === null
-        ? "Aucune annonce dans ton fil. Merci de soutenir Karria."
-        : `Aucune annonce dans ton fil. Prochain renouvellement le ${dateLisible(f.jusquAu)}.`,
+        ? "Aucune annonce et pas de limite. Merci de soutenir Karria."
+        : `Aucune annonce et pas de limite. Prochain renouvellement le ${dateLisible(f.jusquAu)}.`,
     alerte: false,
   };
 }

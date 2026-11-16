@@ -1,4 +1,4 @@
-/** Présente les deux bénéfices de Karria sans pub et la gestion de l’abonnement. */
+/** Présente les bénéfices de Karria sans pub (sans annonce, sans limite) et la gestion de l’abonnement. */
 
 import { Pressable } from "react-native";
 
@@ -91,6 +91,9 @@ export function SurfaceSansPub({ soutien, onVoir }: Props) {
       </HStack>
       <Texte className="text-body leading-6 text-foreground">
         {TEXTES.sansPubAccroche}
+      </Texte>
+      <Texte className="text-footnote text-muted-foreground">
+        {TEXTES.sansPubUsageRaisonnable}
       </Texte>
       <Texte className="text-footnote text-muted-foreground">
         {euros(centimes)} / mois · Résiliable à tout moment

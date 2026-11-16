@@ -171,11 +171,20 @@ export function FeuilleSansPub({ visible, soutien, onFermer }: Props) {
                 </Texte>
               </HStack>
               <HStack className="items-center gap-2">
+                <Icone nom="etincelles" couleur={or} taille={16} />
+                <Texte className="flex-1 text-body text-foreground">
+                  Karria sans limite*
+                </Texte>
+              </HStack>
+              <HStack className="items-center gap-2">
                 <Icone nom="coeur" couleur={or} taille={16} />
                 <Texte className="flex-1 text-body text-foreground">
                   Soutien direct à l’équipe Karria
                 </Texte>
               </HStack>
+              <Texte className="text-footnote text-muted-foreground">
+                {TEXTES.sansPubUsageRaisonnable}
+              </Texte>
             </VStack>
 
             <VStack className="gap-3" accessibilityRole="radiogroup">

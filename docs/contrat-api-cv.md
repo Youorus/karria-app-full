@@ -164,6 +164,8 @@ document se lisent donc ainsi :
 | `DRAFT_INCOMPLETE`          | 409  | `rule_violation`     | `draft_incomplete` (+ `chapters: [...]`)          |
 | `PHOTO_ENHANCE_REFUSED`     | 422  | `invalid_input`      | `photo_enhance_refused`                           |
 | `PHOTO_ENHANCE_UNAVAILABLE` | 503  | `dependency_failure` | `photo_enhance_unavailable`                       |
+| quota de portraits atteint  | 429  | `rate_limited`       | `portrait_quota_exceeded` (+ `limit`, `subscriber`, `resets_at`, `retry_after`) |
+| quota d'imports atteint     | 429  | `rate_limited`       | `import_quota_exceeded` (5 par mois, 30 abonné ; mêmes détails) |
 | chapitre invalide           | 422  | `invalid_input`      | `chapter_invalid` (+ `fields: [{field, reason}]`) |
 | modèle indisponible         | 503  | `dependency_failure` | `ai_unavailable`                                  |
 
@@ -283,7 +285,23 @@ oubliée à la prochaine écriture de la photo, ou avec le compte).
 
 Erreurs : `404 cv_not_found` sans CV ; `409 photo_missing` (`rule_violation`)
 si le CV n'a pas de photo ; `422 photo_enhance_refused` et
-`503 photo_enhance_unavailable` comme `POST /cv/photo`.
+`503 photo_enhance_unavailable` comme `POST /cv/photo` ; `429
+portrait_quota_exceeded` quand les portraits du mois sont épuisés.
+
+### `GET /cv/me/photo/quota` → `200 { subscriber, limit, used, remaining, resets_at }` — les portraits du mois (2026-11-16)
+
+Trois portraits retravaillés par personne et par mois civil UTC (ADR-0038 de
+l'API) ; avec « Karria sans pub », `subscriber` est vrai et `limit` vaut 30,
+le garde-fou de l'usage raisonnable — l'app n'affiche alors pas de compteur. Seul un portrait **rendu** compte : un refus ou une panne du
+générateur ne consomment rien, une photo envoyée sans `enhance` n'est jamais
+limitée. Session requise, **pas** le consentement à l'IA (le compteur
+s'affiche avant). `resets_at` = début du mois suivant, minuit UTC.
+
+Au-delà, `POST /cv/photo` avec `enhance=true` et `POST /cv/me/photo/enhance`
+répondent `429` (`rate_limited`, `details.reason = portrait_quota_exceeded`,
+avec `limit`, `resets_at`, `retry_after` en secondes) **sans** appeler le
+générateur. L'app affiche ce qui reste sous le bouton du portrait, le
+désactive à zéro et dit quand le compteur repart.
 
 ### `GET /cv/suggestions?kind=…&q=…` → `200 { items: string[] }` — suggestions à la saisie (2026-11-04)
 

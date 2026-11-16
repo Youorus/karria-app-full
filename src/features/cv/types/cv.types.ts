@@ -108,6 +108,21 @@ export interface Photo {
   imageId: string | null;
 }
 
+/**
+ * Les portraits retravaillés par l'IA ce mois-ci (`GET /cv/me/photo/quota`).
+ * Trois par mois civil ; seul un portrait réussi compte. Une photo envoyée
+ * telle quelle n'est jamais limitée.
+ */
+export interface QuotaPortraits {
+  /** Karria sans pub : pas de compteur ; `limite` est le garde-fou de l'usage raisonnable. */
+  abonne: boolean;
+  limite: number;
+  utilises: number;
+  restants: number;
+  /** Début du mois suivant (ISO, UTC) : le compteur repart à zéro. */
+  repartLe: string;
+}
+
 /** Ce que chaque chapitre produit — un élément pour les chapitres en
  *  boucle (expériences, formations). */
 export interface DonneesDeChapitre {

@@ -206,6 +206,33 @@ describe("La photo déjà en place, retravaillée (POST /cv/me/photo/enhance)", 
   });
 });
 
+describe("Les portraits du mois (GET /cv/me/photo/quota)", () => {
+  it("comptent chaque portrait rendu, puis refusent au-delà de trois", async () => {
+    accepterConsentementIa(VERSION_SIMULEE);
+    const avant = await appeler("GET", "/cv/me/photo/quota");
+    expect(avant.statut).toBe(200);
+    expect(avant.corps.limit).toBe(3);
+
+    // Le compteur est partagé par le fichier : on consomme ce qui reste.
+    for (let i = 0; i < (avant.corps.remaining as number); i += 1) {
+      expect((await appeler("POST", "/cv/me/photo/enhance")).statut).toBe(201);
+    }
+    const refus = await appeler("POST", "/cv/me/photo/enhance");
+    const apres = await appeler("GET", "/cv/me/photo/quota");
+
+    expect(refus.statut).toBe(429);
+    const erreur = refus.corps.error as {
+      code: string;
+      details: Record<string, unknown>;
+    };
+    expect(erreur.code).toBe("rate_limited");
+    expect(erreur.details.reason).toBe("portrait_quota_exceeded");
+    expect(typeof erreur.details.resets_at).toBe("string");
+    expect(apres.corps.remaining).toBe(0);
+    expect(apres.corps.used).toBe(3);
+  });
+});
+
 describe("Le brouillon", () => {
   it("ne devient un CV qu'une fois chaque chapitre validé ou passé", async () => {
     await appeler("POST", "/cv/draft");

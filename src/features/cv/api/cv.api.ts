@@ -12,7 +12,8 @@
  *   retenu, écarté et ce qu'il reste à vérifier.
  * - `PUT /cv/me/chapters/{c}` : remplacer une section du CV à la main.
  * - `POST /cv/photo` : une photo, améliorée ou non à l'envoi ;
- *   `POST /cv/me/photo/enhance` : retravailler celle déjà sur le CV.
+ *   `POST /cv/me/photo/enhance` : retravailler celle déjà sur le CV ;
+ *   `GET /cv/me/photo/quota` : les portraits retravaillés qui restent ce mois-ci.
  * - `GET /cv/suggestions` : des valeurs connues pour ce qu'on tape (poste,
  *   entreprise, ville, école, diplôme, compétence, langue).
  *
@@ -39,6 +40,7 @@ import {
   type Interpretation,
   type InterpretationBrute,
   type Jet,
+  type QuotaPortraits,
 } from "../types/cv.types";
 
 function versExperience(b: ExperienceBrute) {
@@ -408,6 +410,28 @@ export async function ameliorerPhotoActuelle(): Promise<{
     enhanced: boolean;
   }>("/cv/me/photo/enhance", {});
   return { image: brut.image_url, imageId: brut.image_id, amelioree: brut.enhanced };
+}
+
+/**
+ * Les portraits retravaillés du mois (`GET /cv/me/photo/quota`) : trois par
+ * mois civil, trente avec Karria sans pub. Au-delà, `POST /cv/photo` avec `enhance` et
+ * `POST /cv/me/photo/enhance` répondent `429 portrait_quota_exceeded`.
+ */
+export async function lireQuotaPortraits(): Promise<QuotaPortraits> {
+  const brut = await http.get<{
+    subscriber: boolean;
+    limit: number;
+    used: number;
+    remaining: number;
+    resets_at: string;
+  }>("/cv/me/photo/quota");
+  return {
+    abonne: brut.subscriber,
+    limite: brut.limit,
+    utilises: brut.used,
+    restants: brut.remaining,
+    repartLe: brut.resets_at,
+  };
 }
 
 /**

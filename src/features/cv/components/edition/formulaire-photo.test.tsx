@@ -31,6 +31,7 @@ function rendre(props: Partial<React.ComponentProps<typeof FormulairePhoto>> = {
       etape={{ nom: "repos" }}
       enCours={false}
       probleme={null}
+      portraits={{ mention: null, epuises: false }}
       {...gestes}
       {...props}
     />,
@@ -96,5 +97,33 @@ describe("Le formulaire photo", () => {
     expect(screen.getByText(TEXTES_PHOTO.originaleSuffit)).toBeTruthy();
     expect(screen.getByRole("alert")).toBeTruthy();
     expect(screen.getByText(TEXTES_PHOTO.garderOriginale)).toBeTruthy();
+  });
+
+  it("montre les portraits qui restent sous le geste, et le désactive à zéro", () => {
+    const disponible = rendre({
+      portraits: {
+        mention: "2 portraits retravaillés restants ce mois-ci.",
+        epuises: false,
+      },
+    });
+    expect(
+      screen.getByText("2 portraits retravaillés restants ce mois-ci."),
+    ).toBeTruthy();
+    fireEvent.press(screen.getByText(TEXTES_PHOTO.action));
+    expect(disponible.onAmeliorerActuelle).toHaveBeenCalledTimes(1);
+  });
+
+  it("à zéro portrait, le geste ne part plus mais changer de photo reste possible", () => {
+    const gestes = rendre({
+      portraits: {
+        mention: "Tu as utilisé tes 3 portraits du mois. Les prochains le 1er décembre.",
+        epuises: true,
+      },
+    });
+    expect(screen.getByText(/Les prochains le 1er décembre/)).toBeTruthy();
+    fireEvent.press(screen.getByText(TEXTES_PHOTO.action));
+    expect(gestes.onAmeliorerActuelle).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByText("Choisir dans mes photos"));
+    expect(gestes.onChanger).toHaveBeenCalledWith("galerie");
   });
 });

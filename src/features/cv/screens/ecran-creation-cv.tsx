@@ -211,6 +211,7 @@ export function EcranCreationCv() {
                       onChoisir={c.photo.choisir}
                       onAmeliorer={c.photo.ameliorer}
                       onGarder={c.photo.garder}
+                      portraits={c.photo.portraits}
                     />
                   ) : null}
                 </ScrollView>

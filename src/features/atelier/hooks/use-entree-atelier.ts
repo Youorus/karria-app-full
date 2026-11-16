@@ -25,6 +25,11 @@ import { useActionIa } from "@/features/auth/hooks/use-action-ia";
 import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
 import { ouvrirDossier } from "@/features/candidatures/api/candidatures.api";
 import { memoriserDossier } from "@/features/candidatures/services/memoire-dossiers";
+import {
+  quotaAtteint,
+  TEXTES_QUOTA,
+  VERS_SANS_PUB,
+} from "@/features/soutien/services/quotas";
 import { ErreurApi } from "@/lib/http";
 import { useNavigationUnique } from "@/lib/navigation";
 
@@ -66,6 +71,24 @@ export function useEntreeAtelier(offreId: string | null): EntreeAtelier {
               { text: "Plus tard", style: "cancel" },
               { text: TEXTES.allerAuCv, onPress: () => remplacer("/cv") },
             ]);
+            return;
+          }
+          // Les dossiers du mois sont épuisés : on dit pourquoi, et l'issue.
+          const quota = quotaAtteint(cause);
+          if (quota !== null) {
+            Alert.alert(
+              TEXTES_QUOTA.titre,
+              quota.message,
+              quota.proposerSansPub
+                ? [
+                    { text: TEXTES_QUOTA.plusTard, style: "cancel" },
+                    {
+                      text: TEXTES_QUOTA.voirSansPub,
+                      onPress: () => pousser(VERS_SANS_PUB),
+                    },
+                  ]
+                : [{ text: "OK" }],
+            );
             return;
           }
           Alert.alert(
