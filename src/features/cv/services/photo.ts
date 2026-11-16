@@ -111,7 +111,7 @@ export function messageDAmelioration(cause: unknown): string {
           : "le mois prochain";
       return cause.details.subscriber === true
         ? `Tu as atteint la limite d'usage raisonnable des portraits ce mois-ci. Les prochains ${retour}.`
-        : `Tu as utilisé tes portraits du mois. Les prochains ${retour}, ou sans limite avec Karria sans pub. Ta photo actuelle reste un très bon choix.`;
+        : `Tu as utilisé tes portraits du mois. Les prochains ${retour}. Ta photo actuelle reste un très bon choix.`;
     }
     if (cause.raison === "photo_missing")
       return "Ajoute d'abord une photo, puis Karria pourra la retravailler.";

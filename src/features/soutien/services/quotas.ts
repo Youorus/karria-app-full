@@ -10,7 +10,9 @@
  * Karria sans pub à qui ne l'a pas, et parle d'usage raisonnable à l'abonné.
  *
  * Ici, on reconnaît ce refus et on dit s'il faut proposer l'abonnement —
- * jamais à quelqu'un qui l'a déjà.
+ * jamais à quelqu'un qui l'a déjà, et seulement là où l'offre est ouverte
+ * (`offreSansPubDisponible`, que l'appelant consulte : les paiements sont
+ * coupés dans les apps des stores, ADR-0039 de l'API).
  */
 
 import { ErreurApi } from "@/lib/http";

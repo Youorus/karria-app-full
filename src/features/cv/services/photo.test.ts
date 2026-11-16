@@ -104,7 +104,7 @@ describe("Le compteur des portraits du mois", () => {
           subscriber: false,
         }),
       ),
-    ).toMatch(/Karria sans pub/);
+    ).toMatch(/Les prochains le 1er décembre/);
     expect(
       messageDAmelioration(
         new ErreurApi("x", 429, "portrait_quota_exceeded", undefined, {

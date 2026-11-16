@@ -25,6 +25,7 @@ import { useActionIa } from "@/features/auth/hooks/use-action-ia";
 import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
 import { ouvrirDossier } from "@/features/candidatures/api/candidatures.api";
 import { memoriserDossier } from "@/features/candidatures/services/memoire-dossiers";
+import { offreSansPubDisponible } from "@/features/soutien/services/offre-disponible";
 import {
   quotaAtteint,
   TEXTES_QUOTA,
@@ -76,10 +77,13 @@ export function useEntreeAtelier(offreId: string | null): EntreeAtelier {
           // Les dossiers du mois sont épuisés : on dit pourquoi, et l'issue.
           const quota = quotaAtteint(cause);
           if (quota !== null) {
+            // L'offre n'est proposée que là où elle est ouverte (paiements
+            // coupés dans les apps des stores, ADR-0039 de l'API).
+            const proposer = quota.proposerSansPub && (await offreSansPubDisponible());
             Alert.alert(
               TEXTES_QUOTA.titre,
               quota.message,
-              quota.proposerSansPub
+              proposer
                 ? [
                     { text: TEXTES_QUOTA.plusTard, style: "cancel" },
                     {
