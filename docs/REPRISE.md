@@ -5,6 +5,14 @@
 
 **Dernière mise à jour : 2026-11-16**
 
+## 2026-11-16 (soir) — prêt pour les revues d’Apple et de Google
+
+- Accès de démonstration côté API (ADR-0039) : `appreview@karria.fr` + code fixe (chez Marc, `~/.karria/app-review-demo.txt`). Compte préparé avec un CV fictif. Paiements Stripe coupés côté serveur (iOS et Android) : l’app masque l’abonnement, les cafés, « Masquer les annonces » ; l’alerte de quota ne propose l’offre que si elle est ouverte (commit `efd32c7`).
+- iOS **1.1.0 (10)** installée et lancée sur l’iPhone de Marc ; archive `~/Library/Developer/Xcode/Archives/2026-11-16/Karria 1.1.0 (10).xcarchive` ouverte dans l’Organizer. Numéro de build iOS distant EAS passé à 10 (la prochaine build EAS prendra 11).
+- Android : build EAS production `bba66e4c-00fd-4a31-a550-2d7e18f24bf6` (1.1.0, versionCode 8) lancée, en file au moment d’écrire.
+- Instructions App Store Connect et Play Console : dans la conversation du 2026-11-16 (accès démo, parcours, « no in-app purchases »).
+- **Pour rouvrir les paiements** : achats intégrés Apple et facturation Google Play (prochaine version), Stripe possible sur karria.fr seulement.
+
 ## 2026-11-16 — quotas d’IA et « sans limite » avec Karria sans pub
 
 - Trois portraits retravaillés par mois pour le gratuit (ADR-0038 de l’API). `usePortraits` lit `GET /cv/me/photo/quota` sur la section photo de l’édition et dans l’étape photo de la création. Sous le bouton : « 2 portraits retravaillés restants ce mois-ci. ». À zéro, le bouton se désactive, « Garder l’originale » devient le geste principal, et le texte donne la date de retour. Un abonné n’a pas de compteur, sauf au garde-fou de l’usage raisonnable (30).
