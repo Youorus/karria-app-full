@@ -21,9 +21,10 @@
  * de la liste) : c'est ce qui fait tomber « Nouvelle ».
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   FlatList,
+  Platform,
   Pressable,
   RefreshControl,
   type ListRenderItem,
@@ -32,7 +33,6 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Aura } from "@/components/aura";
 import { ECART_BAS_BARRE, HAUTEUR_BARRE } from "@/components/barre-onglets";
 import { BoutonEnTeteRond, EnTeteKarria } from "@/components/en-tete-karria";
 import { Icone } from "@/components/icone";
@@ -45,6 +45,7 @@ import { RideauAgent } from "@/features/assistant/components/rideau-agent";
 import { CarteAnnonce } from "@/features/publicite/components/carte-annonce";
 import { useCouleurs } from "@/theme/use-couleurs";
 
+import { AuraDuFil, type PiloteAura } from "../components/aura-du-fil";
 import { BoutonKarria } from "../components/bouton-karria";
 import { CarteOffre } from "../components/carte-offre";
 import { FeuilleFiltres } from "../components/feuille-filtres";
@@ -66,27 +67,12 @@ export function EcranOffres() {
   const { bottom } = useSafeAreaInsets();
   // Une référence de vue, pas un état : elle sert seulement à remonter.
   const liste = useRef<FlatList<ElementDuFil>>(null);
-  const [deplacement, setDeplacement] = useState(false);
-  const repriseAura = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const annulerRepriseAura = useCallback(() => {
-    if (repriseAura.current !== null) clearTimeout(repriseAura.current);
-    repriseAura.current = null;
-  }, []);
-  useEffect(() => annulerRepriseAura, [annulerRepriseAura]);
-
-  const suspendreAura = useCallback(() => {
-    annulerRepriseAura();
-    setDeplacement(true);
-  }, [annulerRepriseAura]);
-  const relacherLeFil = useCallback(() => {
-    // L'inertie peut prendre le relais après la fin du geste.
-    annulerRepriseAura();
-    repriseAura.current = setTimeout(() => setDeplacement(false), 150);
-  }, [annulerRepriseAura]);
-  const reprendreAura = useCallback(() => {
-    annulerRepriseAura();
-    setDeplacement(false);
-  }, [annulerRepriseAura]);
+  // L'aura se pilote par une référence : suspendre ou reprendre son
+  // mouvement ne redessine pas l'écran pendant le défilement (`aura-du-fil`).
+  const aura = useRef<PiloteAura>(null);
+  const suspendreAura = useCallback(() => aura.current?.suspendre(), []);
+  const relacherLeFil = useCallback(() => aura.current?.relacher(), []);
+  const reprendreAura = useCallback(() => aura.current?.reprendre(), []);
   const {
     elements,
     maintenant,
@@ -169,11 +155,55 @@ export function EcranOffres() {
     [garder, maintenant, ouvrirOffre, voirLesAutres],
   );
 
+  // Des paramètres stables pour la liste : un nouvel objet à chaque rendu
+  // de l'écran (seuil de défilement franchi, agent ouvert…) la ferait
+  // recalculer toutes ses cellules.
+  const styleContenu = useMemo(() => ({ paddingBottom: basBouton + 60 }), [basBouton]);
+  const actualisationDuFil = useMemo(
+    () => (
+      <RefreshControl
+        refreshing={actualisation}
+        onRefresh={actualiser}
+        tintColor={couleurs.primaire}
+      />
+    ),
+    [actualisation, actualiser, couleurs.primaire],
+  );
+  const entete = useMemo(
+    () =>
+      erreur !== null ? (
+        <MessageErreur message={erreur} action={actualiser} libelleAction="Réessayer" />
+      ) : null,
+    [erreur, actualiser],
+  );
+  const vide = useMemo(
+    () =>
+      chargement ? (
+        <SqueletteFil />
+      ) : erreur === null ? (
+        <VStack space="sm" className="items-center px-6 py-16">
+          <Texte className="font-bold text-title-sm tracking-tight text-foreground">
+            Aucune offre pour le moment
+          </Texte>
+          <Texte className="text-center text-body text-muted-foreground">
+            {mode === "recherche"
+              ? "Ajuste tes filtres, ou demande à Karria d'élargir ta recherche."
+              : "Ajuste tes filtres, ou dis à Karria ce que tu cherches."}
+          </Texte>
+        </VStack>
+      ) : null,
+    [chargement, erreur, mode],
+  );
+  const pied = useMemo(
+    () => (chargementSuite ? <SqueletteFil cartes={1} /> : null),
+    [chargementSuite],
+  );
+
   return (
     <Box style={{ flex: 1 }} className="bg-background">
       <RideauAgent ouvert={agentOuvert} onFermer={fermerAgent} onRecherche={surRecherche}>
         <Box style={{ flex: 1 }} className="bg-background">
-          <Aura visible={!agentOuvert && !deplacement} />
+          <AuraDuFil ref={aura} visible={!agentOuvert} />
           <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
             <EnTeteKarria
               titre="Pour toi"
@@ -209,32 +239,17 @@ export function EcranOffres() {
               data={chargement ? LISTE_VIDE : elements}
               keyExtractor={cleElement}
               renderItem={rendreElement}
-              ListHeaderComponent={
-                erreur !== null ? (
-                  <MessageErreur
-                    message={erreur}
-                    action={actualiser}
-                    libelleAction="Réessayer"
-                  />
-                ) : null
-              }
-              ListEmptyComponent={
-                chargement ? (
-                  <SqueletteFil />
-                ) : erreur === null ? (
-                  <VStack space="sm" className="items-center px-6 py-16">
-                    <Texte className="font-bold text-title-sm tracking-tight text-foreground">
-                      Aucune offre pour le moment
-                    </Texte>
-                    <Texte className="text-center text-body text-muted-foreground">
-                      {mode === "recherche"
-                        ? "Ajuste tes filtres, ou demande à Karria d'élargir ta recherche."
-                        : "Ajuste tes filtres, ou dis à Karria ce que tu cherches."}
-                    </Texte>
-                  </VStack>
-                ) : null
-              }
-              ListFooterComponent={chargementSuite ? <SqueletteFil cartes={1} /> : null}
+              // Peu de cartes préparées à la fois : un changement de filtre,
+              // de tri ou d'onglet ne monte plus une vingtaine de cartes d'un
+              // coup, et la liste en garde moins en mémoire en défilant.
+              initialNumToRender={6}
+              maxToRenderPerBatch={6}
+              updateCellsBatchingPeriod={50}
+              windowSize={9}
+              removeClippedSubviews={Platform.OS === "android"}
+              ListHeaderComponent={entete}
+              ListEmptyComponent={vide}
+              ListFooterComponent={pied}
               onEndReached={chargerLaSuite}
               onEndReachedThreshold={0.5}
               viewabilityConfigCallbackPairs={visibilite}
@@ -245,15 +260,9 @@ export function EcranOffres() {
               onScroll={surDefilement}
               scrollEventThrottle={64}
               contentContainerClassName="gap-3 px-5 pt-3"
-              contentContainerStyle={{ paddingBottom: basBouton + 60 }}
+              contentContainerStyle={styleContenu}
               showsVerticalScrollIndicator={false}
-              refreshControl={
-                <RefreshControl
-                  refreshing={actualisation}
-                  onRefresh={actualiser}
-                  tintColor={couleurs.primaire}
-                />
-              }
+              refreshControl={actualisationDuFil}
             />
           </SafeAreaView>
 
