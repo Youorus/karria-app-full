@@ -5,6 +5,13 @@
 
 **Dernière mise à jour : 2026-11-16**
 
+## 2026-11-16 (nuit) — fil des offres plus fluide, build 1.1.0 (11)
+
+- Saccades au défilement, au retour d’une offre, aux changements de filtre, de tri et d’onglet (retour de Marc). API mesurée : fil 210–270 ms, options de filtre 100–490 ms côté serveur — pas la cause principale. Correction (commit « perf(offres) ») : l’aura se suspend par une référence (`components/aura-du-fil.tsx`) au lieu d’un état de l’écran (début et fin de geste redessinaient tout l’écran) ; paramètres de la `FlatList` mémorisés ; moins de cartes préparées à la fois (`initialNumToRender` 6, `maxToRenderPerBatch` 6, `windowSize` 9, `removeClippedSubviews` sur Android). 690 tests verts. **Ressenti à confirmer par Marc sur l’iPhone.**
+- iOS **1.1.0 (11)** installée sur l’iPhone de Marc ; archive `Karria 1.1.0 (11).xcarchive` dans l’Organizer — c’est elle à envoyer. **Numéro de build distant EAS iOS resté à 10** (l’invite de `eas build:version:set` ne s’automatise pas) : le passer à 11 avant toute build EAS iOS.
+- Android : l’ancienne build EAS annulée, nouvelle build production `cbfb3247-cb04-4953-bbef-5982f6703904` avec la correction.
+- Pistes non faites : `freezeOnBlur` sur les onglets (risque de réveiller l’écran vide des onglets), cache persistant du fil, requêtes serveur du fil.
+
 ## 2026-11-16 (soir) — prêt pour les revues d’Apple et de Google
 
 - Accès de démonstration côté API (ADR-0039) : `appreview@karria.fr` + code fixe (chez Marc, `~/.karria/app-review-demo.txt`). Compte préparé avec un CV fictif. Paiements Stripe coupés puis **rouverts à la demande de Marc** (soumission avec Stripe, risque de refus connu) ; l’app suit le réglage serveur sans nouvelle build, et l’alerte de quota ne propose l’offre que si elle est ouverte (commit `efd32c7`).
