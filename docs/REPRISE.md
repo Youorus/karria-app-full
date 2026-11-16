@@ -11,6 +11,8 @@
 - Les autres plafonds de l’API (imports, dossiers, lettres, paragraphes, chat) se lisent au refus : le message du serveur est affiché. À l’ouverture d’un dossier, l’alerte propose « Voir Karria sans pub » (`services/quotas.ts` de `soutien`), jamais à un abonné.
 - Offre « Karria sans pub » : « sans limite* » dans l’accroche et dans la feuille des formules, avec la mention « usage raisonnable ». Prix inchangé (4,99 €).
 - `npm run check` vert, 688 tests. **Non vu sur appareil ni en simulateur.**
+- **Non publiée.** Commit `e4608ec` poussé sur `main`. `eas update --channel production` a construit et téléversé le bundle, puis **a échoué à la signature** : la signature des mises à jour exige l’offre EAS Production ou Enterprise, que le compte `marc29` n’a pas. Les builds embarquent le certificat, donc une mise à jour non signée serait refusée. Deux issues : souscrire à l’offre, ou livrer par une nouvelle build store depuis `main`.
+- **Piège évité** : EAS n’a **aucune** variable d’environnement `production` côté serveur. Un `eas update` lancé tel quel partirait sans les identifiants AdMob du profil `production` d’`eas.json`, qui ne servent qu’aux builds. Il faut exporter ces variables dans le shell avant de publier, ou les créer dans EAS (`eas env:create`).
 
 ## 2026-11-15 — finitions de l’atelier et contrôle de l’export
 
