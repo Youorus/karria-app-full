@@ -5,6 +5,16 @@
 
 **Dernière mise à jour : 2026-11-20**
 
+## 2026-11-20 (nuit) — pays d'inscription : région et fuseau joints à la connexion
+
+**Branche locale `feat/pays-inscription`, non poussée. Aucune build, rien n'a tourné sur appareil ni contre l'API.** `npm run check` vert (126 suites / 987 tests) ; `npm run bundle:check` produit le paquet iOS. Aucune dépendance ajoutée, aucune permission.
+
+- **Ce qui part** : `region` (deux lettres majuscules) et `timezone` (nom IANA) avec `POST /auth/email/verify` et `POST /auth/social/{apple,google}` — les requêtes qui peuvent créer un compte (`features/auth/api/auth.api.ts`). Clé **absente** quand l'appareil ne dit rien ou dit une forme inattendue. `/auth/email/start` et `/resend` n'envoient rien. Contrat : `docs/contrat-api-compte.md`, « D'où vient le compte ».
+- **La lecture** est sortie de `notifications/services/appareil.ts` vers `lib/localisation.ts` (deux domaines s'en servent) : `lireLocalisation`, `regionDepuisLangue`, `origineAppareil`. La fiche de l'appareil dit la même chose qu'avant.
+- **Côté API** : branche `feat/pays-inscription` de `karria_api_v2` (ADR-0042, migration 29), non déployée. Le serveur actuel ignore déjà les champs inconnus de ces requêtes : ce code peut partir avant lui sans rien casser — à confirmer par un essai.
+- **Non vérifié** : ce que `Intl` rend réellement sur un iPhone ou un Android réglé sur une autre région que sa langue (la région vient de la langue résolue, « fr-BE » → « BE » ; si le moteur ne rend que « fr », rien ne part et le compte reste « pays inconnu »). À regarder sur appareil ; `expo-localization` (`getLocales()[0].regionCode`) serait la lecture directe, c'est une dépendance à demander.
+- **Confidentialité** : `VERSIONS.confidentialite` reste `1.0` (non incrémentée). La phrase à ajouter vit sur le site (`karria-landing`, `app/confidentialite/page.tsx`), pas dans l'app.
+
 ## 2026-11-20 — « connexion instable » : hors ligne, réseau dégradé, retour
 
 **Rien n'est commité ni poussé. Rien n'a tourné sur appareil ni en simulateur, et aucun appel n'a été fait à l'API de production** : tout est éprouvé par les tests. `npm run check` vert (types, lint sans avertissement, format, **120 suites / 955 tests** ; 114 / 892 avant) ; `npm run bundle:check` produit le paquet iOS.
