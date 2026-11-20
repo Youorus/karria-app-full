@@ -14,6 +14,11 @@ import type { QuotaPortraits } from "../types/cv.types";
 import { oublierPropositionPortraits, usePortraits } from "./use-portraits";
 
 const mockPousser = jest.fn();
+
+const mockAcheter = jest.fn<() => Promise<"livre" | "non_confirme" | "echec">>();
+jest.mock("@/features/soutien/services/achat-direct", () => ({
+  acheterSansPub: () => mockAcheter(),
+}));
 jest.mock("@/lib/navigation", () => ({
   useNavigationUnique: () => ({ pousser: mockPousser }),
 }));
@@ -83,7 +88,7 @@ describe("Les portraits du mois", () => {
       titre: "Limite atteinte",
       texte:
         "Tu as utilisé tes 3 portraits IA du mois. Karria sans pub lève la limite : 4,99 € par mois.",
-      accepter: "Voir Karria sans pub",
+      accepter: "Lever la limite — 4,99 €/mois",
       refuser: "Fermer",
     });
     act(() => result.current.proposition.fermer());
@@ -103,14 +108,26 @@ describe("Les portraits du mois", () => {
     expect(second.result.current.proposition.visible).toBe(false);
   });
 
-  it("« Voir Karria sans pub » ferme, puis ouvre l'offre du profil", async () => {
+  it("le bouton ferme, puis ouvre directement le paiement", async () => {
+    mockAcheter.mockResolvedValue("livre");
     mockQuota.mockResolvedValue(EPUISE);
     const { result } = renderHook(() => usePortraits());
     await waitFor(() => expect(result.current.proposition.visible).toBe(true));
     act(() => result.current.proposition.accepter());
     expect(result.current.proposition.visible).toBe(false);
+    expect(mockAcheter).not.toHaveBeenCalled();
+    await act(async () => result.current.proposition.apresFermeture());
+    expect(mockAcheter).toHaveBeenCalledTimes(1);
     expect(mockPousser).not.toHaveBeenCalled();
-    act(() => result.current.proposition.apresFermeture());
+  });
+
+  it("le paiement n'a pas pu s'ouvrir : l'offre du profil prend le relais", async () => {
+    mockAcheter.mockResolvedValue("echec");
+    mockQuota.mockResolvedValue(EPUISE);
+    const { result } = renderHook(() => usePortraits());
+    await waitFor(() => expect(result.current.proposition.visible).toBe(true));
+    act(() => result.current.proposition.accepter());
+    await act(async () => result.current.proposition.apresFermeture());
     expect(mockPousser).toHaveBeenCalledWith({
       pathname: "/profil",
       params: { offre: "sans-pub" },

@@ -24,7 +24,10 @@
  * Montrée quand le document est prêt, s'il porte le filigrane, à une
  * personne non abonnée, là où le paiement est ouvert (catalogue `enabled`).
  * Paiements coupés : la ligne seule. « Retirer le filigrane » ferme la
- * feuille puis ouvre l'offre du profil — le parcours d'abonnement existant.
+ * feuille puis ouvre **directement** la page de paiement
+ * (`soutien/services/achat-direct.ts`) : le prix est sur la feuille, la
+ * personne a déjà dit oui. Abonnée, son CV se régénère seul, sans filigrane.
+ * Si la page ne s'ouvre pas, l'offre du profil prend le relais.
  *
  * ═══ Après l'abonnement ═══
  *
@@ -35,6 +38,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { acheterSansPub } from "@/features/soutien/services/achat-direct";
 import { offreSansPub } from "@/features/soutien/services/offre-disponible";
 import {
   propositionFiligrane,
@@ -60,7 +64,7 @@ export interface Filigrane {
   proposition: {
     visible: boolean;
     textes: TextesProposition;
-    /** « Retirer le filigrane » : ferme, puis ouvre l'offre. */
+    /** « Retirer le filigrane » : ferme, puis ouvre le paiement. */
     accepter: () => void;
     /** « Garder mon CV avec le filigrane », la croix, le voile. */
     fermer: () => void;
@@ -142,8 +146,20 @@ export function useFiligrane({
 
   const fermer = useCallback(() => setVisible(false), []);
 
+  const relancer = useRef(regenerer);
+  useEffect(() => {
+    relancer.current = regenerer;
+  }, [regenerer]);
+
   const accepter = useCallback(() => {
-    suite.current = () => pousser(VERS_SANS_PUB);
+    suite.current = () => {
+      void acheterSansPub().then((issue) => {
+        // Abonnée : le CV affiché se refait tout de suite, sans filigrane.
+        if (issue === "livre") relancer.current();
+        // La page n'a pas pu s'ouvrir : l'offre du profil sait dire pourquoi.
+        else if (issue === "echec") pousser(VERS_SANS_PUB);
+      });
+    };
     setVisible(false);
   }, [pousser]);
 

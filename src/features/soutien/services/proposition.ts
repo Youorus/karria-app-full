@@ -27,7 +27,7 @@ import { euros } from "@/lib/monnaie";
 export interface TextesProposition {
   titre: string;
   texte: string;
-  /** Le bouton principal : il ouvre le parcours d'abonnement. */
+  /** Le bouton principal : il ouvre directement la page de paiement. */
   accepter: string;
   /** Le bouton secondaire : il ferme, et rien ne change. */
   refuser: string;
@@ -72,7 +72,10 @@ export function propositionPortraits(
       prix === null
         ? `${utilises} Karria sans pub lève la limite.`
         : `${utilises} Karria sans pub lève la limite : ${prix}.`,
-    accepter: "Voir Karria sans pub",
+    accepter:
+      prixCentimes === null
+        ? "Passer à Karria sans pub"
+        : `Lever la limite — ${euros(prixCentimes)}/mois`,
     refuser: "Fermer",
   };
 }

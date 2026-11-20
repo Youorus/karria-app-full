@@ -21,6 +21,11 @@ jest.mock("@/lib/navigation", () => ({
   useNavigationUnique: () => ({ pousser: mockPousser }),
 }));
 
+const mockAcheter = jest.fn<() => Promise<"livre" | "non_confirme" | "echec">>();
+jest.mock("@/features/soutien/services/achat-direct", () => ({
+  acheterSansPub: () => mockAcheter(),
+}));
+
 const mockDroits = jest.fn<() => Promise<DroitsFiligrane | null>>();
 jest.mock("../api/documents.api", () => ({
   lireDroitsFiligrane: () => mockDroits(),
@@ -167,8 +172,9 @@ describe("Le filigrane sur Finaliser", () => {
     await waitFor(() => expect(retour.result.current.proposition.visible).toBe(true));
   });
 
-  it("« Retirer le filigrane » ferme la feuille, puis ouvre l'offre du profil", async () => {
-    const { result } = monter({
+  it("« Retirer le filigrane » ferme la feuille, ouvre le paiement, puis refait le CV", async () => {
+    mockAcheter.mockResolvedValue("livre");
+    const { result, regenerer } = monter({
       exporte: { id: "exp_1", filigrane: true },
       enAttente: false,
     });
@@ -176,15 +182,44 @@ describe("Le filigrane sur Finaliser", () => {
     act(() => result.current.proposition.accepter());
     expect(result.current.proposition.visible).toBe(false);
     // Rien ne s'ouvre tant que la fenêtre native n'a pas rendu la main.
+    expect(mockAcheter).not.toHaveBeenCalled();
+    await act(async () => result.current.proposition.apresFermeture());
+    expect(mockAcheter).toHaveBeenCalledTimes(1);
+    // Abonnée : le CV se régénère seul, sans détour par le profil.
+    expect(regenerer).toHaveBeenCalledTimes(1);
     expect(mockPousser).not.toHaveBeenCalled();
-    act(() => result.current.proposition.apresFermeture());
+    // Une seule fois.
+    await act(async () => result.current.proposition.apresFermeture());
+    expect(mockAcheter).toHaveBeenCalledTimes(1);
+  });
+
+  it("le paiement n'a pas pu s'ouvrir : l'offre du profil prend le relais", async () => {
+    mockAcheter.mockResolvedValue("echec");
+    const { result, regenerer } = monter({
+      exporte: { id: "exp_1", filigrane: true },
+      enAttente: false,
+    });
+    await waitFor(() => expect(result.current.proposition.visible).toBe(true));
+    act(() => result.current.proposition.accepter());
+    await act(async () => result.current.proposition.apresFermeture());
     expect(mockPousser).toHaveBeenCalledWith({
       pathname: "/profil",
       params: { offre: "sans-pub" },
     });
-    // Une seule fois.
-    act(() => result.current.proposition.apresFermeture());
-    expect(mockPousser).toHaveBeenCalledTimes(1);
+    expect(regenerer).not.toHaveBeenCalled();
+  });
+
+  it("paiement refermé sans confirmation : rien n'est affirmé, rien n'est refait", async () => {
+    mockAcheter.mockResolvedValue("non_confirme");
+    const { result, regenerer } = monter({
+      exporte: { id: "exp_1", filigrane: true },
+      enAttente: false,
+    });
+    await waitFor(() => expect(result.current.proposition.visible).toBe(true));
+    act(() => result.current.proposition.accepter());
+    await act(async () => result.current.proposition.apresFermeture());
+    expect(regenerer).not.toHaveBeenCalled();
+    expect(mockPousser).not.toHaveBeenCalled();
   });
 
   it("paiements coupés sur la plateforme : pas de feuille, seulement la ligne", async () => {

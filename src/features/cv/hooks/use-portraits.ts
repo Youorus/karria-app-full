@@ -34,6 +34,7 @@ import {
   propositionPortraits,
   type TextesProposition,
 } from "@/features/soutien/services/proposition";
+import { acheterSansPub } from "@/features/soutien/services/achat-direct";
 import { quotaAtteint, VERS_SANS_PUB } from "@/features/soutien/services/quotas";
 import { ErreurApi } from "@/lib/http";
 import { useNavigationUnique } from "@/lib/navigation";
@@ -139,9 +140,16 @@ export function usePortraits(actif = true): Portraits {
   const fermer = useCallback(() => setVisible(false), []);
 
   const accepter = useCallback(() => {
-    suite.current = () => pousser(VERS_SANS_PUB);
+    // Le paiement s'ouvre sur place (`soutien/services/achat-direct.ts`) ;
+    // abonnée, la limite est levée et le compteur se relit.
+    suite.current = () => {
+      void acheterSansPub().then((issue) => {
+        if (issue === "livre") rafraichir();
+        else if (issue === "echec") pousser(VERS_SANS_PUB);
+      });
+    };
     setVisible(false);
-  }, [pousser]);
+  }, [pousser, rafraichir]);
 
   const apresFermeture = useCallback(() => {
     const action = suite.current;

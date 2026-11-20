@@ -34,7 +34,7 @@ describe("La proposition quand les portraits sont épuisés", () => {
       titre: "Limite atteinte",
       texte:
         "Tu as utilisé tes 3 portraits IA du mois. Karria sans pub lève la limite : 4,99 € par mois.",
-      accepter: "Voir Karria sans pub",
+      accepter: "Lever la limite — 4,99 €/mois",
       refuser: "Fermer",
     });
     expect(propositionPortraits(3, null).texte).toBe(

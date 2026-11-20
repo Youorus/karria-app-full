@@ -12,9 +12,10 @@
  *
  * ═══ Un seul bouton plein ═══
  *
- * Le bouton principal mène au parcours d'abonnement existant (l'offre du
- * profil) ; l'appelant l'ouvre **après** la fermeture (`apresFermeture`),
- * parce qu'iOS ne présente pas un écran par-dessus une fenêtre qui se ferme.
+ * Le bouton principal ouvre directement la page de paiement
+ * (`services/achat-direct.ts`) ; l'appelant l'ouvre **après** la fermeture
+ * (`apresFermeture`), parce qu'iOS ne présente rien par-dessus une fenêtre
+ * qui se ferme.
  *
  * La feuille basse vient de l'atelier : c'est la seule du projet qui sache
  * rester à mi-hauteur. Aucun mot n'est écrit ici — `services/proposition.ts`.
