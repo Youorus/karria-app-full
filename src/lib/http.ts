@@ -158,6 +158,14 @@ interface Options {
    * incomplet, et le serveur rejette le corps sans pouvoir dire pourquoi.
    */
   formulaire?: boolean;
+  /**
+   * Vrai pour une lecture **d'information**, que l'app sait faire sans :
+   * son échec n'est pas montré à la personne, et le témoin des erreurs
+   * (`auMomentDUneErreur`) ne le voit pas. L'erreur, elle, remonte toujours
+   * à l'appelant. Ex. : `/cv/me/generated-cvs/allowance`, qu'un serveur plus
+   * ancien refuse — sans que rien ne soit cassé pour autant.
+   */
+  facultatif?: boolean;
 }
 
 async function envoyer(chemin: string, options: Options, jeton: string | null) {
@@ -305,7 +313,38 @@ async function lireErreur(reponse: Response): Promise<ErreurApi> {
   );
 }
 
+/** Prévenu de chaque erreur rendue à un appelant. Voir `auMomentDUneErreur`. */
+let surErreur: ((erreur: ErreurApi) => void) | null = null;
+
+/**
+ * Un témoin de toutes les erreurs que le client rend — refus du serveur
+ * comme panne de transport. Il n'en change aucune : il regarde.
+ *
+ * Posé par la demande d'avis (`features/avis`) : on ne sollicite pas une
+ * note dans une session où quelque chose a échoué. `lib/` ne connaît pas
+ * les domaines, d'où un rappel plutôt qu'un import.
+ */
+export function auMomentDUneErreur(rappel: ((erreur: ErreurApi) => void) | null): void {
+  surErreur = rappel;
+}
+
 async function appeler<T>(chemin: string, options: Options = {}): Promise<T> {
+  try {
+    return await appelerSansTemoin<T>(chemin, options);
+  } catch (cause) {
+    if (cause instanceof ErreurApi && surErreur !== null && options.facultatif !== true) {
+      try {
+        surErreur(cause);
+      } catch (defaut) {
+        // Un témoin défaillant ne doit jamais masquer l'erreur d'origine.
+        console.warn("[karria] témoin des erreurs d'API défaillant", defaut);
+      }
+    }
+    throw cause;
+  }
+}
+
+async function appelerSansTemoin<T>(chemin: string, options: Options = {}): Promise<T> {
   const authentifie = options.authentifie ?? true;
 
   let jeton: string | null = null;

@@ -29,6 +29,7 @@ import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
 import { ChargeurKarria } from "@/components/chargeur-karria";
 import { Suggestions } from "@/features/assistant/components/suggestions";
+import { FeuilleProposition } from "@/features/soutien/components/feuille-proposition";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import { CarteJet } from "../components/carte-jet";
@@ -252,6 +253,14 @@ export function EcranCreationCv() {
           </KeyboardAvoidingView>
         )}
       </SafeAreaView>
+      {/* Portraits du mois épuisés : la proposition d'abonnement, à fermer d'un geste. */}
+      <FeuilleProposition
+        visible={c.photo.proposition.visible}
+        textes={c.photo.proposition.textes}
+        onAccepter={c.photo.proposition.accepter}
+        onFermer={c.photo.proposition.fermer}
+        apresFermeture={c.photo.proposition.apresFermeture}
+      />
     </Box>
   );
 }

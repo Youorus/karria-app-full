@@ -98,7 +98,7 @@ import {
   type Presentation,
 } from "../types/cv.types";
 import { useChoixPhoto } from "./use-choix-photo";
-import { usePortraits } from "./use-portraits";
+import { usePortraits, type PropositionPortraits } from "./use-portraits";
 
 export type ValeurSection =
   | { section: "identity"; valeur: Identite }
@@ -200,6 +200,8 @@ export interface ModifierCv {
     probleme: string | null;
     /** Les portraits retravaillés qui restent ce mois-ci (trois par mois). */
     portraits: { mention: string | null; epuises: boolean };
+    /** Les portraits du mois épuisés : la proposition d'abonnement, à fermer d'un geste. */
+    proposition: PropositionPortraits;
   };
 }
 
@@ -208,11 +210,13 @@ function sectionDepuis(param: string | string[] | undefined): CleChapitre {
   return CHAPITRES.find((c) => c === valeur) ?? "identity";
 }
 
+const IDENTITE_VIDE: Identite = { prenom: "", nom: "", titre: null, precision: null };
+
 /** La valeur de la section, lue dans le CV. */
 export function valeurDuCv(section: CleChapitre, cv: Cv): ValeurSection {
   switch (section) {
     case "identity":
-      return { section, valeur: cv.identite ?? { prenom: "", nom: "", titre: null } };
+      return { section, valeur: cv.identite ?? IDENTITE_VIDE };
     case "contact":
       return {
         section,
@@ -271,6 +275,7 @@ const CHAMPS_SERVEUR: Record<string, string> = {
   first_name: "prenom",
   last_name: "nom",
   headline: "titre",
+  availability: "precision",
   email: "email",
   phone: "telephone",
   city: "ville",
@@ -352,6 +357,7 @@ export function useModifierCv(): ModifierCv {
   const choixPhoto = useChoixPhoto();
   const portraits = usePortraits(section === "photo");
   const rafraichirPortraits = portraits.rafraichir;
+  const signalerRefusPortraits = portraits.signalerRefus;
   const { avecConsentement, rejouerSiConsentementRequis } = useActionIa();
   // Le rejeu après l'accord passe par une référence : la fonction se cite
   // elle-même, et React refuse qu'une valeur soit lue avant sa déclaration.
@@ -596,6 +602,9 @@ export function useModifierCv(): ModifierCv {
             return;
           }
           setProblemePhoto(messageDAmelioration(cause));
+          // Les portraits du mois sont épuisés : la proposition d'abonnement,
+          // par-dessus — l'originale reste là, derrière.
+          signalerRefusPortraits(cause);
           // L'originale reste un très bon choix : on la montre, seule.
           setEtapePhoto({
             nom: "comparaison",
@@ -611,7 +620,7 @@ export function useModifierCv(): ModifierCv {
           rafraichirPortraits();
         });
     },
-    [valeur, rejouerSiConsentementRequis, rafraichirPortraits],
+    [valeur, rejouerSiConsentementRequis, rafraichirPortraits, signalerRefusPortraits],
   );
   useEffect(() => {
     rejouerAmelioration.current = ameliorerDepuis;
@@ -732,6 +741,7 @@ export function useModifierCv(): ModifierCv {
       enCours: photoEnCours,
       probleme: choixPhoto.probleme ?? problemePhoto,
       portraits: { mention: portraits.mention, epuises: portraits.epuises },
+      proposition: portraits.proposition,
     },
   };
 }

@@ -53,7 +53,12 @@ describe("Les messages d'échec de l'import", () => {
 });
 
 const cv: Cv = {
-  identite: { prenom: "Awa", nom: "Diallo", titre: "Conseillère de vente" },
+  identite: {
+    prenom: "Awa",
+    nom: "Diallo",
+    titre: "Conseillère de vente",
+    precision: null,
+  },
   contact: { email: "awa@example.com", telephone: null, ville: "Montreuil", liens: [] },
   presentation: "Je suis souriante.",
   photo: null,

@@ -51,6 +51,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
+import { succesPuisAvis } from "@/features/avis/services/demande-avis";
 import { ErreurApi } from "@/lib/http";
 import {
   garderOffre,
@@ -398,7 +399,12 @@ export function useFilOffres(): FilOffres {
       // revient — et l'on journalise, sans interrompre le défilement.
       remplacer(offre.id, { enregistree: !offre.enregistree });
       garderOffre(offre.id, !offre.enregistree)
-        .then((confirme) => remplacer(offre.id, { enregistree: confirme }))
+        .then((confirme) => {
+          remplacer(offre.id, { enregistree: confirme });
+          // Une offre gardée, confirmée par le serveur : à partir de la
+          // deuxième, un succès qui peut amener la demande d'avis.
+          if (confirme) succesPuisAvis("offre");
+        })
         .catch((cause: unknown) => {
           console.warn("[karria] signet non enregistré", cause);
           remplacer(offre.id, { enregistree: offre.enregistree });

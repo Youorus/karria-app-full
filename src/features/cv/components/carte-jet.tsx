@@ -58,6 +58,7 @@ function Contenu({ jet }: { jet: Jet }) {
             {jet.donnees.prenom} {jet.donnees.nom}
           </Texte>
           <Ligne texte={jet.donnees.titre} discret />
+          <Ligne texte={jet.donnees.precision} discret />
         </VStack>
       );
     case "contact":

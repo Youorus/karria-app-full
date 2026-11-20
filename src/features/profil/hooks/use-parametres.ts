@@ -34,12 +34,13 @@
 
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
-import { Alert, Linking } from "react-native";
+import { Alert, Linking, Platform } from "react-native";
 
 import { usePorte } from "@/features/auth/hooks/use-porte";
 import { useSession } from "@/features/auth/hooks/use-session";
 import { ouvrirConsultationIa } from "@/features/auth/services/consentement-ia";
 import { ouvrirDocument, type Document } from "@/features/auth/services/documents";
+import { noterKarria } from "@/features/avis/services/demande-avis";
 import { synchroniserAppareil } from "@/features/notifications/hooks/synchroniser-appareil";
 import { lirePermission } from "@/features/notifications/services/notifications";
 import type { PermissionPush } from "@/features/notifications/types/appareils.types";
@@ -68,6 +69,10 @@ export interface Parametres {
   choixPublicitaires: boolean;
   gererChoixPublicitaires: () => void;
   lire: (document: Document) => void;
+  /** « Noter Karria » : la fiche du magasin, pour y écrire un avis. */
+  noterKarria: () => void;
+  /** Où l'avis s'écrit : « Sur l'App Store. » ou « Sur Google Play. ». */
+  magasin: string;
   seDeconnecter: () => void;
   supprimerLeCompte: () => void;
   retour: () => void;
@@ -160,6 +165,18 @@ export function useParametres(): Parametres {
       });
     }, []),
     lire: useCallback((document: Document) => void ouvrirDocument(document), []),
+    magasin: Platform.OS === "ios" ? "Sur l'App Store." : "Sur Google Play.",
+    noterKarria: useCallback(() => {
+      void noterKarria().then((ouverte) => {
+        if (!ouverte)
+          Alert.alert(
+            "Le magasin n'a pas pu s'ouvrir",
+            Platform.OS === "ios"
+              ? "Cherche « Karria » dans l'App Store pour laisser ton avis."
+              : "Cherche « Karria » dans Google Play pour laisser ton avis.",
+          );
+      });
+    }, []),
     seDeconnecter,
     supprimerLeCompte: useCallback(() => pousser("/compte/supprimer"), [pousser]),
     retour,

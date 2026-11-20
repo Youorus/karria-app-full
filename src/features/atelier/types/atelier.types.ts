@@ -24,6 +24,9 @@ export interface RenduBrut {
   warnings: string[];
   /** Lettre : le style réellement servi — `template` (assortie) ou `plain` (sobre) (ADR-0036). */
   letter_style_served?: "template" | "plain" | null;
+  /** L'aperçu porte le filigrane que l'export portera (ADR-0040) ; `null` pour
+   *  l'exemple d'un modèle, absent d'un serveur plus ancien. */
+  watermark?: boolean | null;
 }
 
 /** La lettre telle que `documents` la met en page (§ 2 du contrat). */
@@ -91,6 +94,19 @@ export interface ExportBrut {
   preview_urls?: string[] | null;
   /** Toujours là sur le vrai serveur ; toléré absent (un export de dossier d'avance). */
   ats?: AtsBrut;
+  /** Ce document porte le filigrane « réalisé avec Karria » (ADR-0040). Absent
+   *  d'un serveur plus ancien : lu comme `false`, et rien n'est proposé. */
+  watermarked?: boolean;
+}
+
+/** `GET /cv/me/generated-cvs/allowance` : les CV sans filigrane du mois. */
+export interface DroitsFiligraneBruts {
+  subscriber: boolean;
+  free_per_month: number;
+  used: number;
+  remaining: number;
+  watermark_next: boolean;
+  resets_at: string;
 }
 
 /** `POST /documents/exports/send` → `202 Envoi`. */
@@ -124,6 +140,9 @@ export interface Rendu {
   avertissements: string[];
   /** Lettre : le style que le serveur a réellement servi ; `null` pour un CV. */
   styleLettreServi: StyleLettre | null;
+  /** L'aperçu porte le filigrane que l'export portera ; `null` : le serveur ne
+   *  le dit pas (exemple d'un modèle, ou serveur d'avant l'ADR-0040). */
+  filigrane: boolean | null;
 }
 
 export type NiveauAts = "bon" | "moyen" | "faible";
@@ -170,6 +189,26 @@ export interface Export {
   couleur: string | null;
   /** Lettre : le style servi ; `null` pour un CV. */
   styleLettre: StyleLettre | null;
+  /** Le document porte le filigrane Karria : c'est le signal pour proposer
+   *  l'abonnement **après** l'export, sans jamais retenir le fichier. */
+  filigrane: boolean;
+}
+
+/**
+ * Les CV sans filigrane du mois (ADR-0040 de l'API) : trois par mois civil
+ * pour un compte gratuit, puis le filigrane — jamais de refus. Une
+ * information, lue pour prévenir ; le serveur seul décide.
+ */
+export interface DroitsFiligrane {
+  /** Karria sans pub : jamais de filigrane, rien à afficher. */
+  abonne: boolean;
+  gratuitsParMois: number;
+  utilises: number;
+  restants: number;
+  /** Le prochain export sera filigrané. */
+  filigraneAuProchain: boolean;
+  /** Début du mois suivant (ISO, UTC). */
+  repartLe: string;
 }
 
 export type StatutEnvoi = "en_file" | "envoye" | "echoue";

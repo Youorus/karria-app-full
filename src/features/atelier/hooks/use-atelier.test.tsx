@@ -152,7 +152,12 @@ jest.mock("@/features/modeles/api/modeles.api", () => ({
 }));
 
 const mockCv: Cv = {
-  identite: { prenom: "Awa", nom: "Diallo", titre: "Conseillère de vente" },
+  identite: {
+    prenom: "Awa",
+    nom: "Diallo",
+    titre: "Conseillère de vente",
+    precision: null,
+  },
   contact: null,
   presentation: "Dix ans en boutique.",
   photo: null,
@@ -363,6 +368,55 @@ describe("L'atelier : changer de modèle ne perd rien", () => {
     // Annuler rend l'intitulé d'avant : l'historique n'a pas été vidé.
     act(() => result.current.annuler());
     expect(result.current.cv?.identite?.titre).toBe("Conseillère de vente");
+  });
+
+  it("la précision sous le poste visé : touchée, elle ouvre l'identité ; saisie, elle se patche, se rend et se garde", async () => {
+    const { result } = renderHook(() => useAtelier(true));
+    await waitFor(() => expect(result.current.chargement).toBe(false));
+    const patcher = jest.fn<(patches: { chemin: string; texte: string }[]) => void>();
+    act(() =>
+      result.current.poserFeuille({
+        patcher,
+        choisir: jest.fn(),
+      } as unknown as Parameters<typeof result.current.poserFeuille>[0]),
+    );
+
+    // Toucher le texte rendu ouvre le formulaire de l'identité, comme le poste visé.
+    act(() => result.current.toucher("identity.availability"));
+    expect(result.current.cheminChoisi).toBe("identity.availability");
+    expect(result.current.feuille).toEqual({
+      type: "modifier",
+      cible: { section: "identity" },
+    });
+    act(() => result.current.fermer());
+
+    // À la frappe : un patch local, rien n'est retenu.
+    act(() => result.current.apercu("identity.availability", "Dispo"));
+    expect(patcher).toHaveBeenLastCalledWith([
+      { chemin: "identity.availability", texte: "Dispo" },
+    ]);
+    expect(result.current.cv?.identite?.precision).toBeNull();
+
+    // « Enregistrer » : le CV la porte, la feuille est patchée, le rendu la reçoit.
+    mockRendre.mockClear();
+    act(() =>
+      result.current.changerIntitule("Conseillère de vente", "Disponible immédiatement"),
+    );
+    expect(result.current.cv?.identite).toEqual({
+      prenom: "Awa",
+      nom: "Diallo",
+      titre: "Conseillère de vente",
+      precision: "Disponible immédiatement",
+    });
+    expect(patcher).toHaveBeenLastCalledWith([
+      { chemin: "identity.availability", texte: "Disponible immédiatement" },
+    ]);
+    await waitFor(() => expect(mockRendre).toHaveBeenCalled());
+    const [, rendu] = mockRendre.mock.calls[mockRendre.mock.calls.length - 1];
+    expect((rendu as Cv).identite?.precision).toBe("Disponible immédiatement");
+    expect(lireBrouillonAtelier("libre")?.cv.identite?.precision).toBe(
+      "Disponible immédiatement",
+    );
   });
 
   it("libre : `?modele=` (galerie, Mes CV) pose le modèle demandé sans rouvrir la feuille", async () => {

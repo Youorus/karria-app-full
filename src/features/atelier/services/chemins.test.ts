@@ -12,7 +12,7 @@ import {
 } from "./chemins";
 
 const cv: Cv = {
-  identite: { prenom: "Awa", nom: "Diallo", titre: "Vendeuse" },
+  identite: { prenom: "Awa", nom: "Diallo", titre: "Vendeuse", precision: null },
   contact: {
     email: "awa@ex.fr",
     telephone: null,
@@ -65,6 +65,24 @@ describe("les textes par chemin", () => {
     expect(m.has("contact.phone")).toBe(false);
   });
 
+  it("ancre la précision sous le poste visé sur son propre chemin, et rien sans elle", () => {
+    expect(textesDuCv(cv).has("identity.availability")).toBe(false);
+    const avec: Cv = {
+      ...cv,
+      identite: { ...cv.identite!, precision: "Recherche alternance 24 mois" },
+    };
+    expect(textesDuCv(avec).get("identity.availability")).toBe(
+      "Recherche alternance 24 mois",
+    );
+    // La frappe patche ce chemin-là, et lui seul ; l'effacer vide la ligne.
+    expect(differences(cv, avec)).toEqual([
+      { chemin: "identity.availability", texte: "Recherche alternance 24 mois" },
+    ]);
+    expect(differences(avec, cv)).toEqual([
+      { chemin: "identity.availability", texte: "" },
+    ]);
+  });
+
   it("ne rend que ce qui a changé, et efface ce qui disparaît", () => {
     const apres: Cv = {
       ...cv,
@@ -81,6 +99,11 @@ describe("les textes par chemin", () => {
 describe("les cibles", () => {
   it("désigne la section, et l'index dans une liste", () => {
     expect(cibleDuChemin("identity.full_name")).toEqual({ section: "identity" });
+    // Toucher la précision ouvre l'identité, comme toucher le poste visé.
+    expect(cibleDuChemin("identity.availability")).toEqual(
+      cibleDuChemin("identity.headline"),
+    );
+    expect(cibleDuChemin("identity.availability")).toEqual({ section: "identity" });
     expect(cibleDuChemin("experiences.2.missions.1")).toEqual({
       section: "experiences",
       index: 2,

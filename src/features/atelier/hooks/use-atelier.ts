@@ -208,7 +208,8 @@ export interface Atelier {
     index: number,
     element: Experience | Formation,
   ) => void;
-  changerIntitule: (titre: string) => void;
+  /** Le poste visé et, si elle est donnée, la précision écrite dessous. */
+  changerIntitule: (titre: string, precision?: string) => void;
   /** Montre un texte sur la feuille sans rien retenir (à la frappe). */
   apercu: (chemin: string, texte: string) => void;
   annuler: () => void;
@@ -926,11 +927,11 @@ export function useAtelier(libre = false): Atelier {
   );
 
   const changerIntitule = useCallback(
-    (titre: string) => {
+    (titre: string, precision?: string) => {
       const courant = cvRef.current;
       if (courant === null) return;
       choisirChemin("identity.headline");
-      appliquer(cvAvecIntitule(courant, titre));
+      appliquer(cvAvecIntitule(courant, titre, precision));
     },
     [appliquer, choisirChemin],
   );

@@ -68,7 +68,7 @@ import { DEFINITIONS, veutPasser, type DefinitionChapitre } from "../services/ch
 import { messageDAmelioration } from "../services/photo";
 import { CHAPITRES, type Brouillon, type CleChapitre, type Jet } from "../types/cv.types";
 import { useChoixPhoto } from "./use-choix-photo";
-import { usePortraits } from "./use-portraits";
+import { usePortraits, type PropositionPortraits } from "./use-portraits";
 
 const PAROLE_PROPOSITION = "Voici ce que j'ai lu dans ton CV. C'est bon, ou je corrige ?";
 const PAROLE_PROPOSITION_SUIVANTE = "Et celle-ci, c'est bon ?";
@@ -129,6 +129,8 @@ export interface CreationCv {
     garder: (image: string) => void;
     /** Les portraits retravaillés qui restent ce mois-ci (trois par mois). */
     portraits: { mention: string | null; epuises: boolean };
+    /** Les portraits du mois épuisés : la proposition d'abonnement, à fermer d'un geste. */
+    proposition: PropositionPortraits;
   };
   /** « J'ai déjà un CV » : proposé tant que rien n'est validé ; ouvre l'écran d'import. */
   importation: {
@@ -180,6 +182,7 @@ export function useCreationCv(): CreationCv {
   // Le compteur se lit en entrant dans l'étape photo, et se relit à chaque
   // retour dans l'une de ses phases — donc après chaque tentative (`envoi`).
   const portraits = usePortraits(phase.nom.startsWith("photo-"));
+  const signalerRefusPortraits = portraits.signalerRefus;
   const [texte, setTexte] = useState("");
   // Ce que la dictée a entendu s'ajoute à ce qui est déjà écrit : on relit
   // le tout avant d'envoyer.
@@ -417,6 +420,8 @@ export function useCreationCv(): CreationCv {
             return;
           }
           if (ameliorer) {
+            // Portraits du mois épuisés : la proposition d'abonnement monte.
+            signalerRefusPortraits(cause);
             // L'amélioration a échoué : l'originale reste un très bon choix.
             setProbleme(
               cause instanceof ErreurApi && cause.raison === "portrait_quota_exceeded"
@@ -435,7 +440,7 @@ export function useCreationCv(): CreationCv {
           setPhase({ nom: "photo-source" });
         });
     },
-    [enregistrer, rejouerSiConsentementRequis],
+    [enregistrer, rejouerSiConsentementRequis, signalerRefusPortraits],
   );
   useEffect(() => {
     rejouerPhoto.current = (image) => envoyerPhoto(image, true);
@@ -512,6 +517,7 @@ export function useCreationCv(): CreationCv {
         }
       },
       portraits: { mention: portraits.mention, epuises: portraits.epuises },
+      proposition: portraits.proposition,
     },
     importation: {
       possible:

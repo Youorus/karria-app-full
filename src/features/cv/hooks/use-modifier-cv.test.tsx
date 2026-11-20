@@ -55,6 +55,8 @@ jest.mock("@/features/auth/hooks/use-action-ia", () => ({
 }));
 jest.mock("expo-router", () => ({
   useRouter: () => ({ back: mockBack, push: jest.fn(), replace: jest.fn() }),
+  // `usePortraits` ouvre l'offre sans pub par la navigation unique.
+  useNavigation: () => ({ isFocused: () => true }),
   useLocalSearchParams: () => ({ section: mockSection }),
 }));
 jest.mock("./use-choix-photo", () => ({
@@ -62,7 +64,7 @@ jest.mock("./use-choix-photo", () => ({
 }));
 
 const cv: Cv = {
-  identite: { prenom: "Awa", nom: "Diallo", titre: null },
+  identite: { prenom: "Awa", nom: "Diallo", titre: null, precision: null },
   contact: { email: "awa@example.com", telephone: null, ville: "Montreuil", liens: [] },
   presentation: "Moi.",
   photo: null,
@@ -128,7 +130,7 @@ describe("Modifier une section", () => {
     marquerImporte();
     mockModifier.mockResolvedValue({
       ...cv,
-      identite: { prenom: "Awa", nom: "Diallo", titre: "Vendeuse" },
+      identite: { prenom: "Awa", nom: "Diallo", titre: "Vendeuse", precision: null },
     });
     const { result } = renderHook(() => ({ m: useModifierCv(), v: useVerification() }));
 
@@ -139,14 +141,19 @@ describe("Modifier une section", () => {
     expect(result.current.v.aVerifier).toEqual(["contact", "experiences", "educations"]);
 
     act(() =>
-      result.current.m.changer({ prenom: "Awa", nom: "Diallo", titre: "Vendeuse" }),
+      result.current.m.changer({
+        prenom: "Awa",
+        nom: "Diallo",
+        titre: "Vendeuse",
+        precision: null,
+      }),
     );
     expect(result.current.m.modifie).toBe(true);
     act(() => result.current.m.enregistrer());
     await waitFor(() => expect(result.current.m.enregistrement).toBe("fait"));
     expect(mockModifier).toHaveBeenCalledWith("identity", {
       chapitre: "identity",
-      donnees: { prenom: "Awa", nom: "Diallo", titre: "Vendeuse" },
+      donnees: { prenom: "Awa", nom: "Diallo", titre: "Vendeuse", precision: null },
     });
     act(() => jest.advanceTimersByTime(700));
     expect(mockBack).toHaveBeenCalledTimes(1);
@@ -157,7 +164,9 @@ describe("Modifier une section", () => {
     const { result } = renderHook(() => useModifierCv());
     await waitFor(() => expect(result.current.chargement).toBe(false));
 
-    act(() => result.current.changer({ prenom: "", nom: "Diallo", titre: null }));
+    act(() =>
+      result.current.changer({ prenom: "", nom: "Diallo", titre: null, precision: null }),
+    );
     act(() => result.current.enregistrer());
 
     expect(mockModifier).not.toHaveBeenCalled();

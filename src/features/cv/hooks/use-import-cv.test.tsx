@@ -26,6 +26,10 @@ jest.mock("../api/cv.api", () => ({
   importerCv: (fichiers: FichierCv[]) => mockImporter(fichiers),
   lireMonCv: () => mockLireMonCv(),
 }));
+const mockSuccesPuisAvis = jest.fn<(succes: string) => void>();
+jest.mock("@/features/avis/services/demande-avis", () => ({
+  succesPuisAvis: (succes: string) => mockSuccesPuisAvis(succes),
+}));
 jest.mock("./use-choix-fichiers", () => ({
   ChoixImpossible: class ChoixImpossible extends Error {},
   useChoixFichiers: () => ({ choisir: (source: string) => mockChoisir(source) }),
@@ -38,7 +42,7 @@ jest.mock("@/features/auth/hooks/use-action-ia", () => ({
 }));
 
 const cv: Cv = {
-  identite: { prenom: "Awa", nom: "Diallo", titre: null },
+  identite: { prenom: "Awa", nom: "Diallo", titre: null, precision: null },
   contact: null,
   presentation: null,
   photo: null,
@@ -87,6 +91,7 @@ describe("L'import d'un CV", () => {
     mockImporter.mockReset();
     mockLireMonCv.mockReset();
     mockChoisir.mockReset();
+    mockSuccesPuisAvis.mockReset();
   });
 
   it("envoie le fichier choisi puis raconte, ligne par ligne, ce qui a été lu", async () => {
@@ -168,9 +173,15 @@ describe("L'import d'un CV", () => {
       fichiers: pdf,
     });
 
+    // Un échec n'est pas un succès : rien n'est noté pour la demande d'avis.
+    expect(mockSuccesPuisAvis).not.toHaveBeenCalled();
+
     act(() => result.current.reessayer());
     await waitFor(() => expect(result.current.phase.nom).toBe("notes"));
     expect(mockImporter).toHaveBeenCalledTimes(2);
+    // L'import a abouti : un succès, une fois.
+    expect(mockSuccesPuisAvis).toHaveBeenCalledTimes(1);
+    expect(mockSuccesPuisAvis).toHaveBeenCalledWith("import");
   });
 
   it("retrouve un import abouti pendant un passage en arrière-plan", async () => {
@@ -203,6 +214,8 @@ describe("L'import d'un CV", () => {
     expect(phase.lignes[0]).toBe("Awa Diallo.");
     // Le compte rendu est reconstruit depuis le CV : ce qui manque est dit.
     expect(phase.lignes).toContain("Pas de téléphone, e-mail ni de ville trouvés.");
+    // Retrouvé dans un `catch` : on n'y demande jamais d'avis.
+    expect(mockSuccesPuisAvis).not.toHaveBeenCalled();
   });
 
   it("sans passage en arrière-plan, une coupure réseau est une erreur, et rien n'est relu", async () => {

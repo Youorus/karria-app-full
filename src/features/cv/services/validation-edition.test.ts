@@ -12,6 +12,7 @@ import {
   emailValide,
   estBloque,
   messagesDe,
+  PRECISION_LONGUEUR_MAX,
   telephoneValide,
   urlValide,
   validerElement,
@@ -206,7 +207,10 @@ describe("Les coordonnées", () => {
 describe("L'identité et l'à-propos", () => {
   it("réclament prénom et nom", () => {
     const erreurs = validerSection(
-      { section: "identity", valeur: { prenom: "", nom: " ", titre: null } },
+      {
+        section: "identity",
+        valeur: { prenom: "", nom: " ", titre: null, precision: null },
+      },
       AUJOURDHUI,
     );
     expect(messagesDe(erreurs, { avecRequis: true })).toEqual({
@@ -214,6 +218,27 @@ describe("L'identité et l'à-propos", () => {
       nom: "Ton nom est nécessaire.",
     });
     expect(messagesDe(erreurs, { avecRequis: false })).toEqual({});
+  });
+
+  it("bornent la précision sous le poste visé à 150 caractères, sans l'exiger", () => {
+    const identite = { prenom: "Awa", nom: "Diallo", titre: null };
+    expect(
+      validerSection({ section: "identity", valeur: { ...identite, precision: null } }),
+    ).toEqual([]);
+    expect(
+      validerSection({
+        section: "identity",
+        valeur: { ...identite, precision: "x".repeat(PRECISION_LONGUEUR_MAX) },
+      }),
+    ).toEqual([]);
+    const erreurs = validerSection({
+      section: "identity",
+      valeur: { ...identite, precision: "x".repeat(PRECISION_LONGUEUR_MAX + 1) },
+    });
+    expect(erreurs.map((e) => [e.champ, e.nature])).toEqual([
+      ["precision", "incoherent"],
+    ]);
+    expect(PRECISION_LONGUEUR_MAX).toBe(150);
   });
 
   it("bornent la présentation", () => {

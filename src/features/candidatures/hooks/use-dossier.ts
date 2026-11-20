@@ -37,6 +37,7 @@ import { Alert } from "react-native";
 import { memoriserApercu } from "@/features/atelier/services/apercus";
 import { useOuvrirLecteur } from "@/features/atelier/hooks/use-ouvrir-lecteur";
 import { lireOffre } from "@/features/offres/api/offres.api";
+import { succesPuisAvis } from "@/features/avis/services/demande-avis";
 import { ErreurApi } from "@/lib/http";
 import { useNavigationUnique, type Chemin } from "@/lib/navigation";
 
@@ -188,13 +189,14 @@ export function useDossier(): EcranDossier {
   }, [note]);
 
   const basculer = useCallback(
-    async (geste: (id: string) => Promise<Dossier>, phrase: string) => {
-      if (enVol.current) return;
+    async (geste: (id: string) => Promise<Dossier>, phrase: string): Promise<boolean> => {
+      if (enVol.current) return false;
       enVol.current = true;
       setEnregistrement(true);
       try {
         poser(await geste(id));
         setNote(phrase);
+        return true;
       } catch (cause) {
         console.warn("[karria] candidature non marquée", cause);
         Alert.alert(
@@ -203,6 +205,7 @@ export function useDossier(): EcranDossier {
             ? "Vérifie ta connexion, puis réessaie."
             : "Réessaie dans un instant.",
         );
+        return false;
       } finally {
         enVol.current = false;
         setEnregistrement(false);
@@ -314,7 +317,11 @@ export function useDossier(): EcranDossier {
     note,
     maintenant,
     marquerCandidate: useCallback(
-      () => void basculer(marquerCandidate, TEXTES.noteCandidate),
+      () =>
+        void basculer(marquerCandidate, TEXTES.noteCandidate).then((marquee) => {
+          // Candidature marquée : un succès, puis la demande d'avis.
+          if (marquee) succesPuisAvis("candidature");
+        }),
       [basculer],
     ),
     retirerCandidate: useCallback(

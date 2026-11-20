@@ -133,4 +133,96 @@ describe("La porte de mise à jour", () => {
     act(() => surChangement("active"));
     await waitFor(() => expect(mockLireVersion).toHaveBeenCalledTimes(2));
   });
+
+  describe("tant que l'écran bloquant est affiché", () => {
+    it("redemande à chaque retour au premier plan, sans attendre six heures", async () => {
+      mockLireVersion.mockResolvedValue(reponse("requise"));
+      const { result } = renderHook(() => usePorteDeVersion());
+      await waitFor(() => expect(result.current.bloquante).toBe(true));
+      expect(mockLireVersion).toHaveBeenCalledTimes(1);
+
+      // Une minute plus tard : bien avant les six heures.
+      jest.setSystemTime(Date.now() + 60_000);
+      act(() => surChangement("active"));
+      await waitFor(() => expect(mockLireVersion).toHaveBeenCalledTimes(2));
+      expect(result.current.bloquante).toBe(true);
+
+      // Le réglage du serveur est corrigé : le retour suivant ouvre la porte.
+      mockLireVersion.mockResolvedValue(reponse("ok"));
+      jest.setSystemTime(Date.now() + 60_000);
+      act(() => surChangement("active"));
+      await waitFor(() => expect(result.current.bloquante).toBe(false));
+      expect(mockLireVersion).toHaveBeenCalledTimes(3);
+
+      // La porte ouverte, la règle des six heures reprend.
+      jest.setSystemTime(Date.now() + 60_000);
+      act(() => surChangement("active"));
+      expect(mockLireVersion).toHaveBeenCalledTimes(3);
+    });
+
+    it("ne redemande pas en passant à l'arrière-plan", async () => {
+      mockLireVersion.mockResolvedValue(reponse("requise"));
+      const { result } = renderHook(() => usePorteDeVersion());
+      await waitFor(() => expect(result.current.bloquante).toBe(true));
+      act(() => surChangement("background"));
+      act(() => surChangement("inactive"));
+      expect(mockLireVersion).toHaveBeenCalledTimes(1);
+    });
+
+    it("« J'ai mis à jour, vérifier » ouvre la porte dès que le serveur le dit", async () => {
+      mockLireVersion.mockResolvedValue(reponse("requise"));
+      const { result } = renderHook(() => usePorteDeVersion());
+      await waitFor(() => expect(result.current.bloquante).toBe(true));
+      expect(result.current.verification).toBe("repos");
+
+      mockLireVersion.mockResolvedValue(reponse("ok"));
+      act(() => result.current.reverifier());
+      expect(result.current.verification).toBe("en-cours");
+      await waitFor(() => expect(result.current.bloquante).toBe(false));
+      expect(result.current.verification).toBe("repos");
+      expect(mockLireVersion).toHaveBeenCalledTimes(2);
+    });
+
+    it("toujours en retard : l'écran reste, et le dit", async () => {
+      mockLireVersion.mockResolvedValue(reponse("requise"));
+      const { result } = renderHook(() => usePorteDeVersion());
+      await waitFor(() => expect(result.current.bloquante).toBe(true));
+      act(() => result.current.reverifier());
+      await waitFor(() => expect(result.current.verification).toBe("toujours"));
+      expect(result.current.bloquante).toBe(true);
+    });
+
+    it("la règle de blocage ne change pas : une vérification en échec n'ouvre rien", async () => {
+      mockLireVersion.mockResolvedValue(reponse("requise"));
+      const { result } = renderHook(() => usePorteDeVersion());
+      await waitFor(() => expect(result.current.bloquante).toBe(true));
+      mockLireVersion.mockRejectedValue(new ErreurApi("Hors ligne", 0));
+      act(() => result.current.reverifier());
+      await waitFor(() => expect(result.current.verification).toBe("echec"));
+      expect(result.current.bloquante).toBe(true);
+      expect(result.current.etat).toBe("requise");
+    });
+
+    it("le bouton et le retour au premier plan partagent une seule demande", async () => {
+      mockLireVersion.mockResolvedValue(reponse("requise"));
+      const { result } = renderHook(() => usePorteDeVersion());
+      await waitFor(() => expect(result.current.bloquante).toBe(true));
+
+      let repondre: (v: Version) => void = () => undefined;
+      mockLireVersion.mockReturnValue(
+        new Promise<Version>((r) => {
+          repondre = r;
+        }),
+      );
+      act(() => surChangement("active"));
+      act(() => result.current.reverifier());
+      expect(mockLireVersion).toHaveBeenCalledTimes(2);
+      await act(async () => {
+        repondre(reponse("ok"));
+        await Promise.resolve();
+      });
+      await waitFor(() => expect(result.current.bloquante).toBe(false));
+      expect(result.current.verification).toBe("repos");
+    });
+  });
 });

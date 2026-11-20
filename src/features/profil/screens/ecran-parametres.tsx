@@ -15,6 +15,12 @@
  * Le sélecteur à trois positions de la V1 (Sombre / Clair / Système),
  * avec une icône par position. La bascule est immédiate — c'est le
  * fournisseur de thème qui l'applique à toute l'application.
+ *
+ * ═══ « Noter Karria » ═══
+ *
+ * Un lien permanent vers la fiche du magasin, dans « À propos ». C'est la
+ * personne qui le demande : il ouvre la fiche, il ne déclenche pas l'invite
+ * du système (celle-là ne part qu'après un succès, `features/avis`).
  */
 
 import { Pressable, ScrollView } from "react-native";
@@ -62,6 +68,8 @@ export function EcranParametres() {
     choixPublicitaires,
     gererChoixPublicitaires,
     lire,
+    noterKarria,
+    magasin,
     seDeconnecter,
     supprimerLeCompte,
     retour,
@@ -173,6 +181,12 @@ export function EcranParametres() {
                   onPress={gererChoixPublicitaires}
                 />
               ) : null}
+              <LigneReglage
+                icone="etoile"
+                titre="Noter Karria"
+                detail={magasin}
+                onPress={noterKarria}
+              />
               <LigneReglage icone="info" titre="Version" detail={`Karria v${version}`} />
             </GroupeReglages>
           </Animated.View>

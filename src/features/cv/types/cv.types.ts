@@ -37,6 +37,10 @@ export interface Identite {
   prenom: string;
   nom: string;
   titre: string | null;
+  /** La précision écrite sous le poste visé (`identity.availability`) : ce
+   *  que la personne cherche et quand elle est disponible. Facultative,
+   *  150 caractères au plus ; `null` : rien n'est écrit. */
+  precision: string | null;
 }
 
 export interface Lien {
@@ -222,6 +226,8 @@ export interface IdentiteBrute {
   first_name: string;
   last_name: string;
   headline: string | null;
+  /** Absente d'un serveur d'avant l'ADR-0040 : lue comme `null`. */
+  availability?: string | null;
 }
 
 export interface ContactBrut {

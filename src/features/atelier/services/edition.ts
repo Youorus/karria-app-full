@@ -66,13 +66,26 @@ export function cvAvecElement(
   return cv;
 }
 
-export function cvAvecIntitule(cv: Cv, titre: string): Cv {
+/**
+ * Le poste visé, et la précision écrite dessous (`identity.availability`).
+ * `precision` absente : celle du CV ne bouge pas — l'appelant qui ne connaît
+ * que l'intitulé ne l'efface pas.
+ */
+export function cvAvecIntitule(cv: Cv, titre: string, precision?: string): Cv {
   const propre = titre.trim();
+  const base = cv.identite ?? { prenom: "", nom: "", titre: null, precision: null };
+  const precisionPropre = precision?.trim();
   return {
     ...cv,
     identite: {
-      ...(cv.identite ?? { prenom: "", nom: "", titre: null }),
+      ...base,
       titre: propre === "" ? null : propre,
+      precision:
+        precisionPropre === undefined
+          ? base.precision
+          : precisionPropre === ""
+            ? null
+            : precisionPropre,
     },
   };
 }

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "@jest/globals";
 import {
   estUneRouteAtelier,
   htmlDuCv,
+  poserAbonneAtelier,
   possederModeleAtelier,
   reinitialiserAtelier,
   repondreAtelier,
@@ -138,6 +139,65 @@ describe("le faux serveur de l'atelier", () => {
     expect(html).toContain('class="page"');
     expect(pages).toBe(1);
     expect(warnings).toContain("headline_missing");
+  });
+
+  it("écrit la précision sous le poste visé sur son chemin, et rien sans elle", () => {
+    expect(htmlDuCv(cv, MERIDIAN).html).not.toContain(
+      'data-chemin="identity.availability"',
+    );
+    const { html } = htmlDuCv(
+      {
+        ...cv,
+        identity: { ...cv.identity, availability: "Disponible immédiatement" },
+      },
+      MERIDIAN,
+    );
+    expect(html).toContain('data-chemin="identity.availability"');
+    expect(html).toContain("Disponible immédiatement");
+    expect(html.indexOf('data-chemin="identity.availability"')).toBeGreaterThan(
+      html.indexOf('data-chemin="identity.headline"'),
+    );
+  });
+
+  it("trois CV sans filigrane par mois, puis avec — jamais de refus ; un abonné n'en a jamais", async () => {
+    const lireDroits = async () =>
+      (await lire(repondreAtelier("GET", "/cv/me/generated-cvs/allowance", undefined)))
+        .corps as Record<string, unknown>;
+    const exporter = async () =>
+      lire(
+        repondreAtelier("POST", "/cv/me/generated-cvs", { template_id: MERIDIAN, cv }),
+      );
+
+    // Les CV semés d'avance n'entament rien.
+    expect(await lireDroits()).toMatchObject({
+      subscriber: false,
+      free_per_month: 3,
+      used: 0,
+      remaining: 3,
+      watermark_next: false,
+    });
+    for (const restants of [2, 1, 0]) {
+      const r = await exporter();
+      expect(r.statut).toBe(201);
+      expect(r.corps?.watermarked).toBe(false);
+      expect((await lireDroits()).remaining).toBe(restants);
+    }
+    expect((await lireDroits()).watermark_next).toBe(true);
+    // L'aperçu porte le filigrane que l'export portera.
+    const rendu = await lire(
+      repondreAtelier("POST", `/documents/${MERIDIAN}/render`, { cv }),
+    );
+    expect(rendu.corps?.watermark).toBe(true);
+
+    // Le quatrième sort, avec le filigrane, et n'entame rien.
+    const quatrieme = await exporter();
+    expect(quatrieme.statut).toBe(201);
+    expect(quatrieme.corps?.watermarked).toBe(true);
+    expect(await lireDroits()).toMatchObject({ used: 3, remaining: 0 });
+
+    poserAbonneAtelier(true);
+    expect(await lireDroits()).toMatchObject({ subscriber: true, watermark_next: false });
+    expect((await exporter()).corps?.watermarked).toBe(false);
   });
 
   it("refuse un Premium non possédé, puis le rend une fois livré", async () => {

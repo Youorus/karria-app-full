@@ -17,6 +17,13 @@
  * change rien : on garde la dernière réponse connue plutôt que de remettre
  * les annonces à quelqu'un qui a payé.
  *
+ * ═══ Et sans réseau ═══
+ *
+ * Avant de demander au serveur, on relit la dernière réponse qu'il a donnée
+ * (`restaurerSansPub`) : si la lecture échoue ensuite, l'abonné reste sans
+ * pub. La publicité attend de toute façon cette relecture avant d'initialiser
+ * son SDK (`reserve-annonces.ts`) ; la lancer ici la fait partir au plus tôt.
+ *
  * ═══ L'achat en attente ═══
  *
  * Aux mêmes moments — au lancement, au retour au premier plan — la session
@@ -28,12 +35,14 @@
 import { useEffect } from "react";
 import { AppState, Platform } from "react-native";
 
-import { poserSansPub } from "@/lib/sans-pub";
+import { poserSansPub, restaurerSansPub } from "@/lib/sans-pub";
 
 import { lireFacturation } from "../api/soutien.api";
 import { reverifierAchatEnAttente } from "../services/achat-en-attente";
 
 async function relire(): Promise<void> {
+  // La dernière réponse connue d'abord : elle tient si le serveur ne répond pas.
+  await restaurerSansPub();
   try {
     const facturation = await lireFacturation(Platform.OS);
     poserSansPub(facturation.sansPub.actif);

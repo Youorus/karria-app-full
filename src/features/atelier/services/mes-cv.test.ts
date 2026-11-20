@@ -23,6 +23,7 @@ function exporte(partiel: Partial<Export>): Export {
     ats: null,
     couleur: null,
     styleLettre: null,
+    filigrane: false,
     ...partiel,
   };
 }

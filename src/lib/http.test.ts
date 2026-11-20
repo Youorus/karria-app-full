@@ -23,7 +23,13 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 import { ecrireJetons, lireJetons, oublierSession } from "@/lib/session";
 
-import { auMomentDeLaDeconnexion, ErreurApi, http, versJetons } from "./http";
+import {
+  auMomentDeLaDeconnexion,
+  auMomentDUneErreur,
+  ErreurApi,
+  http,
+  versJetons,
+} from "./http";
 
 jest.mock("@/lib/config", () => ({ API_URL: "https://api.test/api/v1" }));
 jest.mock("@/lib/session", () => ({
@@ -514,6 +520,74 @@ describe("versJetons", () => {
     expect(versJetons({ access_token: "a", refresh_token: "r" })).toEqual({
       acces: "a",
       rafraichissement: "r",
+    });
+  });
+});
+
+/**
+ * Le témoin des erreurs (`auMomentDUneErreur`) : la demande d'avis s'en sert
+ * pour ne rien solliciter dans une session où quelque chose a échoué. Il
+ * regarde ; il ne change aucune erreur.
+ */
+describe("le témoin des erreurs", () => {
+  const temoin = jest.fn<(erreur: ErreurApi) => void>();
+
+  beforeEach(() => {
+    temoin.mockReset();
+    auMomentDUneErreur(temoin);
+  });
+
+  afterEach(() => auMomentDUneErreur(null));
+
+  it("ne voit rien quand tout va bien", async () => {
+    recuperer.mockResolvedValue(reponse(200, { ok: true }));
+    await http.get("/users/me");
+    expect(temoin).not.toHaveBeenCalled();
+  });
+
+  it("voit un refus du serveur, tel que l'appelant le reçoit", async () => {
+    recuperer.mockResolvedValue(
+      reponse(429, {
+        error: {
+          message: "Limite atteinte.",
+          details: { reason: "portrait_quota_exceeded" },
+        },
+      }),
+    );
+    await expect(http.post("/users/me/photo", {})).rejects.toMatchObject({
+      statut: 429,
+      raison: "portrait_quota_exceeded",
+    });
+    expect(temoin).toHaveBeenCalledTimes(1);
+    expect(temoin.mock.calls[0][0]).toMatchObject({
+      statut: 429,
+      raison: "portrait_quota_exceeded",
+    });
+  });
+
+  it("voit une panne de transport", async () => {
+    recuperer.mockRejectedValue(new TypeError("Network request failed"));
+    await expect(http.get("/users/me")).rejects.toMatchObject({ statut: 0 });
+    expect(temoin).toHaveBeenCalledTimes(1);
+    expect(temoin.mock.calls[0][0].estReseau).toBe(true);
+  });
+
+  it("ne voit pas l'échec d'une lecture facultative, qui remonte quand même", async () => {
+    recuperer.mockResolvedValue(reponse(422, { error: { message: "Invalide." } }));
+    await expect(http.get("/users/me", { facultatif: true })).rejects.toMatchObject({
+      statut: 422,
+    });
+    expect(temoin).not.toHaveBeenCalled();
+  });
+
+  it("un témoin défaillant ne masque pas l'erreur d'origine", async () => {
+    temoin.mockImplementation(() => {
+      throw new Error("témoin cassé");
+    });
+    recuperer.mockResolvedValue(reponse(500, { error: { message: "Panne." } }));
+    await expect(http.get("/users/me")).rejects.toMatchObject({
+      statut: 500,
+      message: "Panne.",
     });
   });
 });

@@ -26,6 +26,7 @@ import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
+import { FeuilleProposition } from "@/features/soutien/components/feuille-proposition";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import { FeuilleElement } from "../components/edition/formulaires-elements";
@@ -238,6 +239,14 @@ export function EcranModifierCv() {
           )}
         </KeyboardAvoidingView>
       </SafeAreaView>
+      {/* Portraits du mois épuisés : la proposition d'abonnement, à fermer d'un geste. */}
+      <FeuilleProposition
+        visible={m.photo.proposition.visible}
+        textes={m.photo.proposition.textes}
+        onAccepter={m.photo.proposition.accepter}
+        onFermer={m.photo.proposition.fermer}
+        apresFermeture={m.photo.proposition.apresFermeture}
+      />
     </Box>
   );
 }

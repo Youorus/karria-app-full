@@ -299,10 +299,13 @@ export function EcranAtelier({ libre = false }: { libre?: boolean }) {
       <FeuilleIntitule
         visible={a.feuille?.type === "intitule"}
         titre={a.cv?.identite?.titre ?? null}
+        precision={a.cv?.identite?.precision ?? null}
         onApercu={(t) => a.apercu("identity.headline", t)}
+        onApercuPrecision={(t) => a.apercu("identity.availability", t)}
         onEnregistrer={a.changerIntitule}
         onFermer={() => {
           a.apercu("identity.headline", a.cv?.identite?.titre ?? "");
+          a.apercu("identity.availability", a.cv?.identite?.precision ?? "");
           a.fermer();
         }}
       />

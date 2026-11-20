@@ -146,6 +146,16 @@ export async function partagerFichier(
 }
 
 /**
+ * Le partage a-t-il **vraiment** eu lieu ? Sur iOS, la feuille du système le
+ * dit (`sharedAction`). Sur Android, on sait seulement qu'elle s'est ouverte :
+ * ce n'est pas un succès confirmé, et rien ne doit s'appuyer dessus comme tel
+ * (la demande d'avis, `features/avis`).
+ */
+export function partageEstConfirme(partage: boolean): boolean {
+  return partage && Platform.OS === "ios";
+}
+
+/**
  * Télécharge `url` sous `nom`, ouvre la feuille de partage (avec la phrase
  * Karria sur iOS), puis efface le fichier. Sur iOS, un partage annulé
  * rend faux. Sur Android, le système signale seulement que la feuille

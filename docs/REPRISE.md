@@ -3,7 +3,33 @@
 > Document de passation. À lire en premier par toute personne ou IA qui
 > reprend le travail, avec `AGENTS.md`. Mis à jour à chaque fin de session.
 
-**Dernière mise à jour : 2026-11-16**
+**Dernière mise à jour : 2026-11-20**
+
+## 2026-11-20 — avant la campagne : précision du CV, filigrane, fiabilité, demande d'avis
+
+**Rien n'est commité ni poussé. Rien n'a tourné sur appareil ni en simulateur.** `npm run check` vert (types, lint sans avertissement, format, **110 suites / 843 tests** ; 95 / 690 avant) ; `npm run bundle:check` produit le paquet iOS. Le serveur correspondant (ADR-0040 de l'API) n'est pas encore déployé : tout est écrit pour marcher avec l'ancien comme avec le nouveau.
+
+**Nouvelle build nécessaire pour `expo-store-review`** (`~57.0.3`, ajoutée par `npx expo install`, module natif) : non lancée. Sans elle, le reste fonctionne ; la demande d'avis s'abstient (module chargé à la demande, absence avalée et journalisée).
+
+- **Lot 1 — la précision sous le poste visé** (`identity.availability`, ≤ 150, facultative) : `Identite.precision` voyage partout où `titre` voyage — `GET`/`PUT /cv/me` et brouillon (`cv.api.ts`), `cv` du rendu ancré, de l'export et du dossier (`versCvBrut`), brouillon local de l'atelier. Champ « Recherche et disponibilité (facultatif) » sous « Poste visé » dans l'édition de l'identité (qui est aussi le formulaire ouvert en touchant la feuille de l'atelier) et dans la feuille « Poste visé » de l'atelier, avec aperçu à la frappe sur `identity.availability`. Affichée sur « Mon CV » sous le poste. Faux serveur : ligne ancrée sous l'intitulé.
+- **Lot 2 — filigrane et proposition d'abonnement, jamais bloquante** : `Export.filigrane` (`watermarked`, faux si absent), `Rendu.filigrane` (`watermark`), `lireDroitsFiligrane` (`GET /cv/me/generated-cvs/allowance`, `null` sur `404` **et `422`** — l'ancien serveur prend « allowance » pour un identifiant d'export mal formé). Finaliser (`use-filigrane.ts`) : ligne discrète pendant la génération et sous le CV ; feuille « Ton CV est prêt » (`soutien/components/feuille-proposition.tsx`) une fois par export filigrané, seulement si le catalogue ouvre le paiement ici ; « Régénérer sans filigrane » dès que le drapeau sans pub est levé. Le prix affiché vient du catalogue (`offreSansPub`), pas du code. Portraits IA épuisés : même feuille, à l'ouverture de la photo (une fois par lancement) ou sur un `429 portrait_quota_exceeded`. Rien n'est ajouté à la recherche ni à l'assistant. Faux serveur : route `/allowance`, `watermarked`, `watermark`, trois CV par mois.
+- **Lot 3 — fiabilité** : (a) `lib/sans-pub.ts` retient la dernière réponse du serveur (`karria.sans-pub`) et la relit avant toute initialisation du SDK publicitaire (`demarrer` attend `sansPubPret`) — un abonné hors ligne ne voit plus d'annonce ; (b) `reserve-annonces.ts` : retirer et publier **avant** de détruire (250 ms plus tard), une annonce chargée après le passage sans pub est détruite, un emplacement sans annonce est redemandé après 60 s puis 120 s par une seule minuterie ; (c) porte de version : tant que l'écran bloquant est affiché, revérification à **chaque** retour au premier plan, et bouton « J'ai mis à jour, vérifier » avec son retour (toujours en retard / vérification impossible). La règle de blocage est inchangée.
+- **Lot 4 — demande d'avis** (`features/avis`) : `regles-avis.ts` (pur) et `demande-avis.ts` (état `karria.avis`, `isAvailableAsync` puis `requestReview`, tout échec avalé). Déclencheurs, 1,8 s après un succès confirmé : partage d'un export (Finaliser, Mes CV, lecteur), envoi par e-mail accepté, candidature marquée, CV importé, deuxième offre gardée et suivantes. Avec un dossier, la demande attend la fermeture de « As-tu candidaté ? ». Conditions et plafonds : voir l'en-tête de `regles-avis.ts`. « Noter Karria » dans Paramètres › À propos. Aucune pré-question.
+
+**Choix d'interprétation à valider par Marc**
+
+- Finaliser exporte **à l'ouverture** : la ligne « avant l'export » se lit donc pendant la génération ; une fois le CV là, elle dit ce qui est (« Ce CV porte le filigrane Karria », ou « Ton prochain CV portera… » quand le troisième vient de sortir sans). Ouvrir Finaliser, « Optimiser » et revenir de l'atelier consomment chacun un CV du mois : c'est la règle du serveur, à garder en tête.
+- Sur Android, la feuille de partage ne dit pas si le partage a eu lieu : il ne compte pas comme succès pour la demande d'avis (`partageEstConfirme`). Restent l'envoi par e-mail, la candidature, l'import, les offres gardées.
+- « Juste après la feuille de filigrane » = dix minutes ; une session = un lancement, ou un retour après trente minutes hors de l'app ; une « erreur d'API » = réseau, 5xx, 429 et refus 4xx, sauf 401, 404 et `403 ai_consent_required`.
+- La proposition des portraits ne monte pas juste après le troisième portrait (on compare ses photos) mais à la visite suivante.
+
+**Reste à faire**
+
+- Essai sur appareil de tout ce qui précède (iOS et Android), VoiceOver / TalkBack sur les nouvelles feuilles.
+- Nouvelle build (iOS et Android) pour `expo-store-review` ; vérifier l'invite sur une build de test (TestFlight ne la montre pas).
+- Déployer l'API (ADR-0040, migration 24) ; vérifier `/allowance` et `watermarked` contre le vrai serveur.
+- L'annonce d'un emplacement isolé (`use-annonce-emplacement.ts`) ne redemande toujours pas après un « no fill » : seul le fil a été traité.
+- Achat intégré : la feuille mène à l'offre Stripe du profil, comme aujourd'hui (risque de refus des magasins déjà connu).
 
 ## 2026-11-16 (nuit) — fil des offres plus fluide, build 1.1.0 (11)
 

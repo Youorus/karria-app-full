@@ -20,7 +20,7 @@ import {
 } from "./verification";
 
 const complet: Cv = {
-  identite: { prenom: "Awa", nom: "Diallo", titre: "Vendeuse" },
+  identite: { prenom: "Awa", nom: "Diallo", titre: "Vendeuse", precision: null },
   contact: { email: "a@b.fr", telephone: "06", ville: "Paris", liens: [] },
   presentation: "Moi.",
   photo: null,
@@ -54,7 +54,7 @@ describe("Ce qui manque au CV", () => {
     const troue: Cv = {
       ...complet,
       contact: { email: null, telephone: null, ville: null, liens: [] },
-      identite: { prenom: "Awa", nom: "Diallo", titre: null },
+      identite: { prenom: "Awa", nom: "Diallo", titre: null, precision: null },
       presentation: null,
       experiences: [{ ...complet.experiences[0], debut: null }],
       formations: [{ ...complet.formations[0], fin: null }],

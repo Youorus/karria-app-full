@@ -35,6 +35,7 @@ import { Stack } from "expo-router";
 
 import { FeuilleConsentementIa } from "@/features/auth/components/feuille-consentement-ia";
 import { InvitationConnexion } from "@/features/auth/components/invitation-connexion";
+import { useSessionAvis } from "@/features/avis/hooks/use-session-avis";
 import { useSession } from "@/features/auth/hooks/use-session";
 import { useAppareilConnecte } from "@/features/notifications/hooks/use-appareil-connecte";
 import { BandeRemerciement } from "@/features/soutien/components/bande-remerciement";
@@ -175,5 +176,7 @@ export default function LayoutApp() {
 function GardeAppareil() {
   useAppareilConnecte();
   useDroitsConnectes();
+  // Les sessions comptées pour la demande d'avis (`features/avis`).
+  useSessionAvis();
   return null;
 }

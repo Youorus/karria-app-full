@@ -74,7 +74,12 @@ export function versJet(chapitre: CleChapitre, brut: unknown): Jet {
       const b = brut as DonneesBrutes["identity"];
       return {
         chapitre,
-        donnees: { prenom: b.first_name, nom: b.last_name, titre: b.headline },
+        donnees: {
+          prenom: b.first_name,
+          nom: b.last_name,
+          titre: b.headline,
+          precision: b.availability ?? null,
+        },
       };
     }
     case "contact": {
@@ -132,6 +137,7 @@ export function versBrut(jet: Jet): unknown {
         first_name: jet.donnees.prenom,
         last_name: jet.donnees.nom,
         headline: jet.donnees.titre,
+        availability: jet.donnees.precision,
       };
     case "contact":
       return {
@@ -221,6 +227,7 @@ export function versCv(
             prenom: b.identity.first_name,
             nom: b.identity.last_name,
             titre: b.identity.headline,
+            precision: b.identity.availability ?? null,
           },
     contact:
       b.contact === undefined || b.contact === null

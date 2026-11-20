@@ -317,6 +317,12 @@ export function CvRempli({
             ) : manquesIdentite.length > 0 ? (
               <PastilleManque texte={libelleManquant(manquesIdentite[0])} />
             ) : null}
+            {/* La précision sous le poste visé, telle que le CV l'écrira. */}
+            {cv.identite?.precision ? (
+              <Texte className="text-center text-footnote text-muted-foreground">
+                {cv.identite.precision}
+              </Texte>
+            ) : null}
           </Pressable>
           <Pressable
             onPress={() => onModifier("contact")}

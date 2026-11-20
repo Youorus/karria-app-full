@@ -35,6 +35,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Platform } from "react-native";
 
+import { succesPuisAvis } from "@/features/avis/services/demande-avis";
 import { ErreurApi } from "@/lib/http";
 
 import { supprimerExport } from "../services/brouillon-atelier";
@@ -51,6 +52,7 @@ import {
 import {
   enregistrerFichier,
   MIME,
+  partageEstConfirme,
   partagerFichier,
   premiersOctets,
   repertoireDesExports,
@@ -209,7 +211,13 @@ export function useLecteurDocument(): EcranLecteur {
       [geste, nomDuFichier, format],
     ),
     partager: useCallback(
-      () => geste((f) => partagerFichier(f, nomDuFichier, format, genre)),
+      () =>
+        geste(async (f) => {
+          const partage = await partagerFichier(f, nomDuFichier, format, genre);
+          // Un partage confirmé : un succès, puis la demande d'avis.
+          if (partageEstConfirme(partage)) succesPuisAvis("export");
+          return partage;
+        }),
       [geste, nomDuFichier, format, genre],
     ),
     ouvrirAilleurs: useCallback(() => {

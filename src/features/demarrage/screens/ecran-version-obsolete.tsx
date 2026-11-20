@@ -10,6 +10,15 @@
  * lire. Mais rien de sévère : l'orbe au repos, le fond de l'aura, le ton
  * des autres écrans. On n'est pas puni, on est invité.
  *
+ * ═══ Et une issue, si le serveur s'est trompé ═══
+ *
+ * Sous le bouton du magasin, « J'ai mis à jour, vérifier » redemande au
+ * serveur tout de suite (`reverifier`). Ce n'est pas un « plus tard » : la
+ * porte ne s'ouvre que si le serveur le dit. Mais un réglage erroné côté
+ * serveur, une fois corrigé, ne retient plus personne six heures. La
+ * réponse se lit sous le bouton : toujours en retard, ou vérification
+ * impossible — avec quoi faire.
+ *
  * Monté par la racine (`app/_layout.tsx`) à la place de la navigation :
  * aucun écran ne peut passer au-dessus.
  */
@@ -25,15 +34,38 @@ import { Texte } from "@/components/texte";
 import { Box } from "@/components/ui/box";
 import { VStack } from "@/components/ui/vstack";
 
+import type { VerificationDeVersion } from "../hooks/use-porte-de-version";
 import { libelleDeVersion, type Version } from "../services/version";
 
 interface Props {
   /** La réponse du serveur : le numéro de la nouvelle version, et où l'obtenir. */
   version: Version | null;
   onMettreAJour: () => void;
+  /** « J'ai mis à jour, vérifier » : redemande au serveur. */
+  onVerifier: () => void;
+  verification: VerificationDeVersion;
 }
 
-export function EcranVersionObsolete({ version, onMettreAJour }: Props) {
+export const TEXTES_VERIFICATION = {
+  bouton: "J'ai mis à jour, vérifier",
+  enCours: "Vérification…",
+  toujours:
+    "Cette version n'est pas encore la dernière. Mets Karria à jour, puis réessaie.",
+  echec: "Je n'ai pas pu vérifier. Regarde ta connexion, puis réessaie.",
+} as const;
+
+export function EcranVersionObsolete({
+  version,
+  onMettreAJour,
+  onVerifier,
+  verification,
+}: Props) {
+  const retour =
+    verification === "toujours"
+      ? TEXTES_VERIFICATION.toujours
+      : verification === "echec"
+        ? TEXTES_VERIFICATION.echec
+        : null;
   const numero = version === null ? null : libelleDeVersion(version);
   const magasin = version?.urlStore ?? null;
   const nomDuMagasin = Platform.OS === "ios" ? "l'App Store" : "Google Play";
@@ -69,15 +101,33 @@ export function EcranVersionObsolete({ version, onMettreAJour }: Props) {
               </Texte>
             </VStack>
           </VStack>
-          {magasin !== null ? (
-            <BoutonAction libelle="Mettre à jour" onPress={onMettreAJour} />
-          ) : (
+          <VStack className="gap-2">
+            {magasin !== null ? (
+              <BoutonAction libelle="Mettre à jour" onPress={onMettreAJour} />
+            ) : (
+              <BoutonAction
+                libelle={`Ouvrir ${nomDuMagasin}`}
+                ton="secondaire"
+                onPress={onMettreAJour}
+              />
+            )}
             <BoutonAction
-              libelle={`Ouvrir ${nomDuMagasin}`}
-              ton="secondaire"
-              onPress={onMettreAJour}
+              libelle={TEXTES_VERIFICATION.bouton}
+              ton="discret"
+              multiligne
+              enCours={verification === "en-cours"}
+              libelleEnCours={TEXTES_VERIFICATION.enCours}
+              onPress={onVerifier}
             />
-          )}
+            {retour !== null ? (
+              <Texte
+                accessibilityLiveRegion="polite"
+                className="text-center text-footnote text-muted-foreground"
+              >
+                {retour}
+              </Texte>
+            ) : null}
+          </VStack>
         </VStack>
       </SafeAreaView>
     </Box>

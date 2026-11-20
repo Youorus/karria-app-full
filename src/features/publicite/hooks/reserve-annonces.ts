@@ -34,6 +34,30 @@
  * libéré dès qu'il se lève. La règle est vérifiée ici, au plus bas, pour
  * qu'aucun écran ne puisse l'oublier.
  *
+ * Le drapeau est relu du magasin local au démarrage (`lib/sans-pub.ts`) :
+ * `demarrer` **attend** cette relecture (`sansPubPret`) avant le consentement
+ * et le SDK. Sans cela, un abonné hors ligne — `GET /payments/me` en échec —
+ * voyait des annonces toute la session. Une annonce dont le chargement
+ * aboutit après que le drapeau s'est levé (ou après une déconnexion) est
+ * détruite au lieu d'être posée.
+ *
+ * ═══ Retirer d'abord, détruire ensuite ═══
+ *
+ * `rafraichir` et `liberer` détruisaient l'objet natif **avant** de publier,
+ * et la publication pouvait attendre le calme tactile : pendant ce temps, une
+ * vue rendait une annonce déjà détruite. L'ordre est maintenant : retirer de
+ * la réserve, publier **tout de suite** (un retrait ne fait rien surgir sous
+ * le doigt — c'est l'apparition qui attend le calme), puis détruire un
+ * instant plus tard, quand les vues ont rendu l'objet.
+ *
+ * ═══ Sans annonce (« no fill ») : on redemande, sans insister ═══
+ *
+ * Une absence d'annonce était définitive pour la session : l'emplacement
+ * restait « demandé » et vide. Il est maintenant redemandé après
+ * `delaiDeReprise` — une minute la première fois, deux ensuite — par une
+ * seule minuterie pour toute la réserve. Jamais de boucle serrée : au plus
+ * une requête par emplacement et par délai.
+ *
  * ═══ L'expiration ═══
  *
  * Google demande qu'une annonce native soit montrée dans l'heure qui suit
@@ -45,7 +69,7 @@
 import { Platform } from "react-native";
 import { NativeAdEventType } from "react-native-google-mobile-ads";
 
-import { abonnerSansPub, estSansPub } from "@/lib/sans-pub";
+import { abonnerSansPub, estSansPub, sansPubPret } from "@/lib/sans-pub";
 
 import {
   chargerAnnonce,
@@ -79,10 +103,71 @@ const demandes = new Set<number>();
 const file: number[] = [];
 let enCours = false;
 
+/** Le laps laissé aux vues pour rendre une annonce retirée, avant de la détruire. */
+export const DELAI_DESTRUCTION_MS = 250;
+
+/**
+ * L'attente avant de redemander un emplacement resté sans annonce : une
+ * minute après le premier échec, deux minutes ensuite.
+ */
+export function delaiDeReprise(echecs: number): number {
+  return echecs <= 1 ? 60_000 : 120_000;
+}
+
+/** Les emplacements restés sans annonce, et leur nombre d'échecs de suite. */
+const sansAnnonce = new Map<number, number>();
+/** Ceux qui attendent la prochaine reprise. */
+const aReprendre = new Set<number>();
+let reprise: ReturnType<typeof setTimeout> | null = null;
+
+const REFUS: Autorisation = { peutDemander: false, personnalisees: false };
+
 let instantane: ReadonlyMap<number, NativeAd> = new Map();
 const abonnes = new Set<() => void>();
 
 let publicationEnAttente: ReturnType<typeof setTimeout> | null = null;
+
+/** Publie tout de suite, sans attendre le calme : pour un **retrait**. */
+function publierMaintenant(): void {
+  if (publicationEnAttente !== null) {
+    clearTimeout(publicationEnAttente);
+    publicationEnAttente = null;
+  }
+  instantane = new Map(annonces);
+  abonnes.forEach((rappel) => rappel());
+}
+
+/** Détruit des annonces **déjà retirées** de la réserve, une fois les vues à jour. */
+function detruireEnsuite(retirees: readonly NativeAd[]): void {
+  if (retirees.length === 0) return;
+  setTimeout(() => {
+    for (const annonce of retirees) {
+      try {
+        annonce.destroy();
+      } catch (cause) {
+        console.warn("[karria] annonce non détruite", cause);
+      }
+    }
+  }, DELAI_DESTRUCTION_MS);
+}
+
+/** Une seule minuterie : à l'échéance, les emplacements vides repartent en file. */
+function programmerLaReprise(delai: number): void {
+  if (reprise !== null) return;
+  reprise = setTimeout(() => {
+    reprise = null;
+    if (bloc.mode === "coupe" || estSansPub()) {
+      aReprendre.clear();
+      return;
+    }
+    for (const emplacement of aReprendre) {
+      // Toujours « demandé », plus servi : il retourne en file, une fois.
+      if (demandes.has(emplacement) && !annonces.has(emplacement)) file.push(emplacement);
+    }
+    aReprendre.clear();
+    void vider();
+  }, delai);
+}
 
 /**
  * Publie l'instantané — mais jamais dans les deux secondes qui suivent un
@@ -106,14 +191,17 @@ function publier(): void {
 }
 
 export function demarrer(): Promise<Autorisation> {
-  if (bloc.mode === "coupe" || estSansPub()) {
-    return Promise.resolve({ peutDemander: false, personnalisees: false });
-  }
-  autorisation ??= demarrerLaPublicite(bloc.mode === "test").then((reponse) => {
-    if (!reponse.peutDemander) autorisation = null;
-    return reponse;
+  if (bloc.mode === "coupe" || estSansPub()) return Promise.resolve(REFUS);
+  // La dernière réponse connue du serveur d'abord : ni consentement ni SDK
+  // pour quelqu'un qui était abonné au dernier lancement.
+  return sansPubPret().then(() => {
+    if (estSansPub()) return REFUS;
+    autorisation ??= demarrerLaPublicite(bloc.mode === "test").then((reponse) => {
+      if (!reponse.peutDemander) autorisation = null;
+      return reponse;
+    });
+    return autorisation;
   });
-  return autorisation;
 }
 
 async function vider(): Promise<void> {
@@ -125,15 +213,27 @@ async function vider(): Promise<void> {
     let emplacement = file.shift();
     while (emplacement !== undefined) {
       const annonce = await chargerAnnonce(bloc, personnalisees);
-      if (annonce !== null) {
+      if (estSansPub() || !demandes.has(emplacement)) {
+        // Pendant le chargement, la personne est passée sans pub, s'est
+        // déconnectée, ou l'emplacement a été libéré : l'annonce n'a plus
+        // sa place, on ne la pose pas.
+        annonce?.destroy();
+      } else if (annonce !== null) {
         // L'impression du fil, comptée sur l'événement du SDK — pas au
         // chargement, qui surestimerait (`services/journal-impressions.ts`).
         annonce.addAdEventListener(NativeAdEventType.IMPRESSION, () =>
           compterImpression("fil"),
         );
+        sansAnnonce.delete(emplacement);
         annonces.set(emplacement, annonce);
         chargeesA.set(emplacement, Date.now());
         publier();
+      } else {
+        // Sans annonce pour l'instant : on redemandera, plus tard.
+        const echecs = (sansAnnonce.get(emplacement) ?? 0) + 1;
+        sansAnnonce.set(emplacement, echecs);
+        aReprendre.add(emplacement);
+        programmerLaReprise(delaiDeReprise(echecs));
       }
       if (file.length > 0) await new Promise((r) => setTimeout(r, ESPACEMENT_MS));
       emplacement = file.shift();
@@ -161,24 +261,35 @@ export function rafraichir(maintenant: number = Date.now()): void {
     if (maintenant - instant >= DUREE_DE_VIE_MS) perimes.push(emplacement);
   }
   if (perimes.length === 0) return;
+  const retirees: NativeAd[] = [];
   for (const emplacement of perimes) {
-    annonces.get(emplacement)?.destroy();
+    const annonce = annonces.get(emplacement);
+    if (annonce !== undefined) retirees.push(annonce);
     annonces.delete(emplacement);
     chargeesA.delete(emplacement);
     demandes.delete(emplacement);
   }
-  publier();
+  // Retirer, publier, **puis** détruire : aucune vue ne rend un objet détruit.
+  publierMaintenant();
+  detruireEnsuite(retirees);
   prechauffer(perimes);
 }
 
 /** Tout détruire (déconnexion) : les objets natifs sont libérés, la file vidée. */
 export function liberer(): void {
-  for (const annonce of annonces.values()) annonce.destroy();
+  const retirees = [...annonces.values()];
   annonces.clear();
   chargeesA.clear();
   demandes.clear();
   file.length = 0;
-  publier();
+  sansAnnonce.clear();
+  aReprendre.clear();
+  if (reprise !== null) {
+    clearTimeout(reprise);
+    reprise = null;
+  }
+  publierMaintenant();
+  detruireEnsuite(retirees);
 }
 
 // Dès que la personne passe sans pub, tout ce qui était chargé est libéré :

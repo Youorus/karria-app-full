@@ -41,6 +41,12 @@ export const MISSIONS_MAX = 15;
 export const MISSION_LONGUEUR_MAX = 300;
 export const PRESENTATION_LONGUEUR_MAX = 1500;
 export const TITRE_LONGUEUR_MAX = 150;
+/** La précision sous le poste visé (`identity.availability`) : la borne du serveur. */
+export const PRECISION_LONGUEUR_MAX = 150;
+/** Les mêmes mots dans l'édition du CV et dans l'atelier. */
+export const LIBELLE_PRECISION = "Recherche et disponibilité (facultatif)";
+export const AIDE_PRECISION =
+  "Ex. : Recherche alternance 24 mois · Disponible immédiatement";
 export const LIENS_MAX = 10;
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -224,6 +230,11 @@ export function validerSection(v: ValeurSection, aujourdHui = new Date()): Erreu
       if (vide(v.valeur.nom)) erreurs.push(requis("nom", "Ton nom est nécessaire."));
       if ((v.valeur.titre ?? "").length > TITRE_LONGUEUR_MAX) {
         erreurs.push(incoherent("titre", `${TITRE_LONGUEUR_MAX} caractères au plus.`));
+      }
+      if ((v.valeur.precision ?? "").length > PRECISION_LONGUEUR_MAX) {
+        erreurs.push(
+          incoherent("precision", `${PRECISION_LONGUEUR_MAX} caractères au plus.`),
+        );
       }
       break;
     case "contact": {

@@ -220,8 +220,36 @@ describe("La traduction d'un dossier", () => {
 
   it("repasse le CV et la lettre en forme réseau, sans rien perdre", () => {
     const d = versDossier(dossierBrut);
-    expect(versCvBrut(d.cv)).toEqual(dossierBrut.cv);
+    // La précision, absente de ce dossier, repart explicitement à `null`.
+    expect(versCvBrut(d.cv)).toEqual({
+      ...dossierBrut.cv,
+      identity: { ...dossierBrut.cv.identity, availability: null },
+    });
     expect(versLettreBrute(d.lettre!)).toEqual(dossierBrut.letter);
+  });
+
+  it("fait voyager la précision sous le poste visé dans les deux sens", () => {
+    // Un serveur d'avant l'ADR-0040 ne l'envoie pas : `null`, jamais `undefined`.
+    expect(versDossier(dossierBrut).cv.identite?.precision).toBeNull();
+    const avec: DossierBrut = {
+      ...dossierBrut,
+      cv: {
+        ...dossierBrut.cv,
+        identity: {
+          ...dossierBrut.cv.identity!,
+          availability: "Recherche alternance 24 mois · Disponible immédiatement",
+        },
+      },
+    };
+    const d = versDossier(avec);
+    expect(d.cv.identite?.precision).toBe(
+      "Recherche alternance 24 mois · Disponible immédiatement",
+    );
+    // C'est `versCvBrut` qui écrit le `cv` du rendu ancré, de l'export et du
+    // `PUT /applications/{id}/cv`.
+    expect(versCvBrut(d.cv).identity?.availability).toBe(
+      "Recherche alternance 24 mois · Disponible immédiatement",
+    );
   });
 
   it("traduit un export : une lettre, ou un CV par défaut", () => {

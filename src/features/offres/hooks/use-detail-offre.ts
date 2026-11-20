@@ -42,6 +42,7 @@ import { useEntreeAtelier } from "@/features/atelier/hooks/use-entree-atelier";
 import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
 import { useAnnonceEmplacement } from "@/features/publicite/hooks/use-annonce-emplacement";
 import type { NativeAd } from "@/features/publicite/api/publicite.api";
+import { succesPuisAvis } from "@/features/avis/services/demande-avis";
 import { ErreurApi } from "@/lib/http";
 import {
   ecarterOffre,
@@ -137,7 +138,11 @@ export function useDetailOffre(): DetailOffre {
     if (!exiger("garder", { cle: "offre.garder", charge: offre.id })) return;
     setEnregistrement(true);
     garderOffre(offre.id, !offre.enregistree)
-      .then((enregistree) => setOffre({ ...offre, enregistree }))
+      .then((enregistree) => {
+        setOffre({ ...offre, enregistree });
+        // Une offre gardée : à partir de la deuxième, un succès (`features/avis`).
+        if (enregistree) succesPuisAvis("offre");
+      })
       .catch((cause: unknown) => console.warn("[karria] signet non enregistré", cause))
       .finally(() => setEnregistrement(false));
   }, [offre, enregistrement, exiger]);

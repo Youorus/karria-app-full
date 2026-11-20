@@ -21,7 +21,7 @@
  * (`possederModele`), comme le ferait le vrai serveur par son webhook.
  */
 
-import { possederModeleAtelier } from "./atelier-simule";
+import { poserAbonneAtelier, possederModeleAtelier } from "./atelier-simule";
 import { possederModele, trouverModele } from "./modeles-simule";
 
 const PRIX_SANS_PUB = 499;
@@ -152,7 +152,11 @@ function ouvrir(session: Session, montant: number): Response {
 }
 
 function livrer(session: Session): void {
-  if (session.type === "ad_free") etat.sansPub = true;
+  if (session.type === "ad_free") {
+    etat.sansPub = true;
+    // Un abonné n'a jamais de filigrane (ADR-0040 de l'API).
+    poserAbonneAtelier(true);
+  }
   if (session.type === "coffee") {
     etat.cafes += session.tasses ?? 1;
     etat.montantCafes += session.montant ?? 0;
@@ -268,6 +272,7 @@ export function repondrePaiements(
 export function reinitialiserPaiements(): void {
   etat.sessions.clear();
   etat.sansPub = false;
+  poserAbonneAtelier(false);
   etat.cafes = 0;
   etat.dernierCafe = null;
   etat.resiliation = false;

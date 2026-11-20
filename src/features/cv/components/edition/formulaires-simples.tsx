@@ -6,7 +6,9 @@
  * (`validation-edition.ts`), le serveur revalide. Les erreurs arrivent par
  * champ (`erreurs.prenom`, `erreurs["liens.0.url"]`…), déjà traduites en
  * noms français par le hook. Le poste visé et la ville proposent ce que
- * l'index connaît (`ChampAvecSuggestions`).
+ * l'index connaît (`ChampAvecSuggestions`). Sous le poste visé, la précision
+ * facultative (`identity.availability`) : ce qu'on cherche, quand on est
+ * disponible — une saisie libre, sans suggestion.
  */
 
 import { Pressable } from "react-native";
@@ -18,6 +20,11 @@ import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
 import { useCouleurs } from "@/theme/use-couleurs";
 
+import {
+  AIDE_PRECISION,
+  LIBELLE_PRECISION,
+  PRECISION_LONGUEUR_MAX,
+} from "../../services/validation-edition";
 import type { Contact, Identite, Lien, Presentation } from "../../types/cv.types";
 import { ChampAvecSuggestions } from "./champ-avec-suggestions";
 import { ChampMultiligne } from "./champ-multiligne";
@@ -62,6 +69,18 @@ export function FormulaireIdentite({
           onChange({ ...valeur, titre: titre === "" ? null : titre })
         }
         erreur={erreurs.titre}
+        autoCapitalize="sentences"
+        returnKeyType="next"
+      />
+      <ChampTexte
+        libelle={LIBELLE_PRECISION}
+        aide={AIDE_PRECISION}
+        value={valeur.precision ?? ""}
+        onChangeText={(precision) =>
+          onChange({ ...valeur, precision: precision === "" ? null : precision })
+        }
+        erreur={erreurs.precision}
+        maxLength={PRECISION_LONGUEUR_MAX}
         autoCapitalize="sentences"
         returnKeyType="done"
       />

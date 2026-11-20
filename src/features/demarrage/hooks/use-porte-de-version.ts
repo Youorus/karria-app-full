@@ -12,6 +12,16 @@
  * - `ok`, route injoignable, build illisible → rien. Une panne ne bloque
  *   jamais personne : la cause part dans les journaux.
  *
+ * ═══ Tant que l'écran bloquant est là, on redemande ═══
+ *
+ * La règle des six heures vaut pour une app qui fonctionne. Devant l'écran
+ * bloquant, elle enfermait : un `LATEST_BUILD` mal réglé côté serveur, corrigé
+ * dans la minute, laissait les gens dehors six heures. Désormais, tant que
+ * la réponse connue bloque, **chaque** retour au premier plan redemande, et
+ * l'écran porte « J'ai mis à jour, vérifier » (`reverifier`). La règle de
+ * blocage, elle, ne change pas : seul le serveur ouvre la porte — une
+ * vérification qui échoue laisse l'écran en place et le dit.
+ *
  * ═══ Pourquoi ce hook vit à la racine ═══
  *
  * La question concerne tout le monde, invité compris, et la réponse doit
@@ -42,6 +52,16 @@ import {
 
 const CLE_BANDE = "karria.version.bande";
 
+/** Où en est « J'ai mis à jour, vérifier ». */
+export type VerificationDeVersion =
+  /** Rien demandé, ou la porte vient de s'ouvrir. */
+  | "repos"
+  | "en-cours"
+  /** Le serveur a répondu : cette build est toujours en retard. */
+  | "toujours"
+  /** Pas de réponse (réseau, serveur) : on ne sait pas. */
+  | "echec";
+
 export interface PorteDeVersion {
   etat: EtatDeVersion;
   /** La réponse du serveur telle quelle (numéro de version, builds). */
@@ -54,6 +74,9 @@ export interface PorteDeVersion {
   fermerBande: () => void;
   /** Ouvre la fiche de l'application sur le magasin. */
   ouvrirStore: () => void;
+  /** « J'ai mis à jour, vérifier » : redemande au serveur, tout de suite. */
+  reverifier: () => void;
+  verification: VerificationDeVersion;
 }
 
 const plateforme: "ios" | "android" = Platform.OS === "ios" ? "ios" : "android";
@@ -62,47 +85,81 @@ export function usePorteDeVersion(): PorteDeVersion {
   const version = useSyncExternalStore(abonnerVersion, lireVersionConnue);
   const [bande, setBande] = useState(false);
   const derniereReponse = useRef<number | null>(null);
+  const [verification, setVerification] = useState<VerificationDeVersion>("repos");
+  const vivant = useRef(true);
+  /** La demande en vol : le premier plan et le bouton partagent la même. */
+  const enVol = useRef<Promise<Version | null> | null>(null);
 
-  useEffect(() => {
-    let vivant = true;
+  /** Demande au serveur ; rend sa réponse, ou `null` sans réponse. */
+  const verifier = useCallback((): Promise<Version | null> => {
     const build = numeroDeBuild(Application.nativeBuildVersion);
-    if (build === null) {
-      console.warn("[karria] numéro de build illisible, porte de version ignorée");
-      return undefined;
-    }
-
-    const verifier = async () => {
+    if (build === null) return Promise.resolve(null);
+    enVol.current ??= (async () => {
       try {
         const reponse = await lireVersion(plateforme, build);
-        if (!vivant) return;
+        if (!vivant.current) return null;
         derniereReponse.current = Date.now();
         poserVersionConnue(reponse);
-        if (reponse.etat !== "disponible") return;
-        const derniereBande = await lireLocal<number | null>(
-          CLE_BANDE,
-          null,
-          estUnNombre,
-        );
-        if (!vivant || !bandeMontrable(derniereBande, Date.now())) return;
-        setBande(true);
-        await ecrireLocal(CLE_BANDE, Date.now());
+        if (reponse.etat === "disponible") {
+          const derniereBande = await lireLocal<number | null>(
+            CLE_BANDE,
+            null,
+            estUnNombre,
+          );
+          if (vivant.current && bandeMontrable(derniereBande, Date.now())) {
+            setBande(true);
+            await ecrireLocal(CLE_BANDE, Date.now());
+          }
+        }
+        return reponse;
       } catch (cause) {
         // Route absente, réseau coupé : on entre comme si de rien n'était.
         console.warn("[karria] version de l'application non vérifiée", cause);
+        return null;
+      } finally {
+        enVol.current = null;
       }
-    };
+    })();
+    return enVol.current;
+  }, []);
+
+  useEffect(() => {
+    vivant.current = true;
+    if (numeroDeBuild(Application.nativeBuildVersion) === null) {
+      console.warn("[karria] numéro de build illisible, porte de version ignorée");
+      return () => {
+        vivant.current = false;
+      };
+    }
 
     void verifier();
     const abonnement = AppState.addEventListener("change", (etatApp) => {
-      if (etatApp === "active" && fautIlReverifier(derniereReponse.current, Date.now())) {
+      if (etatApp !== "active") return;
+      // Écran bloquant affiché : on redemande à chaque retour, sans attendre
+      // six heures — la personne revient peut-être du magasin, ou le réglage
+      // du serveur vient d'être corrigé.
+      if (
+        estBloquante(lireVersionConnue()) ||
+        fautIlReverifier(derniereReponse.current, Date.now())
+      ) {
         void verifier();
       }
     });
     return () => {
-      vivant = false;
+      vivant.current = false;
       abonnement.remove();
     };
-  }, []);
+  }, [verifier]);
+
+  const reverifier = useCallback(() => {
+    setVerification("en-cours");
+    void verifier().then((reponse) => {
+      if (!vivant.current) return;
+      setVerification(
+        reponse === null ? "echec" : estBloquante(reponse) ? "toujours" : "repos",
+      );
+    });
+  }, [verifier]);
 
   const urlStore = version?.urlStore ?? null;
   const ouvrirStore = useCallback(() => {
@@ -125,5 +182,7 @@ export function usePorteDeVersion(): PorteDeVersion {
     bande: bande && version?.etat === "disponible",
     fermerBande: useCallback(() => setBande(false), []),
     ouvrirStore,
+    reverifier,
+    verification,
   };
 }

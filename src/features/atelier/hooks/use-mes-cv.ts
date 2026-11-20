@@ -43,6 +43,7 @@ import { Alert } from "react-native";
 
 import { lireMoi } from "@/features/auth/api/auth.api";
 import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
+import { succesPuisAvis } from "@/features/avis/services/demande-avis";
 import { lireMonCv } from "@/features/cv/api/cv.api";
 import { lireModeles } from "@/features/modeles/api/modeles.api";
 import type { Modele } from "@/features/modeles/types/modeles.types";
@@ -55,7 +56,11 @@ import { useNavigationUnique } from "@/lib/navigation";
 import { effacerExport, envoyerExport, lireMesExports } from "../api/documents.api";
 import { exportsLibres, sousTitreDesCv, TEXTES_MES_CV } from "../services/mes-cv";
 import { messageDEnvoi, nomDeFichier } from "../services/presentation";
-import { telechargerEtPartager, type Format } from "../services/telechargement";
+import {
+  partageEstConfirme,
+  telechargerEtPartager,
+  type Format,
+} from "../services/telechargement";
 import { oublierDocument } from "../services/lecteur";
 import type { Export } from "../types/atelier.types";
 import { memoriserApercu } from "../services/apercus";
@@ -224,12 +229,14 @@ export function useMesCv(): EcranMesCv {
       setTelechargement({ id: exporte.id, format });
       void (async () => {
         try {
-          await telechargerEtPartager(
+          const partage = await telechargerEtPartager(
             url,
             nomDeFichier("cv", nom, null, format),
             format,
             "cv",
           );
+          // Un partage confirmé : un succès, puis la demande d'avis.
+          if (partageEstConfirme(partage)) succesPuisAvis("export");
         } catch (cause) {
           console.warn("[karria] téléchargement en échec", cause);
           Alert.alert(TEXTES_MES_CV.erreurTelechargement, TEXTES_MES_CV.reessayer);
@@ -269,14 +276,16 @@ export function useMesCv(): EcranMesCv {
       if (exporte === null || envoi.enCours) return;
       setEnvoi((e) => ({ ...e, enCours: true, erreur: null }));
       envoyerExport(exporte.id, a)
-        .then((fait) =>
+        .then((fait) => {
           setEnvoi({
             exporte: null,
             enCours: false,
             erreur: null,
             fait: { id: exporte.id, a: fait.a },
-          }),
-        )
+          });
+          // Le serveur a accepté l'envoi : un succès, puis la demande d'avis.
+          succesPuisAvis("envoi");
+        })
         .catch((cause: unknown) => {
           console.warn("[karria] envoi en échec", cause);
           setEnvoi((e) => ({ ...e, enCours: false, erreur: messageDEnvoi(cause) }));

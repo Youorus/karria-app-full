@@ -37,6 +37,16 @@ par `POST /cv/photo`.
 dans le CV — `identity { first_name, last_name, headline }` et
 `contact { email, phone, city, links: [{ label, url }] }`.
 
+**Ajout du 2026-11-20 (ADR-0040 de l'API)** : `identity.availability`, la
+**précision sous le poste visé** — chaîne facultative de 150 caractères au
+plus (`null` ou absente : rien n'est écrit), ce que la personne cherche et
+quand elle est disponible (« Recherche alternance 24 mois · Disponible
+immédiatement »). Même champ dans `GET` / `PUT /cv/me`, dans
+`PUT /cv/me/chapters/identity`, dans le `cv` du rendu ancré et de l'export
+(`docs/contrat-api-documents.md`, « La précision sous le poste visé »). Un
+serveur qui ne la connaît pas encore ne la renvoie pas : l'app lit alors
+une chaîne vide.
+
 ## Les chapitres
 
 Ordre fixe. `boucle` = l'utilisateur peut en ajouter plusieurs (« Une
@@ -44,7 +54,7 @@ autre ? »).
 
 | Clé           | Produit                                                  | Boucle |
 | ------------- | -------------------------------------------------------- | ------ |
-| `identity`    | `{ first_name, last_name, headline }`                    | non    |
+| `identity`    | `{ first_name, last_name, headline, availability? }`     | non    |
 | `contact`     | `{ email, phone, city, links[] }`                        | non    |
 | `summary`     | `{ summary }` (3 à 5 phrases, « je »)                    | non    |
 | `experiences` | `Experience` V1                                          | oui    |
@@ -158,16 +168,16 @@ fine voyage dans `details.reason`, en `snake_case` minuscule — comme pour
 l'authentification (`auth_code_invalid`). Les noms en capitales de ce
 document se lisent donc ainsi :
 
-| Ce document disait          | HTTP | `error.code`         | `details.reason`                                  |
-| --------------------------- | ---- | -------------------- | ------------------------------------------------- |
-| `DRAFT_NOT_FOUND`           | 404  | `not_found`          | `draft_not_found`                                 |
-| `DRAFT_INCOMPLETE`          | 409  | `rule_violation`     | `draft_incomplete` (+ `chapters: [...]`)          |
-| `PHOTO_ENHANCE_REFUSED`     | 422  | `invalid_input`      | `photo_enhance_refused`                           |
-| `PHOTO_ENHANCE_UNAVAILABLE` | 503  | `dependency_failure` | `photo_enhance_unavailable`                       |
+| Ce document disait          | HTTP | `error.code`         | `details.reason`                                                                |
+| --------------------------- | ---- | -------------------- | ------------------------------------------------------------------------------- |
+| `DRAFT_NOT_FOUND`           | 404  | `not_found`          | `draft_not_found`                                                               |
+| `DRAFT_INCOMPLETE`          | 409  | `rule_violation`     | `draft_incomplete` (+ `chapters: [...]`)                                        |
+| `PHOTO_ENHANCE_REFUSED`     | 422  | `invalid_input`      | `photo_enhance_refused`                                                         |
+| `PHOTO_ENHANCE_UNAVAILABLE` | 503  | `dependency_failure` | `photo_enhance_unavailable`                                                     |
 | quota de portraits atteint  | 429  | `rate_limited`       | `portrait_quota_exceeded` (+ `limit`, `subscriber`, `resets_at`, `retry_after`) |
-| quota d'imports atteint     | 429  | `rate_limited`       | `import_quota_exceeded` (5 par mois, 30 abonné ; mêmes détails) |
-| chapitre invalide           | 422  | `invalid_input`      | `chapter_invalid` (+ `fields: [{field, reason}]`) |
-| modèle indisponible         | 503  | `dependency_failure` | `ai_unavailable`                                  |
+| quota d'imports atteint     | 429  | `rate_limited`       | `import_quota_exceeded` (5 par mois, 30 abonné ; mêmes détails)                 |
+| chapitre invalide           | 422  | `invalid_input`      | `chapter_invalid` (+ `fields: [{field, reason}]`)                               |
+| modèle indisponible         | 503  | `dependency_failure` | `ai_unavailable`                                                                |
 
 Autres raisons : `chapter_required` (passer `identity` ou `contact`),
 `chapter_items_expected` / `chapter_data_expected` / `chapter_items_empty`

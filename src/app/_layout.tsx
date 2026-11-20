@@ -157,6 +157,8 @@ function Portail() {
         <EcranVersionObsolete
           version={version.version}
           onMettreAJour={version.ouvrirStore}
+          onVerifier={version.reverifier}
+          verification={version.verification}
         />
       </>
     );

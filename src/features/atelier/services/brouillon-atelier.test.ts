@@ -60,7 +60,7 @@ import {
 } from "./brouillon-atelier";
 
 const cv: Cv = {
-  identite: { prenom: "Awa", nom: "Diallo", titre: null },
+  identite: { prenom: "Awa", nom: "Diallo", titre: null, precision: null },
   contact: null,
   presentation: null,
   photo: null,

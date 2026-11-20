@@ -60,7 +60,13 @@ interface Lien {
 
 interface CvRecu {
   summary?: string | null;
-  identity?: { first_name?: string; last_name?: string; headline?: string | null } | null;
+  identity?: {
+    first_name?: string;
+    last_name?: string;
+    headline?: string | null;
+    /** La précision sous le poste visé (ADR-0040 de l'API). */
+    availability?: string | null;
+  } | null;
   contact?: {
     email?: string | null;
     phone?: string | null;
@@ -116,6 +122,8 @@ interface ExportSimule {
   dossier_id: string | null;
   company_name: string | null;
   created_at: string;
+  /** Le document porte le filigrane (ADR-0040 de l'API). */
+  watermarked: boolean;
   pdf_url: string;
   docx_url: string;
   fit: { spacing: number; font_scale: number; pages: number };
@@ -206,13 +214,48 @@ const etat = {
   /** Les modèles Premium possédés, pour `template_not_owned` — rempli par
    *  `possederModeleAtelier` quand le faux paiement livre. */
   possedes: new Set<string>(),
+  /** Karria sans pub : jamais de filigrane — posé par le faux paiement. */
+  abonne: false,
+  /** Les CV exportés **sans** filigrane qui entament les trois du mois. Les
+   *  CV semés d'avance n'en font pas partie : la simulation commence à trois. */
+  sansFiligrane: new Set<string>(),
 };
+
+/** Les CV sans filigrane d'un compte gratuit, par mois civil (UTC). */
+const CV_SANS_FILIGRANE_PAR_MOIS = 3;
+
+/** `GET /cv/me/generated-cvs/allowance`, tel que le contrat l'écrit. */
+function droitsFiligrane(maintenant: number) {
+  const date = new Date(maintenant);
+  const mois = date.toISOString().slice(0, 7);
+  const used = [...etat.exports.values()].filter(
+    (e) => etat.sansFiligrane.has(e.id) && e.created_at.slice(0, 7) === mois,
+  ).length;
+  const remaining = etat.abonne ? 0 : Math.max(0, CV_SANS_FILIGRANE_PAR_MOIS - used);
+  return {
+    subscriber: etat.abonne,
+    free_per_month: CV_SANS_FILIGRANE_PAR_MOIS,
+    used,
+    remaining,
+    watermark_next: !etat.abonne && remaining === 0,
+    resets_at: new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1),
+    ).toISOString(),
+  };
+}
+
+/** Le faux paiement abonne (ou la remise à zéro désabonne) : plus de filigrane. */
+export function poserAbonneAtelier(abonne: boolean): void {
+  etat.abonne = abonne;
+}
 
 export function reinitialiserAtelier(maintenant: number = Date.now()): void {
   etat.selection = null;
   etat.exports.clear();
   etat.envois.clear();
   etat.possedes.clear();
+  etat.abonne = false;
+  etat.sansFiligrane.clear();
   semer(maintenant);
 }
 
@@ -459,7 +502,11 @@ function entete(cv: CvRecu, colonnes: 1 | 2): string {
   )
     .map((l, i) => ancre(`contact.links.${i}.url`, l.url.replace(/^https?:\/\//, "")))
     .join("")}</div>`;
-  const tete = `<h1>${ancre("identity.full_name", nom || "Prénom Nom")}</h1>${ancre("identity.headline", id.headline ?? "Poste visé", "span", "intitule")}`;
+  // La précision : sur sa ligne sous le poste visé, et rien sans elle.
+  const precision = id.availability
+    ? ancre("identity.availability", id.availability, "span", "precision")
+    : "";
+  const tete = `<h1>${ancre("identity.full_name", nom || "Prénom Nom")}</h1>${ancre("identity.headline", id.headline ?? "Poste visé", "span", "intitule")}${precision}`;
   if (colonnes === 1) return `${tete}${contact}`;
   return `${tete}<h2>Contact</h2>${contact}`;
 }
@@ -717,6 +764,7 @@ function nouvelExport(
   pages: number,
   maintenant: number,
   couleur: string | null = null,
+  watermarked = false,
 ): ExportSimule {
   const modele = MODELES[templateId] ?? MODELES["9b2e7c41-3f6d-4a8b-b1c2-5e7f9a0d1b02"];
   const id = identifiant("exp");
@@ -730,6 +778,7 @@ function nouvelExport(
     dossier_id: dossierId,
     company_name: companyName,
     created_at: new Date(maintenant).toISOString(),
+    watermarked,
     pdf_url: `https://storage.karria.fr/simule/${id}.pdf`,
     docx_url: `https://storage.karria.fr/simule/${id}.docx`,
     fit: { spacing: 1, font_scale: 1, pages },
@@ -830,6 +879,8 @@ export function repondreAtelier(
       return json(200, {
         ...htmlDuCv(cv as CvRecu, templateId, true, couleur),
         letter_style_served: null,
+        // L'aperçu porte le filigrane que l'export portera.
+        watermark: droitsFiligrane(maintenant).watermark_next,
       });
     return erreur(422, "nothing_to_render", "Ni CV, ni lettre.");
   }
@@ -848,6 +899,11 @@ export function repondreAtelier(
       )
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
     return json(200, { items, total: items.length });
+  }
+
+  // Avant `/{id}` : « allowance » n'est pas un identifiant d'export.
+  if (route === "GET /cv/me/generated-cvs/allowance") {
+    return json(200, droitsFiligrane(maintenant));
   }
 
   const unExport = /^\/cv\/me\/generated-cvs\/([^/]+)$/.exec(cheminSeul);
@@ -893,6 +949,8 @@ export function repondreAtelier(
       });
     }
     const { pages } = htmlDuCv(cv as CvRecu, templateId, false);
+    // Trois CV sans filigrane par mois, puis avec — jamais de refus.
+    const filigrane = droitsFiligrane(maintenant).watermark_next;
     const exporte = nouvelExport(
       "cv",
       templateId,
@@ -903,8 +961,11 @@ export function repondreAtelier(
       pages,
       maintenant,
       couleur ?? etat.selection?.primary_color ?? null,
+      filigrane,
     );
     etat.exports.set(exporte.id, exporte);
+    // Seul un CV sorti sans filigrane entame les trois du mois.
+    if (!filigrane) etat.sansFiligrane.add(exporte.id);
     return json(201, exporte);
   }
 
@@ -951,6 +1012,8 @@ export function repondreAtelier(
         1,
         maintenant,
         couleurLettre,
+        // Une lettre suit l'état du compte, et ne consomme rien.
+        droitsFiligrane(maintenant).watermark_next,
       ),
       letter_style: style,
     };

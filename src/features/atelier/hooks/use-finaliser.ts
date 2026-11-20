@@ -36,6 +36,21 @@
  * Après un téléchargement ou un envoi réussi, la feuille du domaine
  * Candidatures : « Oui » marque le dossier et y renvoie.
  *
+ * ═══ Le filigrane (ADR-0040 de l'API) ═══
+ *
+ * Trois CV sans filigrane par mois, puis avec — jamais de refus. `useFiligrane`
+ * rend la ligne d'information, la proposition d'abonnement montrée une fois
+ * le document prêt (jamais bloquante), et « Régénérer sans filigrane » après
+ * l'abonnement. Télécharger, partager et envoyer ne dépendent de rien de tout
+ * cela.
+ *
+ * ═══ Et, après un succès, la demande d'avis ═══
+ *
+ * Un partage confirmé ou un envoi accepté est un succès (`features/avis`).
+ * Il est noté tout de suite ; la demande, elle, attend que les feuilles
+ * soient fermées : aussitôt en mode libre, à la fermeture de « As-tu
+ * candidaté ? » avec un dossier. Jamais dans un `catch`.
+ *
  * ═══ Deux annonces, deux moments ═══
  *
  * Une pendant la génération (`finaliser`), une autre une fois les documents
@@ -49,6 +64,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { lireMoi } from "@/features/auth/api/auth.api";
 import { useActionIa } from "@/features/auth/hooks/use-action-ia";
+import {
+  noterSucces,
+  proposerAvis,
+  succesPuisAvis,
+} from "@/features/avis/services/demande-avis";
 import type { UsageIa } from "@/features/auth/types/auth.types";
 import { lireDossier } from "@/features/candidatures/api/candidatures.api";
 import {
@@ -72,6 +92,7 @@ import {
   exporterLettre,
   lireModeleChoisi,
 } from "../api/documents.api";
+import { useFiligrane, type Filigrane } from "./use-filigrane";
 import { useOuvrirLecteur } from "./use-ouvrir-lecteur";
 import { memoriserApercu } from "../services/apercus";
 import {
@@ -93,7 +114,11 @@ import {
   TEXTES,
   type CorrectionAts,
 } from "../services/presentation";
-import { telechargerEtPartager, type Format } from "../services/telechargement";
+import {
+  partageEstConfirme,
+  telechargerEtPartager,
+  type Format,
+} from "../services/telechargement";
 import type { ControleAts, Export, ScoreAts } from "../types/atelier.types";
 
 export type { Format };
@@ -157,6 +182,8 @@ export interface EcranFinaliser {
   retour: () => void;
   /** Libre : « Voir mes CV » — la liste, avec la nouvelle entrée. */
   terminer: () => void;
+  /** Le filigrane : la ligne, la proposition d'abonnement, la régénération. */
+  filigrane: Filigrane;
 }
 
 export function useFinaliser(libre = false): EcranFinaliser {
@@ -376,6 +403,12 @@ export function useFinaliser(libre = false): EcranFinaliser {
       void (async () => {
         try {
           const partage = await telechargerEtPartager(url, nom, format);
+          // Un partage confirmé est un succès ; la demande d'avis attendra
+          // que « As-tu candidaté ? » soit refermée (`fermerQuestion`).
+          if (partageEstConfirme(partage)) {
+            if (libre) succesPuisAvis("export");
+            else void noterSucces("export");
+          }
           if (partage && vivant.current && !libre) setQuestion(true);
         } catch (cause) {
           console.warn("[karria] téléchargement en échec", cause);
@@ -398,6 +431,9 @@ export function useFinaliser(libre = false): EcranFinaliser {
       setEnvoi((e) => ({ ...e, enCours: true, erreur: null }));
       envoyerExports(ids, a)
         .then((fait) => {
+          // Le serveur a accepté l'envoi : un succès, écran encore là ou non.
+          if (libre) succesPuisAvis("envoi");
+          else void noterSucces("envoi");
           if (!vivant.current) return;
           setEnvoi({ ouvert: false, enCours: false, erreur: null, fait: fait.a });
           if (!libre) setQuestion(true);
@@ -508,6 +544,13 @@ export function useFinaliser(libre = false): EcranFinaliser {
     [exportCv, exportLettre, dossier, cvLibre, libre, pousser, ouvrirLecteur],
   );
 
+  const filigrane = useFiligrane({
+    exporte: exportCv,
+    lettre: exportLettre,
+    enAttente: generation || optimisation,
+    regenerer: reessayer,
+  });
+
   const score = exportCv?.ats ?? null;
   const couleurOrigine =
     galerie.find((m) => m.id === exportCv?.modele?.id)?.couleur ?? null;
@@ -544,7 +587,11 @@ export function useFinaliser(libre = false): EcranFinaliser {
     fermerEnvoi: useCallback(() => setEnvoi((e) => ({ ...e, ouvert: false })), []),
     envoyer,
     question,
-    fermerQuestion: useCallback(() => setQuestion(false), []),
+    fermerQuestion: useCallback(() => {
+      setQuestion(false);
+      // La feuille est fermée : si un succès attend, la demande d'avis peut partir.
+      proposerAvis();
+    }, []),
     reessayer,
     ouvrirLettre: useCallback(() => {
       if (!libre)
@@ -563,6 +610,7 @@ export function useFinaliser(libre = false): EcranFinaliser {
     // liste relue au focus montre la nouvelle entrée. Arrivé autrement
     // (lien), `dismissTo` y va quand même.
     terminer: useCallback(() => router.dismissTo("/cv/mes-cv"), [router]),
+    filigrane,
   };
 }
 

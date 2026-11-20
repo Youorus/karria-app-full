@@ -16,6 +16,7 @@ import {
   FILTRES_PAR_DEFAUT,
   type Fil,
   type ModeDuFil,
+  type Offre,
   type Tri,
 } from "../types/offres.types";
 import { useFilOffres } from "./use-fil-offres";
@@ -31,11 +32,17 @@ const mockLireFil =
   >();
 const mockLireOptions = jest.fn<(mode: ModeDuFil) => Promise<unknown>>();
 
+const mockGarder = jest.fn<(id: string, garder: boolean) => Promise<boolean>>();
+
 jest.mock("../api/offres.api", () => ({
   lireFil: (...args: Parameters<typeof mockLireFil>) => mockLireFil(...args),
   lireOptionsDeFiltre: (mode: ModeDuFil) => mockLireOptions(mode),
-  garderOffre: jest.fn(),
+  garderOffre: (id: string, garder: boolean) => mockGarder(id, garder),
   marquerVues: jest.fn(),
+}));
+const mockSuccesPuisAvis = jest.fn<(succes: string) => void>();
+jest.mock("@/features/avis/services/demande-avis", () => ({
+  succesPuisAvis: (succes: string) => mockSuccesPuisAvis(succes),
 }));
 jest.mock("@/features/auth/hooks/use-porte", () => ({
   usePorte: () => ({ exiger: () => true, invite: false }),
@@ -70,6 +77,8 @@ beforeEach(() => {
   mockLireFil.mockReset();
   mockLireOptions.mockReset();
   mockLireOptions.mockResolvedValue({ contrats: [], villes: [] });
+  mockGarder.mockReset();
+  mockSuccesPuisAvis.mockReset();
   servir();
 });
 
@@ -222,5 +231,36 @@ describe("Le tri", () => {
     await waitFor(() => expect(result.current.tri).toBe("pertinence"));
     expect(dernierAppel()[3]).toBeNull();
     expect(result.current.erreur).toBeNull();
+  });
+});
+
+describe("Garder une offre, et la demande d'avis", () => {
+  const offre = { id: "o1", enregistree: false } as Offre;
+
+  it("une offre gardée, confirmée par le serveur, est un succès", async () => {
+    mockGarder.mockResolvedValue(true);
+    const { result } = await monter();
+    act(() => result.current.garder(offre));
+    await waitFor(() => expect(mockSuccesPuisAvis).toHaveBeenCalledWith("offre"));
+    expect(mockGarder).toHaveBeenCalledWith("o1", true);
+    expect(mockSuccesPuisAvis).toHaveBeenCalledTimes(1);
+  });
+
+  it("retirer un signet n'en est pas un", async () => {
+    mockGarder.mockResolvedValue(false);
+    const { result } = await monter();
+    act(() => result.current.garder({ ...offre, enregistree: true }));
+    await waitFor(() => expect(mockGarder).toHaveBeenCalledWith("o1", false));
+    await act(async () => {});
+    expect(mockSuccesPuisAvis).not.toHaveBeenCalled();
+  });
+
+  it("un signet refusé par le serveur ne demande rien", async () => {
+    mockGarder.mockRejectedValue(new ErreurApi("Panne", 500));
+    const { result } = await monter();
+    act(() => result.current.garder(offre));
+    await waitFor(() => expect(mockGarder).toHaveBeenCalled());
+    await act(async () => {});
+    expect(mockSuccesPuisAvis).not.toHaveBeenCalled();
   });
 });

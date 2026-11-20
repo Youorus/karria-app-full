@@ -24,7 +24,7 @@ const CV_VIDE: Cv = {
 
 const CV_REMPLI: Cv = {
   ...CV_VIDE,
-  identite: { prenom: "Marc", nom: "Takoumba", titre: "Data engineer" },
+  identite: { prenom: "Marc", nom: "Takoumba", titre: "Data engineer", precision: null },
   photo: "https://exemple.fr/photo.jpg",
   experiences: [
     {

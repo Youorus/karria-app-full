@@ -33,12 +33,15 @@ import { Platform } from "react-native";
 import mobileAds, {
   AdsConsent,
   AdsConsentPrivacyOptionsRequirementStatus,
+  AdsConsentStatus,
   NativeAd,
   NativeMediaAspectRatio,
   NativeAdChoicesPlacement,
   TestIds,
   MaxAdContentRating,
 } from "react-native-google-mobile-ads";
+
+import { noterSollicitation } from "@/lib/sollicitations";
 
 import type { BlocAnnonce } from "../services/regles-publicite";
 
@@ -59,9 +62,26 @@ async function suiviAutoriseSurIos(): Promise<boolean> {
   try {
     const actuel = await getTrackingPermissionsAsync();
     if (actuel.status !== PermissionStatus.UNDETERMINED) return actuel.granted;
+    // L'invite du système va s'afficher : c'est une sollicitation de ce
+    // lancement (`lib/sollicitations.ts`) — pas de demande d'avis derrière.
+    noterSollicitation("consentement-pub");
     return (await requestTrackingPermissionsAsync()).granted;
   } catch (cause) {
     console.warn("[karria] ATT illisible, annonces non personnalisées", cause);
+    return false;
+  }
+}
+
+/**
+ * Le consentement était-il déjà recueilli avant ce lancement ? `false` aussi
+ * quand on ne sait pas : dans le doute, on considère que le formulaire a pu
+ * être montré.
+ */
+async function consentementDejaRecueilli(): Promise<boolean> {
+  try {
+    return (await AdsConsent.getConsentInfo()).status === AdsConsentStatus.OBTAINED;
+  } catch (cause) {
+    console.warn("[karria] état du consentement illisible avant la demande", cause);
     return false;
   }
 }
@@ -71,7 +91,12 @@ export async function demarrerLaPublicite(test: boolean): Promise<Autorisation> 
   let peutDemander = false;
   let personnaliseesPermises = false;
   try {
+    const dejaRecueilli = await consentementDejaRecueilli();
     const info = await AdsConsent.gatherConsent();
+    // Recueilli maintenant et pas avant : le formulaire UMP vient d'être montré.
+    if (!dejaRecueilli && info.status === AdsConsentStatus.OBTAINED) {
+      noterSollicitation("consentement-pub");
+    }
     peutDemander = info.canRequestAds;
     const rgpd = await AdsConsent.getGdprApplies();
     personnaliseesPermises = rgpd

@@ -50,6 +50,9 @@ export function textesDuCv(cv: Cv): Map<string, string> {
     poser(m, "identity.last_name", cv.identite.nom);
     poser(m, "identity.full_name", `${cv.identite.prenom} ${cv.identite.nom}`.trim());
     poser(m, "identity.headline", cv.identite.titre);
+    // La précision sous le poste visé (ADR-0040 de l'API) : sa propre ligne,
+    // son propre chemin — rien n'est ancré tant qu'elle est vide.
+    poser(m, "identity.availability", cv.identite.precision);
   }
   if (cv.contact !== null) {
     poser(m, "contact.phone", cv.contact.telephone);

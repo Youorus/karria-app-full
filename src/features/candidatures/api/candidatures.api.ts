@@ -223,6 +223,7 @@ export function versCvBrut(cv: Cv): CvDeDossierBrut {
             first_name: cv.identite.prenom,
             last_name: cv.identite.nom,
             headline: cv.identite.titre,
+            availability: cv.identite.precision,
           },
     contact:
       cv.contact === null

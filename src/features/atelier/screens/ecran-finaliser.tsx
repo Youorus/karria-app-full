@@ -1,6 +1,11 @@
 /**
  * Finaliser rend les documents disponibles et donne la priorité à l'envoi.
  * Les formats, la lettre facultative et les conseils restent accessibles.
+ *
+ * Le filigrane (ADR-0040 de l'API) : une ligne discrète pendant la génération
+ * et sous le CV, une feuille de proposition qu'on ferme d'un geste quand le
+ * CV sort filigrané, « Régénérer sans filigrane » après l'abonnement. Aucune
+ * de ces trois choses ne conditionne « Télécharger » ni « Envoyer ».
  */
 
 import { Image } from "expo-image";
@@ -21,6 +26,8 @@ import { HStack } from "@/components/ui/hstack";
 import { VStack } from "@/components/ui/vstack";
 import { FeuilleCandidature } from "@/features/candidatures/components/feuille-candidature";
 import { CarteAnnonce } from "@/features/publicite/components/carte-annonce";
+import { FeuilleProposition } from "@/features/soutien/components/feuille-proposition";
+import { REGENERER_SANS_FILIGRANE } from "@/features/soutien/services/proposition";
 import { useCouleurs } from "@/theme/use-couleurs";
 
 import { FeuilleBasse } from "../components/feuille-basse";
@@ -230,6 +237,11 @@ export function EcranFinaliser({ libre = false }: { libre?: boolean }) {
                   <Texte className="text-center text-body leading-6 text-muted-foreground">
                     {f.libre ? TEXTES.generationPhraseLibre : TEXTES.generationPhrase}
                   </Texte>
+                  {f.filigrane.ligne !== null ? (
+                    <Texte className="text-center text-footnote text-muted-foreground">
+                      {f.filigrane.ligne}
+                    </Texte>
+                  ) : null}
                 </VStack>
               </VStack>
             </Animated.View>
@@ -290,6 +302,22 @@ export function EcranFinaliser({ libre = false }: { libre?: boolean }) {
                   onTelecharger={(format) => f.telecharger("cv", format)}
                   onVoir={() => f.voirApercu("cv")}
                 />
+                {f.filigrane.ligne !== null ? (
+                  <HStack className="items-center gap-2">
+                    <Icone nom="info" couleur={couleurs.estompe} taille={13} />
+                    <Texte className="flex-1 text-footnote text-muted-foreground">
+                      {f.filigrane.ligne}
+                    </Texte>
+                  </HStack>
+                ) : null}
+                {f.filigrane.regenerable ? (
+                  <BoutonAction
+                    libelle={REGENERER_SANS_FILIGRANE}
+                    ton="secondaire"
+                    multiligne
+                    onPress={f.filigrane.regenerer}
+                  />
+                ) : null}
                 {!f.libre && f.dossier?.lettre != null ? (
                   <CarteDocument
                     document="lettre"
@@ -390,6 +418,14 @@ export function EcranFinaliser({ libre = false }: { libre?: boolean }) {
         onEnvoyer={f.envoyer}
         onFermer={f.fermerEnvoi}
         apresFermeture={confirmerFermetureEnvoi}
+      />
+      {/* Jamais bloquante : le document est déjà là, derrière elle. */}
+      <FeuilleProposition
+        visible={f.filigrane.proposition.visible}
+        textes={f.filigrane.proposition.textes}
+        onAccepter={f.filigrane.proposition.accepter}
+        onFermer={f.filigrane.proposition.fermer}
+        apresFermeture={f.filigrane.proposition.apresFermeture}
       />
       {!f.libre && f.dossier !== null ? (
         <FeuilleCandidature

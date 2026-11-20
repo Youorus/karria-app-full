@@ -38,6 +38,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 
 import { useActionIa } from "@/features/auth/hooks/use-action-ia";
+import { succesPuisAvis } from "@/features/avis/services/demande-avis";
 import { ErreurApi } from "@/lib/http";
 
 import { importerCv, lireMonCv, type FichierCv } from "../api/cv.api";
@@ -161,6 +162,8 @@ export function useImportCv(onRenonce: () => void): ImportCv {
       });
       importerCv(fichiers)
         .then((resultat) => {
+          // Le CV est importé : un succès, puis la demande d'avis.
+          succesPuisAvis("import");
           if (vivant.current) raconter(resultat);
         })
         .catch(async (cause: unknown) => {

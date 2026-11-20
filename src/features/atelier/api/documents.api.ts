@@ -12,6 +12,8 @@
  *   personne — dossiers compris : « Mes CV » garde ceux **sans dossier**
  *   (`services/mes-cv.ts`), le contrat n'a pas de filtre « sans dossier ».
  * - `DELETE /cv/me/generated-cvs/{id}` : effacer un export.
+ * - `GET /cv/me/generated-cvs/allowance` : les CV sans filigrane qui restent
+ *   ce mois-ci (ADR-0040) ; `404` ou `422` sur un serveur plus ancien → `null`.
  * - `POST /documents/letters/export` : l'export de la lettre d'un dossier.
  * - `POST /documents/exports/send` : plusieurs exports dans un seul e-mail ;
  *   `POST /documents/exports/{id}/send` : un seul.
@@ -41,10 +43,12 @@ import {
   versStyleLettreBrut,
 } from "@/features/candidatures/services/style-lettre";
 import type { Cv } from "@/features/cv/types/cv.types";
-import { http } from "@/lib/http";
+import { ErreurApi, http } from "@/lib/http";
 
 import type {
   AtsBrut,
+  DroitsFiligrane,
+  DroitsFiligraneBruts,
   Envoi,
   EnvoiBrut,
   Export,
@@ -99,6 +103,19 @@ export function versExport(b: ExportBrut): Export {
     ats: versScoreAts(b.ats),
     couleur: b.primary_color ?? null,
     styleLettre: versStyleLettre(b.letter_style),
+    // Strictement `true` : un serveur qui ne le dit pas n'a rien filigrané.
+    filigrane: b.watermarked === true,
+  };
+}
+
+export function versDroitsFiligrane(b: DroitsFiligraneBruts): DroitsFiligrane {
+  return {
+    abonne: b.subscriber,
+    gratuitsParMois: b.free_per_month,
+    utilises: b.used,
+    restants: b.remaining,
+    filigraneAuProchain: b.watermark_next,
+    repartLe: b.resets_at,
   };
 }
 
@@ -121,6 +138,7 @@ function versRendu(b: RenduBrut): Rendu {
     pages: b.pages,
     avertissements: b.warnings,
     styleLettreServi: versStyleLettre(b.letter_style_served),
+    filigrane: typeof b.watermark === "boolean" ? b.watermark : null,
   };
 }
 
@@ -220,6 +238,49 @@ export async function lireMesExports(genre: "cv" | "lettre" = "cv"): Promise<Exp
     `/cv/me/generated-cvs?kind=${genre === "cv" ? "cv" : "letter"}`,
   );
   return brut.items.map(versExport);
+}
+
+/**
+ * Les CV sans filigrane qui restent ce mois-ci. `null` quand le serveur ne
+ * connaît pas encore la route ou répond une forme inattendue : il n'y a
+ * alors rien à dire, et surtout rien à casser. Toute autre panne remonte —
+ * l'appelant la journalise et n'affiche rien non plus.
+ *
+ * « Ne connaît pas encore » : `404`, mais aussi `422`. Le serveur d'avant
+ * l'ADR-0040 a déjà `GET /cv/me/generated-cvs/{id}` avec un identifiant
+ * UUID : il prend « allowance » pour un identifiant mal formé et répond
+ * `422`, pas `404` (vérifié dans son routeur). Cette lecture n'envoie aucun
+ * paramètre : un `422` ne peut rien vouloir dire d'autre.
+ *
+ * La lecture est `facultatif` : son échec n'est pas un accroc de la session
+ * (`lib/http.ts`).
+ */
+export async function lireDroitsFiligrane(): Promise<DroitsFiligrane | null> {
+  try {
+    const brut = await http.get<Partial<DroitsFiligraneBruts> | undefined>(
+      "/cv/me/generated-cvs/allowance",
+      { facultatif: true },
+    );
+    if (
+      brut === undefined ||
+      brut === null ||
+      typeof brut.subscriber !== "boolean" ||
+      typeof brut.remaining !== "number"
+    )
+      return null;
+    return versDroitsFiligrane({
+      subscriber: brut.subscriber,
+      free_per_month: brut.free_per_month ?? 0,
+      used: brut.used ?? 0,
+      remaining: brut.remaining,
+      watermark_next: brut.watermark_next ?? brut.remaining <= 0,
+      resets_at: brut.resets_at ?? "",
+    });
+  } catch (cause: unknown) {
+    if (cause instanceof ErreurApi && (cause.statut === 404 || cause.statut === 422))
+      return null;
+    throw cause;
+  }
 }
 
 /** Efface un export (ses fichiers avec). `404 generated_cv_not_found`. */

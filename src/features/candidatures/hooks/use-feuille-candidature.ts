@@ -16,6 +16,7 @@ import { useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { Alert } from "react-native";
 
+import { succesPuisAvis } from "@/features/avis/services/demande-avis";
 import { ErreurApi } from "@/lib/http";
 
 import { marquerCandidate } from "../api/candidatures.api";
@@ -46,6 +47,9 @@ export function useFeuilleCandidature(
     setEnregistrement(true);
     marquerCandidate(dossierId)
       .then((dossier) => {
+        // La candidature est marquée : un succès, puis — feuille fermée,
+        // 1,8 s plus tard — la demande d'avis si tout s'y prête.
+        succesPuisAvis("candidature");
         memoriserDossier(dossier);
         onMarque?.(dossier);
         poserRetourDiscret(TEXTES.noteCandidate);

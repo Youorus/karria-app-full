@@ -11,8 +11,15 @@
  * lien mènerait nulle part.
  *
  * Le catalogue n'est lu qu'**une fois** par lancement, quel que soit le
- * nombre d'annonces affichées ; un échec vaut « non » et se retentera au
- * lancement suivant.
+ * nombre d'annonces affichées ; un échec vaut « non » et se retentera à la
+ * prochaine demande.
+ *
+ * ═══ Et le prix, pour qui propose l'abonnement ═══
+ *
+ * La proposition faite après un CV filigrané ou des portraits épuisés
+ * (`services/proposition.ts`) écrit le prix dans sa phrase. Il vient de la
+ * même lecture (`offreSansPub`) : aucun montant n'est écrit dans l'app
+ * (AGENTS.md §6.4).
  */
 
 import { useEffect, useState } from "react";
@@ -20,18 +27,37 @@ import { Platform } from "react-native";
 
 import { lireCatalogue } from "../api/soutien.api";
 
-let lecture: Promise<boolean> | null = null;
+/** L'offre telle que le serveur la vend ici. */
+export interface OffreSansPub {
+  /** Le paiement est ouvert sur cette plateforme. */
+  ouverte: boolean;
+  /** Le prix mensuel, en centimes ; `null` tant qu'on ne le connaît pas. */
+  prixCentimes: number | null;
+}
 
-/** Lit (une fois) si l'offre sans pub est ouverte sur cette plateforme. */
-export function offreSansPubDisponible(): Promise<boolean> {
+const OFFRE_FERMEE: OffreSansPub = { ouverte: false, prixCentimes: null };
+
+let lecture: Promise<OffreSansPub> | null = null;
+
+/** Lit (une fois) l'offre sans pub : ouverte ici ou non, et son prix mensuel. */
+export function offreSansPub(): Promise<OffreSansPub> {
   lecture ??= lireCatalogue(Platform.OS).then(
-    (catalogue) => catalogue.actif,
-    () => {
+    (catalogue) => ({
+      ouverte: catalogue.actif,
+      prixCentimes: catalogue.sansPub?.prixCentimes ?? null,
+    }),
+    (cause: unknown) => {
+      console.warn("[karria] catalogue des paiements illisible", cause);
       lecture = null;
-      return false;
+      return OFFRE_FERMEE;
     },
   );
   return lecture;
+}
+
+/** Lit (une fois) si l'offre sans pub est ouverte sur cette plateforme. */
+export function offreSansPubDisponible(): Promise<boolean> {
+  return offreSansPub().then((offre) => offre.ouverte);
 }
 
 /** Pour les tests : oublie la lecture en cache. */
