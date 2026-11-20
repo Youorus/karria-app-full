@@ -20,6 +20,34 @@ l'IA devra se montrer avant le premier outil d'IA (`required`), et quelle
 `disclosure` (version, fournisseurs, usages) afficher. Le détail est dans
 `contrat-api-consentement-ia.md`.
 
+## D'où vient le compte : `region` et `timezone` à la connexion
+
+Les trois requêtes qui peuvent **créer** un compte — `POST /auth/email/verify`,
+`POST /auth/social/google`, `POST /auth/social/apple` — acceptent deux champs
+facultatifs de plus (depuis le 2026-11-20, ADR-0042 de l'API) :
+
+```jsonc
+{
+  // … les champs habituels de la requête …
+  "region": "BE", // string | absent — ISO 3166-1 alpha-2, exactement deux lettres majuscules
+  "timezone": "Europe/Brussels", // string | absent — nom IANA, 64 caractères au plus
+}
+```
+
+Ce sont le réglage « Région » du téléphone et son fuseau, lus sans permission
+(`src/lib/localisation.ts`) : ni position, ni adresse IP. Le serveur les note
+**une seule fois** sur le compte (à sa création, sinon à la première occasion)
+et ne remplace jamais une valeur déjà connue ; ils servent à savoir de quels
+pays viennent les inscrits, rien d'autre, et ne reviennent dans aucune réponse.
+
+- L'app **omet** la clé quand elle ne sait pas, et n'envoie que la forme exacte.
+- Une valeur hors forme (`fr`, `419`, `ZZ`, un nombre) est **ignorée** par le
+  serveur : jamais d'erreur, la connexion aboutit pareil.
+- `/auth/email/start` et `/auth/email/resend` ne les portent pas : ils ne créent
+  aucun compte.
+- Une version de l'app qui ne les envoie pas reste acceptée : le serveur reprend
+  alors la région de la fiche de l'appareil (`PUT /devices/{installation_id}`).
+
 ## Le principe
 
 Supprimer son compte est un droit, pas un parcours d'obstacles. L'app

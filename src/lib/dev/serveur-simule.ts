@@ -261,6 +261,10 @@ export async function repondreEnSimulation(requete: RequeteSimulee): Promise<Res
       }
       etat.parcours.delete(id);
       accepterConsentementIaALaConnexion(parcours.aiVersion);
+      // `region` (deux lettres majuscules) et `timezone` (nom IANA, 64
+      // caractères au plus), facultatifs : le serveur les note une fois sur
+      // le compte et ignore une valeur hors forme sans jamais refuser. Ils
+      // ne changent rien à la réponse — ici comme sur `/auth/social/*`.
       return json(200, ouvrirSession(parcours.email, true));
     }
 

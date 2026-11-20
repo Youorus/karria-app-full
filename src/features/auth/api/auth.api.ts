@@ -19,9 +19,19 @@
  * eu le temps de charger l'information (`GET /auth/ai-disclosure`). Sinon le
  * champ manque, le serveur ne consigne rien, et la feuille de consentement
  * demandera au premier geste d'IA — jamais une version qu'on n'a pas montrée.
+ *
+ * ═══ D'où vient le compte, sans le demander ═══
+ *
+ * Les requêtes qui peuvent **créer** un compte — la validation du code,
+ * Apple, Google — portent aussi `region` et `timezone` : le réglage
+ * « Région » du téléphone et son fuseau, lus sans permission
+ * (`lib/localisation.ts`). Le serveur les note une seule fois sur le
+ * compte, pour savoir de quels pays viennent les inscrits. Une valeur
+ * inconnue ne part pas : la clé manque, et la connexion se fait pareil.
  */
 
 import { http } from "@/lib/http";
+import { origineAppareil } from "@/lib/localisation";
 import { versionDisclosureAffichee } from "../services/consentement-ia";
 import { VERSIONS } from "../services/consentements";
 import { versConsentementIa } from "./consentement-ia.api";
@@ -92,7 +102,7 @@ export async function verifierCode(parcoursId: string, code: string): Promise<Co
   return versConnexion(
     await http.post<ConnexionBrute>(
       "/auth/email/verify",
-      { challenge_id: parcoursId, code },
+      { challenge_id: parcoursId, code, ...origineAppareil() },
       { authentifie: false },
     ),
   );
@@ -112,8 +122,18 @@ export async function connecterAvec(
 ): Promise<Connexion> {
   const corps =
     fournisseur === "apple"
-      ? { identity_token: jeton, nonce: nonce ?? null, ...consentement() }
-      : { id_token: jeton, nonce: nonce ?? null, ...consentement() };
+      ? {
+          identity_token: jeton,
+          nonce: nonce ?? null,
+          ...consentement(),
+          ...origineAppareil(),
+        }
+      : {
+          id_token: jeton,
+          nonce: nonce ?? null,
+          ...consentement(),
+          ...origineAppareil(),
+        };
   return versConnexion(
     await http.post<ConnexionBrute>(`/auth/social/${fournisseur}`, corps, {
       authentifie: false,
