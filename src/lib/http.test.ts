@@ -15,12 +15,20 @@
  *    d'un refus, et sa cause est journalisée ;
  * 4. la forme des requêtes : adresse, jeton, corps, formulaire refabriqué
  *    à la reprise, délai d'abandon.
+ * 5. **hors ligne, une action n'attend pas** : elle échoue tout de suite
+ *    avec l'erreur réseau, sans partir ; les lectures partent toujours ; et
+ *    chaque envoi dit à `etat-connexion` comment va le réseau.
  *
  * On ne simule que `fetch`, le stockage de session et l'adresse de l'API.
  */
 
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+import {
+  lireAffichage,
+  noterAppareil,
+  reinitialiserConnexion,
+} from "@/lib/etat-connexion";
 import { ecrireJetons, lireJetons, oublierSession } from "@/lib/session";
 
 import {
@@ -142,10 +150,14 @@ beforeEach(() => {
   jest.mocked(ecrireJetons).mockResolvedValue(undefined);
   jest.mocked(oublierSession).mockResolvedValue(undefined);
   auMomentDeLaDeconnexion(() => undefined);
+  // L'état de la connexion est un module : sans cela, les pannes d'un test
+  // compteraient dans le suivant.
+  reinitialiserConnexion();
 });
 
 afterEach(() => {
   jest.useRealTimers();
+  reinitialiserConnexion();
 });
 
 describe("La forme d'une requête", () => {
@@ -589,5 +601,120 @@ describe("le témoin des erreurs", () => {
       statut: 500,
       message: "Panne.",
     });
+  });
+});
+
+describe("Hors ligne et connexion instable", () => {
+  const PANNE = new TypeError("Network request failed");
+
+  it("hors ligne, une action ne part pas : l'erreur réseau, tout de suite", async () => {
+    noterAppareil("sans-reseau");
+
+    for (const action of [
+      () => http.post("/assistant/messages", { text: "Bonjour" }),
+      () => http.put("/cv/me/chapters/identity", {}),
+      () => http.patch("/shipments/1", {}),
+      () => http.delete("/search/criteria"),
+      () => http.postFormulaire("/cv/import", () => new FormData()),
+    ]) {
+      const erreur = await echecDe(action());
+      expect(erreur.estReseau).toBe(true);
+      expect(erreur.raison).toBe("reseau_injoignable");
+    }
+    expect(recuperer).not.toHaveBeenCalled();
+    expect(envoisXhr).toHaveLength(0);
+  });
+
+  it("hors ligne, le témoin des erreurs voit l'action refusée comme une panne réseau", async () => {
+    const temoin = jest.fn();
+    auMomentDUneErreur(temoin);
+    noterAppareil("sans-reseau");
+    await echecDe(http.post("/assistant/messages", {}));
+    expect(temoin).toHaveBeenCalledTimes(1);
+    auMomentDUneErreur(null);
+  });
+
+  it("hors ligne, une lecture part quand même : sa réponse peut démentir l'appareil", async () => {
+    noterAppareil("sans-reseau");
+    recuperer.mockResolvedValue(reponse(200, { ok: true }));
+    await expect(http.get("/offers")).resolves.toEqual({ ok: true });
+    expect(recuperer).toHaveBeenCalledTimes(1);
+  });
+
+  it("un réseau « sans Internet » ne refuse pas l'action : elle part", async () => {
+    noterAppareil("sans-internet");
+    recuperer.mockResolvedValue(reponse(200, {}));
+    await http.post("/assistant/messages", {});
+    expect(recuperer).toHaveBeenCalledTimes(1);
+    // Et la réponse reçue dément le « sans Internet ».
+    expect(lireAffichage()).toBe("retablie");
+  });
+
+  it("en ligne, une action part normalement", async () => {
+    noterAppareil("en-ligne");
+    recuperer.mockResolvedValue(reponse(200, {}));
+    await http.post("/assistant/messages", {});
+    expect(recuperer).toHaveBeenCalledTimes(1);
+  });
+
+  it("deux pannes de transport distinctes disent « instable », un succès « rétablie »", async () => {
+    const horloge = jest.spyOn(Date, "now");
+    noterAppareil("en-ligne");
+    recuperer.mockRejectedValue(PANNE);
+
+    horloge.mockReturnValue(1_000_000);
+    await echecDe(http.get("/offers"));
+    expect(lireAffichage()).toBe("aucun");
+
+    horloge.mockReturnValue(1_020_000);
+    await echecDe(http.get("/offers"));
+    expect(lireAffichage()).toBe("instable");
+
+    recuperer.mockResolvedValue(reponse(200, {}));
+    await http.get("/offers");
+    expect(lireAffichage()).toBe("retablie");
+    horloge.mockRestore();
+  });
+
+  it("trois requêtes tombées ensemble ne sont qu'un incident", async () => {
+    noterAppareil("en-ligne");
+    jest.spyOn(Date, "now").mockReturnValue(1_000_000);
+    recuperer.mockRejectedValue(PANNE);
+    await Promise.all([
+      echecDe(http.get("/a")),
+      echecDe(http.get("/b")),
+      echecDe(http.get("/c")),
+    ]);
+    expect(lireAffichage()).toBe("aucun");
+    jest.restoreAllMocks();
+  });
+
+  it("un refus du serveur n'est pas une panne : le réseau porte", async () => {
+    const horloge = jest.spyOn(Date, "now");
+    noterAppareil("en-ligne");
+    recuperer.mockResolvedValue(reponse(503, { error: { message: "Indisponible." } }));
+    horloge.mockReturnValue(1_000_000);
+    await echecDe(http.get("/offers"));
+    horloge.mockReturnValue(1_020_000);
+    await echecDe(http.get("/offers"));
+    expect(lireAffichage()).toBe("aucun");
+    horloge.mockRestore();
+  });
+
+  it("un envoi de fichier tombé compte aussi", async () => {
+    const horloge = jest.spyOn(Date, "now");
+    noterAppareil("en-ligne");
+    class XhrEnPanne extends FauxXhr {
+      send() {
+        setTimeout(() => this.onerror?.(), 0);
+      }
+    }
+    global.XMLHttpRequest = XhrEnPanne as unknown as typeof XMLHttpRequest;
+    horloge.mockReturnValue(1_000_000);
+    await echecDe(http.postFormulaire("/shipments/1/files", () => new FormData()));
+    horloge.mockReturnValue(1_020_000);
+    await echecDe(http.postFormulaire("/shipments/1/files", () => new FormData()));
+    expect(lireAffichage()).toBe("instable");
+    horloge.mockRestore();
   });
 });

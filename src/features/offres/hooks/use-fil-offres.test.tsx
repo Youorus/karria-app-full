@@ -10,6 +10,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 
+import { noterAppareil, reinitialiserConnexion } from "@/lib/etat-connexion";
 import { ErreurApi } from "@/lib/http";
 
 import { signalerRechercheChangee } from "../services/recherche-changee";
@@ -294,5 +295,57 @@ describe("Garder une offre, et la demande d'avis", () => {
     await waitFor(() => expect(mockGarder).toHaveBeenCalled());
     await act(async () => {});
     expect(mockSuccesPuisAvis).not.toHaveBeenCalled();
+  });
+});
+
+describe("Sans réseau, puis au retour de la connexion", () => {
+  const PANNE = new ErreurApi("Connexion impossible.", 0, "reseau_injoignable");
+
+  beforeEach(() => {
+    reinitialiserConnexion();
+    noterAppareil("en-ligne");
+  });
+
+  it("ouvert sans réseau : pas de chargement sans fin, le message hors ligne", async () => {
+    mockLireFil.mockRejectedValue(PANNE);
+    const { result } = await monter();
+    expect(result.current.chargement).toBe(false);
+    expect(result.current.offres).toEqual([]);
+    expect(result.current.erreur).toBe(
+      "Pas de connexion. Tes offres reviendront dès que le réseau sera là.",
+    );
+  });
+
+  it("se relit seul quand la connexion revient, et l'erreur s'efface", async () => {
+    mockLireFil.mockRejectedValue(PANNE);
+    const { result } = await monter();
+    expect(result.current.erreur).not.toBeNull();
+    const avant = mockLireFil.mock.calls.length;
+
+    servir();
+    act(() => noterAppareil("sans-reseau"));
+    expect(mockLireFil.mock.calls.length).toBe(avant);
+    act(() => noterAppareil("en-ligne"));
+
+    await waitFor(() => expect(result.current.erreur).toBeNull());
+    expect(mockLireFil.mock.calls.length).toBe(avant + 1);
+    // Les options de filtre de la vue servie arrivent juste après.
+    await waitFor(() => expect(mockLireOptions).toHaveBeenCalled());
+    await act(async () => {
+      await Promise.resolve();
+    });
+  });
+
+  it("ne se relit pas au retour quand il avait ses offres", async () => {
+    const { result } = await monter();
+    expect(result.current.erreur).toBeNull();
+    const avant = mockLireFil.mock.calls.length;
+
+    act(() => noterAppareil("sans-reseau"));
+    act(() => noterAppareil("en-ligne"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockLireFil.mock.calls.length).toBe(avant);
   });
 });

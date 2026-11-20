@@ -47,6 +47,11 @@
  * laissant le serveur choisir le mode — il ne déduit pas lui-même ce qui
  * reste.
  *
+ * ═══ La connexion revenue ═══
+ *
+ * Un fil resté en erreur se relit seul quand la connexion revient
+ * (`hooks/use-relance-au-retour.ts`) — seulement s'il était en erreur.
+ *
  * ═══ Une seule requête à la fois ═══
  *
  * `jeton` numérote chaque chargement. Une réponse arrivée après un
@@ -60,6 +65,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
 import { succesPuisAvis } from "@/features/avis/services/demande-avis";
+import { useRelanceAuRetour } from "@/hooks/use-relance-au-retour";
 import { ErreurApi } from "@/lib/http";
 import {
   garderOffre,
@@ -455,6 +461,10 @@ export function useFilOffres(): FilOffres {
     setReglages((r) => ({ ...r, recherche: REGLAGE_PAR_DEFAUT }));
     setRelance((n) => n + 1);
   }, [versionRecherche]);
+
+  // La connexion revient alors que le fil était resté sur une erreur : il
+  // se relit seul, sans attendre « Réessayer ».
+  useRelanceAuRetour(erreur !== null, actualiser);
 
   const marquerOuverte = useCallback(
     (offre: Offre) => remplacer(offre.id, { nonOuverte: false }),

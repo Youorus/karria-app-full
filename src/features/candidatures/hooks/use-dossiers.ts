@@ -43,6 +43,7 @@ import { usePorte } from "@/features/auth/hooks/use-porte";
 import type { NativeAd } from "@/features/publicite/api/publicite.api";
 import { useAnnonceEmplacement } from "@/features/publicite/hooks/use-annonce-emplacement";
 import { insererApres } from "@/features/publicite/services/regles-publicite";
+import { useRelanceAuRetour } from "@/hooks/use-relance-au-retour";
 import { ErreurApi } from "@/lib/http";
 import { useNavigationUnique } from "@/lib/navigation";
 
@@ -136,6 +137,9 @@ export function useDossiers(): EcranCandidatures {
   );
 
   useFocusEffect(useCallback(() => charger(false), [charger]));
+  // La connexion revient : la liste restée en erreur se relit.
+  const relire = useCallback(() => void charger(true), [charger]);
+  useRelanceAuRetour(erreur !== null, relire);
 
   // La phrase du retour discret s'efface d'elle-même.
   useEffect(() => {

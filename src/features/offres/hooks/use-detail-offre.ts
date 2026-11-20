@@ -43,6 +43,7 @@ import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
 import { useAnnonceEmplacement } from "@/features/publicite/hooks/use-annonce-emplacement";
 import type { NativeAd } from "@/features/publicite/api/publicite.api";
 import { succesPuisAvis } from "@/features/avis/services/demande-avis";
+import { useRelanceAuRetour } from "@/hooks/use-relance-au-retour";
 import { ErreurApi } from "@/lib/http";
 import {
   ecarterOffre,
@@ -206,6 +207,8 @@ export function useDetailOffre(): DetailOffre {
     setEtatDescription("chargement");
     setTentative((t) => t + 1);
   }, [id]);
+  // La connexion revient : l'offre (ou son texte) restée en erreur se relit.
+  useRelanceAuRetour(erreur !== null || etatDescription === "erreur", recharger);
 
   return {
     offre,

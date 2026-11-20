@@ -25,6 +25,7 @@ import { useCallback, useState } from "react";
 import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
 import type { NativeAd } from "@/features/publicite/api/publicite.api";
 import { useAnnonceEmplacement } from "@/features/publicite/hooks/use-annonce-emplacement";
+import { useRelanceAuRetour } from "@/hooks/use-relance-au-retour";
 import { ErreurApi } from "@/lib/http";
 
 import { DEFINITIONS } from "../services/chapitres";
@@ -111,6 +112,9 @@ export function useEcranCv(): EcranCv {
   }, [invite]);
 
   useFocusEffect(charger);
+  // La connexion revient : le CV resté en erreur se relit.
+  const relire = useCallback(() => void charger(), [charger]);
+  useRelanceAuRetour(erreur !== null, relire);
 
   const ouvrirImport = useCallback(
     (source: SourceImport) =>

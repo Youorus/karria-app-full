@@ -29,4 +29,30 @@ describe("La bande du démarrage", () => {
     fireEvent.press(screen.getByRole("button", { name: "Fermer" }));
     expect(props.onFermer).toHaveBeenCalledTimes(1);
   });
+
+  it("porte le rôle d'alerte sur sa phrase, pour les lecteurs d'écran", () => {
+    render(<BandeDemarrage visible {...props} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Une amélioration est prête.");
+  });
+
+  it("sans action ni croix, ne montre que la phrase", () => {
+    render(<BandeDemarrage visible phrase="Connexion rétablie" icone="cocheCercle" />);
+    expect(screen.getByText("Connexion rétablie")).toBeTruthy();
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("sans action mais avec croix, la croix porte le libellé demandé", () => {
+    const onFermer = jest.fn();
+    render(
+      <BandeDemarrage
+        visible
+        phrase="Pas de connexion."
+        onFermer={onFermer}
+        libelleFermer="Masquer"
+      />,
+    );
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    fireEvent.press(screen.getByRole("button", { name: "Masquer" }));
+    expect(onFermer).toHaveBeenCalledTimes(1);
+  });
 });

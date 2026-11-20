@@ -5,6 +5,38 @@
 
 **Dernière mise à jour : 2026-11-20**
 
+## 2026-11-20 — « connexion instable » : hors ligne, réseau dégradé, retour
+
+**Rien n'est commité ni poussé. Rien n'a tourné sur appareil ni en simulateur, et aucun appel n'a été fait à l'API de production** : tout est éprouvé par les tests. `npm run check` vert (types, lint sans avertissement, format, **120 suites / 955 tests** ; 114 / 892 avant) ; `npm run bundle:check` produit le paquet iOS.
+
+**Nouvelle build nécessaire pour `expo-network`** (`~57.0.3`, ajoutée par `npx expo install`, module natif) : non lancée ; `ios/` et `android/` intacts (`pod install` se fera à la build). Sans elle — une build actuelle qui recevrait ce code par mise à jour EAS — rien ne plante : le module est chargé à la demande, son absence est journalisée, et l'app ne sait dire que « Connexion instable » (d'après ses requêtes), jamais « Pas de connexion ».
+
+- **La décision** (`lib/connexion.ts`, pur ; état vivant dans `lib/etat-connexion.ts`) : `hors-ligne` quand l'appareil le dit (aucun réseau, ou réseau sans Internet) ; `instable` après **2 incidents** consécutifs de transport (délai dépassé, hôte injoignable) alors que l'appareil se dit connecté — des requêtes tombées dans la même 1,5 s comptent pour un incident ; retour à `bonne` au **premier** succès (une réponse du serveur, même un refus). « Instable » s'oublie seul après 30 s sans nouvel échec, sans annoncer de retour. Aucun ping : seules les requêtes que l'app fait déjà renseignent.
+- **Les sources** : `lib/http.ts` rapporte l'issue de chaque envoi réel (pas ceux du faux serveur) ; `lib/ecoute-reseau.ts` lit `expo-network` au démarrage, à chaque changement, et à chaque retour au premier plan.
+- **Le bandeau** (`components/bandeau-connexion.tsx`, `hooks/use-bandeau-connexion.ts`, monté dans `app/_layout.tsx` sous les autres bandes) : la carte de `bande-demarrage.tsx` sans action, avec une icône — « Pas de connexion. Karria reprendra dès qu'elle revient. », « Connexion instable. Certaines actions peuvent être lentes. », puis « Connexion rétablie » 2 s. En absolu (aucun décalage de mise en page) ; une croix « Masquer » la retire jusqu'au prochain changement d'état. Chaque état est annoncé au lecteur d'écran (`announceForAccessibility`) et la phrase porte le rôle `alert`. Au passage, `bande-demarrage.tsx` porte désormais ce rôle **sur le texte** : sur la carte (une vue non accessible), il n'était pas exposé — vaut aussi pour les bandes de mise à jour et du merci.
+- **Au retour** (`hooks/use-relance-au-retour.ts`) : un écran **resté en erreur** se relit seul — fil d'offres, détail d'une offre, dossiers, onglet CV, galerie de modèles. Un écran qui a ses données ne redemande rien ; le signal ne part pas plus d'une fois toutes les 5 s.
+- **Hors ligne, une action n'attend plus** : dans `lib/http.ts`, tout appel autre que `GET` (message à Karria, import, export, paiement, enregistrements) échoue **tout de suite** avec l'erreur réseau existante quand l'appareil n'a **aucun** réseau — chaque écran affiche donc le message qu'il avait déjà. Les lectures partent toujours (leur réponse corrige un appareil qui se tromperait). Même garde sur le téléchargement d'un export (`telechargement.ts`).
+- **Démarrage à froid sans réseau** : vérifié à la lecture, rien à corriger — session et polices sont locales, la porte de version et la mise à jour EAS avalent leur échec ; le fil montre son squelette puis « Pas de connexion… — Réessayer », et maintenant le bandeau, puis se relit seul au retour.
+
+**Choix d'interprétation à valider par Marc**
+
+- Le bandeau **recouvre** le haut de l'écran (comme les bandes de mise à jour) au lieu de pousser le contenu : pousser aurait doublé la marge de l'encoche de chaque écran. D'où la croix. Variante possible : une pastille plus petite, ou en bas au-dessus des onglets.
+- Les feuilles (`Modal` : connexion, consentement, filtres, sans pub…) passent au-dessus du bandeau : pendant qu'une feuille est ouverte, seuls ses propres messages d'erreur parlent.
+- Une action n'est refusée d'avance que sans **aucun** réseau. Avec un réseau « sans Internet » (portail d'hôtel), elle part et échoue au bout du délai : ce drapeau du système est une estimation, et refuser à tort serait pire.
+- « Réseau lent » = des requêtes qui **tombent** (12 s). Une requête lente mais qui aboutit ne déclenche rien.
+- Les messages d'erreur réseau existants ne sont pas réécrits (certains vouvoient encore : « Connexion impossible. Vérifiez votre réseau… », `lib/http.ts`).
+
+**Délais maximaux — ce qui n'en a pas**
+
+- Tout `http.*` : 12 s (`DELAI_MS`), JSON comme envoi de fichier. **C'est court pour l'import d'un CV (5 à 10 s mesurées) et la génération d'un export sur un réseau lent** : à surveiller pendant la campagne, non modifié ici.
+- Sans délai : `File.downloadFileAsync` (`telechargement.ts`), l'ouverture du WebSocket de l'équipe (`equipe.api.ts`, qui se reconnecte seul), les images (`expo-image`), les pages Stripe dans le navigateur.
+
+**Reste à faire**
+
+- **Tout l'essai sur appareil** (iOS et Android) : mode avion à chaud et à froid, Wi-Fi sans Internet, réseau bridé ; hauteur et lisibilité du bandeau sous l'encoche et l'île dynamique, en mode sombre, sur deux lignes ; VoiceOver / TalkBack ; la fiabilité de `isInternetReachable` sur Android ; la relance des cinq écrans au retour.
+- Nouvelle build (iOS et Android) pour `expo-network`.
+- La relance au retour est testée sur le hook partagé et sur le fil ; le détail, les dossiers, l'onglet CV et la galerie y sont branchés d'une ligne, sans test dédié.
+
 ## 2026-11-20 — « Mes recherches » dans les paramètres (ADR-0041 de l'API)
 
 **Rien n'est commité ni poussé. Rien n'a tourné sur appareil ni en simulateur, et aucun appel n'a été fait à l'API de production** : tout est éprouvé contre le faux serveur et par les tests. `npm run check` vert (types, lint sans avertissement, format, **114 suites / 892 tests** ; 110 / 843 avant) ; `npm run bundle:check` produit le paquet iOS. Aucune dépendance ajoutée, `ios/` et `android/` intacts : pas de nouvelle build nécessaire pour ce lot.

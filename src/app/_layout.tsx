@@ -36,6 +36,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaListener } from "react-native-safe-area-context";
 import { Uniwind } from "uniwind";
 
+import { BandeauConnexion } from "@/components/bandeau-connexion";
 import { FrontiereErreur } from "@/components/frontiere-erreur";
 import { RenvoiClavier } from "@/components/renvoi-clavier";
 import { GluestackUIProvider } from "@/components/ui/gluestack-ui-provider";
@@ -181,6 +182,9 @@ function Portail() {
             entre dans l'application, on ne « va » pas quelque part. */}
         <Stack.Screen name="(app)" options={{ animation: "fade" }} />
       </Stack>
+      {/* L'état de la connexion — hors ligne, instable, rétablie — sur tous
+          les écrans ; monté avant les autres bandes, donc dessous. */}
+      <BandeauConnexion />
       {/* Au-dessus de la navigation : les notifications touchées avant la
           session y attendent, et la bannière du premier plan s'y pose. */}
       <CentreDeNotifications />

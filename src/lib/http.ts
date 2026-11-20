@@ -28,14 +28,36 @@
  *
  * Si la requête rejouée échoue encore en 401, on abandonne. Boucler
  * masquerait une panne serveur derrière un écran qui tourne indéfiniment.
+ *
+ * ═══ Il dit aussi comment va la connexion ═══
+ *
+ * Chaque envoi réel rapporte son issue à `etat-connexion.ts` : une réponse
+ * (même un refus) prouve que le réseau porte ; une panne de transport
+ * compte pour « connexion instable ». Le faux serveur ne rapporte rien : il
+ * répond sans réseau.
+ *
+ * Et une **action** (tout sauf `GET`) ne part pas quand l'appareil n'a
+ * aucun réseau : elle échoue tout de suite avec la même erreur réseau, donc
+ * le message que chaque écran sait déjà afficher, au lieu de faire attendre
+ * `DELAI_MS`. Les lectures, elles, partent toujours : si l'appareil se
+ * trompe, c'est leur réponse qui le dément.
  */
 
 import { API_URL, SIMULATION } from "@/lib/config";
 import { enAvanceSurLeBackend, repondreEnSimulation } from "@/lib/dev/serveur-simule";
+import { estSansReseau, noterEchecReseau, noterSuccesReseau } from "@/lib/etat-connexion";
 import { ecrireJetons, lireJetons, oublierSession, type Jetons } from "@/lib/session";
 
 /** Au-delà, l'utilisateur croit que l'application est bloquée. */
 const DELAI_MS = 12_000;
+/**
+ * Les envois qui font travailler le serveur — import d'un CV (5 à 10 s
+ * mesurées sur un bon réseau), photo, dictée, export — ont plus de temps :
+ * à 12 s, un réseau mobile moyen les faisait échouer alors que le serveur
+ * répondait. Les lectures gardent le délai court.
+ */
+const DELAI_FICHIER_MS = 60_000;
+const DELAI_ECRITURE_MS = 30_000;
 
 /**
  * Une erreur venue de l'API, avec de quoi décider quoi afficher.
@@ -188,6 +210,17 @@ async function envoyer(chemin: string, options: Options, jeton: string | null) {
       jeton,
     });
   }
+  try {
+    const reponse = await envoyerAuServeur(chemin, options, jeton);
+    noterSuccesReseau();
+    return reponse;
+  } catch (cause) {
+    noterEchecReseau();
+    throw cause;
+  }
+}
+
+function envoyerAuServeur(chemin: string, options: Options, jeton: string | null) {
   const entetes = {
     ...(options.formulaire === true ? {} : { "Content-Type": "application/json" }),
     ...(jeton === null ? {} : { Authorization: `Bearer ${jeton}` }),
@@ -201,27 +234,27 @@ async function envoyer(chemin: string, options: Options, jeton: string | null) {
     );
   }
   const controleur = new AbortController();
-  const echeance = setTimeout(() => controleur.abort(), DELAI_MS);
-  try {
-    return await fetch(`${API_URL}${chemin}`, {
-      method: options.method ?? "GET",
-      headers: entetes,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: controleur.signal,
-      // `no-store` explicite. Le serveur ne pose aucun en-tête de cache
-      // sur ces routes, et URLSession applique alors une heuristique
-      // maison : sur simulateur, une liste de résultats est restée
-      // affichée avec d'anciens libellés alors que l'API rendait les
-      // nouveaux — vérifié en confrontant l'écran à un appel direct.
-      //
-      // Une recherche n'a de toute façon rien à mettre en cache : sa
-      // réponse dépend de qui demande, d'où il est, et de ce qui a été
-      // publié dans la minute.
-      cache: "no-store",
-    });
-  } finally {
-    clearTimeout(echeance);
-  }
+  const lecture = (options.method ?? "GET") === "GET";
+  const echeance = setTimeout(
+    () => controleur.abort(),
+    lecture ? DELAI_MS : DELAI_ECRITURE_MS,
+  );
+  return fetch(`${API_URL}${chemin}`, {
+    method: options.method ?? "GET",
+    headers: entetes,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    signal: controleur.signal,
+    // `no-store` explicite. Le serveur ne pose aucun en-tête de cache
+    // sur ces routes, et URLSession applique alors une heuristique
+    // maison : sur simulateur, une liste de résultats est restée
+    // affichée avec d'anciens libellés alors que l'API rendait les
+    // nouveaux — vérifié en confrontant l'écran à un appel direct.
+    //
+    // Une recherche n'a de toute façon rien à mettre en cache : sa
+    // réponse dépend de qui demande, d'où il est, et de ce qui a été
+    // publié dans la minute.
+    cache: "no-store",
+  }).finally(() => clearTimeout(echeance));
 }
 
 /**
@@ -251,7 +284,7 @@ function envoyerMultipart(
   return new Promise((resoudre, rejeter) => {
     const requete = new XMLHttpRequest();
     requete.open(methode, url);
-    requete.timeout = DELAI_MS;
+    requete.timeout = DELAI_FICHIER_MS;
     for (const [nom, valeur] of Object.entries(entetes))
       requete.setRequestHeader(nom, valeur);
     requete.onload = () => {
@@ -277,6 +310,9 @@ function envoyerMultipart(
   });
 }
 
+/** Le même message qu'un envoi soit tombé ou n'ait pas été lancé. */
+const MESSAGE_RESEAU = "Connexion impossible. Vérifiez votre réseau, puis réessayez.";
+
 /**
  * Transforme une panne de transport en erreur lisible, sans perdre la cause.
  *
@@ -290,11 +326,21 @@ function erreurReseau(chemin: string, cause: unknown): ErreurApi {
   const detail =
     cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause);
   console.warn(`[karria] échec réseau sur ${API_URL}${chemin} — ${detail}`);
-  return new ErreurApi(
-    "Connexion impossible. Vérifiez votre réseau, puis réessayez.",
-    0,
-    "reseau_injoignable",
-  );
+  return new ErreurApi(MESSAGE_RESEAU, 0, "reseau_injoignable");
+}
+
+/**
+ * L'erreur réseau d'une action qu'on ne lance pas : l'appareil n'a aucun
+ * réseau. La même que celle d'un envoi tombé (`estReseau`), pour que chaque
+ * écran affiche le message qu'il a déjà — mais tout de suite.
+ *
+ * Exportée pour ce qui ne passe pas par ce client (le téléchargement d'un
+ * export, `atelier/services/telechargement.ts`).
+ */
+export function erreurSiHorsLigne(quoi: string): ErreurApi | null {
+  if (!estSansReseau()) return null;
+  console.warn(`[karria] hors ligne, non lancé : ${quoi}`);
+  return new ErreurApi(MESSAGE_RESEAU, 0, "reseau_injoignable");
 }
 
 async function lireErreur(reponse: Response): Promise<ErreurApi> {
@@ -350,6 +396,12 @@ async function appelerSansTemoin<T>(chemin: string, options: Options = {}): Prom
   let jeton: string | null = null;
   if (authentifie) {
     jeton = (await lireJetons())?.acces ?? null;
+  }
+
+  const methode = options.method ?? "GET";
+  if (methode !== "GET") {
+    const horsLigne = erreurSiHorsLigne(`${methode} ${chemin}`);
+    if (horsLigne !== null) throw horsLigne;
   }
 
   let reponse: Response;

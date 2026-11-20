@@ -61,6 +61,7 @@ export const ICONES = {
   entreprise: { ios: "building.2", android: "apartment" },
   eclair: { ios: "bolt.fill", android: "bolt" },
   alerte: { ios: "exclamationmark.circle", android: "error" },
+  horsLigne: { ios: "wifi.slash", android: "wifi_off" },
   info: { ios: "info.circle", android: "info" },
   etoile: { ios: "star.fill", android: "star" },
   tendance: { ios: "chart.line.uptrend.xyaxis", android: "trending_up" },

@@ -37,6 +37,7 @@ import * as Sharing from "expo-sharing";
 import { Platform, Share } from "react-native";
 
 import { SIMULATION } from "@/lib/config";
+import { erreurSiHorsLigne } from "@/lib/http";
 import { ecrireFichierSimule, estUnFichierSimule } from "@/lib/dev/stockage-simule";
 
 import { fichierDExport, supprimerExport } from "./brouillon-atelier";
@@ -87,6 +88,11 @@ export async function telechargerFichier(
   )
     throw new Error("[karria] fichier hors du répertoire des exports");
   if (SIMULATION && estUnFichierSimule(url)) return ecrireFichierSimule(destination, url);
+  // Sans aucun réseau, on ne lance rien : `downloadFileAsync` n'a pas de
+  // délai maximal, et l'erreur réseau du client HTTP est celle que les
+  // appelants savent déjà dire.
+  const horsLigne = erreurSiHorsLigne("téléchargement d'un export");
+  if (horsLigne !== null) throw horsLigne;
   return File.downloadFileAsync(url, destination);
 }
 

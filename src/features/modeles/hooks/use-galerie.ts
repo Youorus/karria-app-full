@@ -21,6 +21,7 @@ import { usePorte } from "@/features/auth/hooks/use-porte";
 import type { NativeAd } from "@/features/publicite/api/publicite.api";
 import { useAnnonceEmplacement } from "@/features/publicite/hooks/use-annonce-emplacement";
 import { insererApres } from "@/features/publicite/services/regles-publicite";
+import { useRelanceAuRetour } from "@/hooks/use-relance-au-retour";
 import { ErreurApi } from "@/lib/http";
 import { lireMesModeles, lireModeles } from "../api/modeles.api";
 import {
@@ -123,6 +124,8 @@ export function useGalerie(): Galerie {
     setActualisation(true);
     setTentative((t) => t + 1);
   }, []);
+  // La connexion revient : la galerie restée en erreur se relit.
+  useRelanceAuRetour(erreur !== null, actualiser);
 
   const modeles = useMemo(() => filtrer(tous, filtre), [tous, filtre]);
   const annonce = useAnnonceEmplacement(
