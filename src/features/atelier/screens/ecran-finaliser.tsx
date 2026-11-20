@@ -427,6 +427,13 @@ export function EcranFinaliser({ libre = false }: { libre?: boolean }) {
         onFermer={f.filigrane.proposition.fermer}
         apresFermeture={f.filigrane.proposition.apresFermeture}
       />
+      <FeuilleProposition
+        visible={f.limiteOptimisation.visible}
+        textes={f.limiteOptimisation.textes}
+        onAccepter={f.limiteOptimisation.accepter}
+        onFermer={f.limiteOptimisation.fermer}
+        apresFermeture={f.limiteOptimisation.apresFermeture}
+      />
       {!f.libre && f.dossier !== null ? (
         <FeuilleCandidature
           visible={f.question && envoiFerme}

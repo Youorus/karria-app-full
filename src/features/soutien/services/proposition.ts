@@ -80,5 +80,30 @@ export function propositionPortraits(
   };
 }
 
+/** Quand les optimisations pour les ATS du mois sont épuisées. */
+export function propositionOptimisations(
+  /** La limite que le serveur annonce ; `null` s'il ne l'a pas dite. */
+  limite: number | null,
+  prixCentimes: number | null,
+): TextesProposition {
+  const prix = parMois(prixCentimes);
+  const utilisees =
+    limite === null
+      ? "Tu as utilisé tes optimisations du mois."
+      : `Tu as utilisé tes ${limite} optimisations du mois.`;
+  return {
+    titre: "Limite atteinte",
+    texte:
+      prix === null
+        ? `${utilisees} Avec Karria sans pub, tu optimises autant de CV que tu veux. Ton CV actuel reste disponible.`
+        : `${utilisees} Avec Karria sans pub, tu optimises autant de CV que tu veux : ${prix}, sans engagement. Ton CV actuel reste disponible.`,
+    accepter:
+      prixCentimes === null
+        ? "Passer à Karria sans pub"
+        : `Optimiser sans limite — ${euros(prixCentimes)}/mois`,
+    refuser: "Garder mon CV tel quel",
+  };
+}
+
 /** Après l'abonnement, sur un CV sorti avec le filigrane. */
 export const REGENERER_SANS_FILIGRANE = "Régénérer sans filigrane";

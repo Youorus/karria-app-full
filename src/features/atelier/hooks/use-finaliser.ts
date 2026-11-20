@@ -93,6 +93,10 @@ import {
   lireModeleChoisi,
 } from "../api/documents.api";
 import { useFiligrane, type Filigrane } from "./use-filigrane";
+import {
+  useLimiteOptimisation,
+  type LimiteOptimisation,
+} from "./use-limite-optimisation";
 import { useOuvrirLecteur } from "./use-ouvrir-lecteur";
 import { memoriserApercu } from "../services/apercus";
 import {
@@ -184,6 +188,8 @@ export interface EcranFinaliser {
   terminer: () => void;
   /** Le filigrane : la ligne, la proposition d'abonnement, la régénération. */
   filigrane: Filigrane;
+  /** Trois optimisations par mois sans abonnement : la proposition, à la quatrième. */
+  limiteOptimisation: LimiteOptimisation["proposition"];
 }
 
 export function useFinaliser(libre = false): EcranFinaliser {
@@ -367,14 +373,23 @@ export function useFinaliser(libre = false): EcranFinaliser {
     };
   }, [generer, tentative, rejouerSiConsentementRequis, usageIa, reessayer]);
 
+  // La limite est branchée plus bas (elle relance `optimiser`) : par référence.
+  const signalerLimite = useRef<(cause: unknown) => Promise<boolean>>(() =>
+    Promise.resolve(false),
+  );
+
   const optimiser = useCallback(() => {
     if (optimisation || generation) return;
     const geste = () => {
       setOptimisation(true);
       generer(true)
-        .catch((cause: unknown) => {
+        .catch(async (cause: unknown) => {
           if (!vivant.current) return;
           if (rejouerSiConsentementRequis(cause, usageIa, geste)) return;
+          // Trois optimisations par mois sans abonnement : la feuille propose
+          // Karria sans pub ; le CV affiché reste là.
+          if (await signalerLimite.current(cause)) return;
+          if (!vivant.current) return;
           console.warn("[karria] export optimisé en échec", cause);
           setErreur(messageDExport(cause));
         })
@@ -544,6 +559,11 @@ export function useFinaliser(libre = false): EcranFinaliser {
     [exportCv, exportLettre, dossier, cvLibre, libre, pousser, ouvrirLecteur],
   );
 
+  const limiteOptimisation = useLimiteOptimisation(optimiser);
+  useEffect(() => {
+    signalerLimite.current = limiteOptimisation.signaler;
+  }, [limiteOptimisation.signaler]);
+
   const filigrane = useFiligrane({
     exporte: exportCv,
     lettre: exportLettre,
@@ -611,6 +631,7 @@ export function useFinaliser(libre = false): EcranFinaliser {
     // (lien), `dismissTo` y va quand même.
     terminer: useCallback(() => router.dismissTo("/cv/mes-cv"), [router]),
     filigrane,
+    limiteOptimisation: limiteOptimisation.proposition,
   };
 }
 
