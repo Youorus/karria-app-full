@@ -102,9 +102,28 @@ export function EcranOffres() {
     defile,
     signalerDefilement,
     visibilite,
+    mouvement,
     ouvrirOffre,
     voirLesAutres,
   } = useEcranOffres();
+
+  const { debutGlisse, finGlisse, debutElan, finElan } = mouvement;
+  const surDebutGlisse = useCallback(() => {
+    suspendreAura();
+    debutGlisse();
+  }, [suspendreAura, debutGlisse]);
+  const surFinGlisse = useCallback(() => {
+    relacherLeFil();
+    finGlisse();
+  }, [relacherLeFil, finGlisse]);
+  const surDebutElan = useCallback(() => {
+    suspendreAura();
+    debutElan();
+  }, [suspendreAura, debutElan]);
+  const surFinElan = useCallback(() => {
+    reprendreAura();
+    finElan();
+  }, [reprendreAura, finElan]);
 
   const basBouton = Math.max(bottom, 8) + ECART_BAS_BARRE + HAUTEUR_BARRE + 16;
 
@@ -253,10 +272,10 @@ export function EcranOffres() {
               onEndReached={chargerLaSuite}
               onEndReachedThreshold={0.5}
               viewabilityConfigCallbackPairs={visibilite}
-              onScrollBeginDrag={suspendreAura}
-              onScrollEndDrag={relacherLeFil}
-              onMomentumScrollBegin={suspendreAura}
-              onMomentumScrollEnd={reprendreAura}
+              onScrollBeginDrag={surDebutGlisse}
+              onScrollEndDrag={surFinGlisse}
+              onMomentumScrollBegin={surDebutElan}
+              onMomentumScrollEnd={surFinElan}
               onScroll={surDefilement}
               scrollEventThrottle={64}
               contentContainerClassName="gap-3 px-5 pt-3"

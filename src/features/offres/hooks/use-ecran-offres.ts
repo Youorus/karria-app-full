@@ -55,6 +55,7 @@ import { ouvrirPorte } from "@/features/auth/hooks/porte-store";
 import { usePorte, useReprise } from "@/features/auth/hooks/use-porte";
 import type { NativeAd } from "@/features/publicite/api/publicite.api";
 import { useAnnoncesDeListe } from "@/features/publicite/hooks/use-annonces-de-liste";
+import { useAnnoncesPosees } from "@/features/publicite/hooks/use-annonces-posees";
 import { entrelacer, REGLE_DU_FIL } from "@/features/publicite/services/regles-publicite";
 import { useNavigationUnique } from "@/lib/navigation";
 import { noterDetailOuvert } from "../api/offres.api";
@@ -107,6 +108,13 @@ export interface EcranOffres extends FilOffres {
    *  seule référence pour toute la vie de l'écran : la liste refuse
    *  qu'elle change en cours de route. */
   visibilite: ViewabilityConfigCallbackPairs;
+  /** La liste dit quand elle bouge : les annonces n'entrent qu'à l'arrêt. */
+  mouvement: {
+    debutGlisse: () => void;
+    finGlisse: () => void;
+    debutElan: () => void;
+    finElan: () => void;
+  };
   defile: boolean;
   signalerDefilement: (y: number) => void;
   ouvrirMenu: () => void;
@@ -189,7 +197,11 @@ export function useEcranOffres(): EcranOffres {
     () => offres.filter(estPrincipale).length,
     [offres, estPrincipale],
   );
-  const annonces = useAnnoncesDeListe(nombrePrincipales, REGLE_DU_FIL);
+  const annoncesPretes = useAnnoncesDeListe(nombrePrincipales, REGLE_DU_FIL);
+  // Elles n'entrent dans la liste qu'à l'arrêt, et sous ce qui est à l'écran :
+  // une annonce insérée en plein défilement faisait sauter les cartes.
+  const pose = useAnnoncesPosees(annoncesPretes, REGLE_DU_FIL);
+  const annonces = pose.annonces;
 
   const elements = useMemo<ElementDuFil[]>(() => {
     const principales = offres.filter(estPrincipale);
@@ -291,12 +303,16 @@ export function useEcranOffres(): EcranOffres {
   // `signalerVisibles` change d'identité à la connexion, et `FlatList`
   // refuse qu'on change ses paires après le montage — l'écran noircissait.
   const { signalerVisibles } = fil;
+  const { noterVisibles } = pose;
   const signalerOffresVisibles = useCallback(
-    (visibles: ViewToken<ElementDuFil>[]) =>
+    (visibles: ViewToken<ElementDuFil>[]) => {
+      const dernier = visibles.reduce((max, v) => Math.max(max, v.index ?? -1), -1);
+      if (dernier >= 0) noterVisibles(dernier);
       signalerVisibles(
         visibles.flatMap((v) => (v.item.type === "offre" ? [v.item.offre.id] : [])),
-      ),
-    [signalerVisibles],
+      );
+    },
+    [signalerVisibles, noterVisibles],
   );
   const visibilite = useVisibiliteStable(signalerOffresVisibles);
 
@@ -322,6 +338,12 @@ export function useEcranOffres(): EcranOffres {
     fermerAgent: useCallback(() => setAgentOuvert(false), []),
     surRecherche,
     visibilite,
+    mouvement: {
+      debutGlisse: pose.debutGlisse,
+      finGlisse: pose.finGlisse,
+      debutElan: pose.debutElan,
+      finElan: pose.finElan,
+    },
     defile,
     signalerDefilement,
     ouvrirMenu,
