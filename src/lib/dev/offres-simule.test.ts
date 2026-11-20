@@ -329,3 +329,152 @@ describe("Le tri et les options, par mode (ADR-0027)", () => {
     expect(total(pourTout.corps)).toBeGreaterThan(total(pourLaRecherche.corps));
   });
 });
+
+describe("Les recherches enregistrées (ADR-0041)", () => {
+  interface Enregistree {
+    id: string;
+    summary: string;
+    query: string;
+    job_titles: string[];
+    location_label: string | null;
+    whole_france: boolean;
+    contract_types: string[];
+    alerts_enabled: boolean;
+    is_current: boolean;
+    created_at: string;
+    last_used_at: string;
+    last_alert_at: string | null;
+  }
+  interface Liste {
+    items: Enregistree[];
+    max: number;
+  }
+
+  async function lister(): Promise<Liste> {
+    const reponse = repondreOffres("GET", "/search/saved", undefined);
+    expect(reponse.status).toBe(200);
+    return (await reponse.json()) as Liste;
+  }
+
+  function chercher(metier: string, ville = "Paris") {
+    const reponse = repondreOffres("PUT", "/search/criteria", {
+      job_titles: [metier],
+      location: { label: ville },
+    });
+    expect(reponse.status).toBe(200);
+  }
+
+  it("est vide tant que la personne n'a rien cherché, et dit le plafond", async () => {
+    expect(await lister()).toEqual({ items: [], max: 10 });
+  });
+
+  it("retient chaque recherche appliquée, la plus récemment utilisée d'abord", async () => {
+    chercher("Serveur");
+    chercher("Vendeur", "Lyon");
+    const { items } = await lister();
+    expect(items.map((r) => r.job_titles[0])).toEqual(["Vendeur", "Serveur"]);
+    expect(items.map((r) => r.is_current)).toEqual([true, false]);
+    const premiere = items[0]!;
+    expect(premiere.id).toMatch(UUID);
+    expect(premiere.summary).toContain("Vendeur");
+    expect(premiere.location_label).toBe("Lyon");
+    expect(premiere.alerts_enabled).toBe(true);
+    expect(premiere.last_alert_at).toBeNull();
+    expect(Object.keys(premiere).sort()).toEqual(
+      [
+        "alerts_enabled",
+        "contract_types",
+        "created_at",
+        "id",
+        "is_current",
+        "job_titles",
+        "last_alert_at",
+        "last_used_at",
+        "location_label",
+        "query",
+        "summary",
+        "whole_france",
+      ].sort(),
+    );
+  });
+
+  it("ne garde qu'une recherche par jeu de critères, et la remonte en tête", async () => {
+    chercher("Serveur");
+    chercher("Vendeur");
+    chercher("Serveur");
+    const { items } = await lister();
+    expect(items.map((r) => r.job_titles[0])).toEqual(["Serveur", "Vendeur"]);
+    expect(items[0]!.is_current).toBe(true);
+  });
+
+  it("au-delà de dix, la moins récemment utilisée sort", async () => {
+    for (let i = 0; i < 11; i += 1) chercher(`Métier ${i}`);
+    const { items } = await lister();
+    expect(items).toHaveLength(10);
+    expect(items[0]!.job_titles).toEqual(["Métier 10"]);
+    expect(items.some((r) => r.job_titles[0] === "Métier 0")).toBe(false);
+  });
+
+  it("coupe et réactive une alerte, en phase avec la recherche en cours", async () => {
+    chercher("Serveur");
+    const [courante] = (await lister()).items;
+    const coupee = await appeler("PUT", `/search/saved/${courante!.id}/alerts`, {
+      enabled: false,
+    });
+    expect(coupee.statut).toBe(200);
+    expect((coupee.corps as unknown as Enregistree).alerts_enabled).toBe(false);
+    expect((coupee.corps as unknown as Enregistree).is_current).toBe(true);
+    const criteres = await appeler("GET", "/search/criteria");
+    expect(
+      (criteres.corps.criteria as unknown as { alerts_enabled: boolean }).alerts_enabled,
+    ).toBe(false);
+
+    // Et dans l'autre sens : la bascule du fil se lit dans la liste.
+    await appeler("PUT", "/search/criteria/alerts", { enabled: true });
+    expect((await lister()).items[0]!.alerts_enabled).toBe(true);
+  });
+
+  it("répond 404 saved_search_not_found pour une recherche inconnue", async () => {
+    const inconnue = "00000000-0000-4000-8000-000000000000";
+    const bascule = await appeler("PUT", `/search/saved/${inconnue}/alerts`, {
+      enabled: true,
+    });
+    expect(bascule.statut).toBe(404);
+    expect(bascule.corps.error.details.reason).toBe("saved_search_not_found");
+    const suppression = await appeler("DELETE", `/search/saved/${inconnue}`);
+    expect(suppression.statut).toBe(404);
+    expect(suppression.corps.error.details.reason).toBe("saved_search_not_found");
+  });
+
+  it("supprimer la recherche en cours rend le fil à toutes les offres", async () => {
+    chercher("Serveur");
+    chercher("Vendeur");
+    const { items } = await lister();
+    const reponse = repondreOffres("DELETE", `/search/saved/${items[0]!.id}`, undefined);
+    expect(reponse.status).toBe(204);
+    const fil = await appeler("GET", "/job-matches/me?limit=5&offset=0");
+    expect(fil.corps.mode).toBe("all_offers");
+    expect(fil.corps.criteria_summary).toBeNull();
+    const reste = (await lister()).items;
+    expect(reste.map((r) => r.job_titles[0])).toEqual(["Serveur"]);
+    expect(reste[0]!.is_current).toBe(false);
+  });
+
+  it("supprimer une autre recherche ne touche pas au fil", async () => {
+    chercher("Serveur");
+    chercher("Vendeur");
+    const { items } = await lister();
+    repondreOffres("DELETE", `/search/saved/${items[1]!.id}`, undefined);
+    const fil = await appeler("GET", "/job-matches/me?limit=5&offset=0");
+    expect(fil.corps.mode).toBe("search");
+  });
+
+  it("oublier la recherche la garde enregistrée, alerte coupée", async () => {
+    chercher("Serveur");
+    repondreOffres("DELETE", "/search/criteria", undefined);
+    const { items } = await lister();
+    expect(items).toHaveLength(1);
+    expect(items[0]!.alerts_enabled).toBe(false);
+    expect(items[0]!.is_current).toBe(false);
+  });
+});

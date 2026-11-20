@@ -16,6 +16,12 @@
  * avec une icône par position. La bascule est immédiate — c'est le
  * fournisseur de thème qui l'applique à toute l'application.
  *
+ * ═══ « Mes recherches » ═══
+ *
+ * Sous la ligne des notifications, dans le même groupe : c'est là qu'on
+ * règle ce dont Karria prévient. Le libellé est celui que Karria cite en
+ * conversation (`services/mes-recherches.ts`).
+ *
  * ═══ « Noter Karria » ═══
  *
  * Un lien permanent vers la fiche du magasin, dans « À propos ». C'est la
@@ -40,6 +46,7 @@ import { useCouleurs } from "@/theme/use-couleurs";
 
 import { GroupeReglages, LigneReglage } from "../components/ligne-reglage";
 import { useParametres } from "../hooks/use-parametres";
+import { TEXTES_MES_RECHERCHES } from "../services/mes-recherches";
 
 const APPARENCES: { valeur: Theme; libelle: string; icone: NomIcone }[] = [
   { valeur: "sombre", libelle: "Sombre", icone: "lune" },
@@ -65,6 +72,7 @@ export function EcranParametres() {
     changerTheme,
     notifications,
     gererNotifications,
+    mesRecherches,
     choixPublicitaires,
     gererChoixPublicitaires,
     lire,
@@ -148,6 +156,12 @@ export function EcranParametres() {
                     notifications === null ? null : NOTIFICATIONS[notifications].action
                   }
                   onPress={notifications === null ? undefined : gererNotifications}
+                />
+                <LigneReglage
+                  icone="signet"
+                  titre={TEXTES_MES_RECHERCHES.titre}
+                  detail={TEXTES_MES_RECHERCHES.detailDeLaLigne}
+                  onPress={mesRecherches}
                 />
               </GroupeReglages>
             </Animated.View>

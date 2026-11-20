@@ -39,6 +39,14 @@
  * signet se pose tout seul une fois connecté (`useReprise`), et le fil se
  * relit avec l'état de la personne.
  *
+ * ═══ La recherche changée ailleurs ═══
+ *
+ * « Mes recherches » (paramètres) peut supprimer la recherche en cours : le
+ * serveur rend alors le fil à « toutes les offres ». Le fil, resté monté
+ * dessous, l'apprend par `services/recherche-changee.ts` et se relit en
+ * laissant le serveur choisir le mode — il ne déduit pas lui-même ce qui
+ * reste.
+ *
  * ═══ Une seule requête à la fois ═══
  *
  * `jeton` numérote chaque chargement. Une réponse arrivée après un
@@ -68,6 +76,7 @@ import {
   type OptionsDeFiltre,
   type Tri,
 } from "../types/offres.types";
+import { useVersionRecherche } from "../services/recherche-changee";
 import { memoriser } from "./memoire-offres";
 
 /** Le délai avant d'envoyer les offres vues : assez pour grouper un
@@ -430,6 +439,22 @@ export function useFilOffres(): FilOffres {
     }
     etaitInvite.current = invite;
   }, [invite]);
+
+  // La recherche en cours a changé depuis « Mes recherches » : on relit
+  // tout, sans demander de vue — c'est le serveur qui dit s'il reste une
+  // recherche.
+  const versionRecherche = useVersionRecherche();
+  const versionServie = useRef(versionRecherche);
+  useEffect(() => {
+    if (versionServie.current === versionRecherche) return;
+    versionServie.current = versionRecherche;
+    pages.current = {};
+    setOptionsParMode({});
+    setChargement(true);
+    setDemande(null);
+    setReglages((r) => ({ ...r, recherche: REGLAGE_PAR_DEFAUT }));
+    setRelance((n) => n + 1);
+  }, [versionRecherche]);
 
   const marquerOuverte = useCallback(
     (offre: Offre) => remplacer(offre.id, { nonOuverte: false }),

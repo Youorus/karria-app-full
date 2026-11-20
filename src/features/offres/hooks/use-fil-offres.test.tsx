@@ -12,6 +12,7 @@ import { act, renderHook, waitFor } from "@testing-library/react-native";
 
 import { ErreurApi } from "@/lib/http";
 
+import { signalerRechercheChangee } from "../services/recherche-changee";
 import {
   FILTRES_PAR_DEFAUT,
   type Fil,
@@ -132,6 +133,37 @@ describe("Les filtres appartiennent à la vue affichée", () => {
     act(() => result.current.rechargerApresRecherche());
     await waitFor(() => expect(result.current.chargement).toBe(false));
     expect(dernierAppel()).toEqual([FILTRES_PAR_DEFAUT, 0, "recherche", null]);
+  });
+
+  it("se relit sans demander de vue quand la recherche a changé ailleurs", async () => {
+    const { result } = await monter();
+    act(() => result.current.changerDeVue("toutes"));
+    await waitFor(() => expect(result.current.vue).toBe("toutes"));
+    act(() => result.current.changerDeVue("pour_toi"));
+    await waitFor(() => expect(result.current.vue).toBe("pour_toi"));
+    expect(result.current.aUneRecherche).toBe(true);
+
+    // « Mes recherches » vient de supprimer la recherche en cours : le
+    // serveur ne sert plus que toutes les offres.
+    mockLireFil.mockImplementation((_filtres, _offset, _demande, tri) =>
+      Promise.resolve({
+        offres: [],
+        total: 0,
+        suivantes: false,
+        mode: "toutes",
+        resumeRecherche: null,
+        tri: tri ?? "recentes",
+        procheDisponible: false,
+      }),
+    );
+    const avant = mockLireFil.mock.calls.length;
+    act(() => signalerRechercheChangee());
+    await waitFor(() => expect(result.current.vue).toBe("toutes"));
+    expect(mockLireFil.mock.calls.length).toBeGreaterThan(avant);
+    // Aucune vue demandée : c'est le serveur qui dit s'il reste une recherche.
+    expect(dernierAppel()).toEqual([FILTRES_PAR_DEFAUT, 0, null, null]);
+    expect(result.current.aUneRecherche).toBe(false);
+    expect(result.current.chargement).toBe(false);
   });
 
   it("un filtre posé sur « Ma recherche » reste en mode recherche", async () => {

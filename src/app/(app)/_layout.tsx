@@ -146,6 +146,8 @@ export default function LayoutApp() {
             qu'on ouvre — et le geste de retour reste permis : on doit
             pouvoir y renoncer d'un glissement. */}
         <Stack.Screen name="parametres" />
+        {/* « Mes recherches » s'empile sur les paramètres, de la même façon. */}
+        <Stack.Screen name="mes-recherches" />
         {/* « Parler à l'équipe » s'empile comme les paramètres, depuis le
             Profil (ou une notification de réponse) : on y va, on revient. */}
         <Stack.Screen name="equipe" />

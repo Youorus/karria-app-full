@@ -26,6 +26,12 @@
  * La ligne ouvre la feuille de consentement en consultation : ce qui part,
  * chez qui, la date de l'accord, et « Retirer mon consentement ».
  *
+ * ═══ Mes recherches ═══
+ *
+ * La ligne mène à l'écran où l'on coupe, rallume ou retire les recherches
+ * que Karria surveille (`use-mes-recherches.ts`). Elle parle d'une
+ * personne : pas de ligne sans compte.
+ *
  * ═══ La suppression n'est pas ici ═══
  *
  * Elle a son écran : une raison à choisir, ce qui disparaît à lire, un
@@ -65,6 +71,8 @@ export interface Parametres {
   /** Refusées → les réglages du téléphone ; jamais demandées → l'écran
    *  qui les propose ; accordées → les réglages, pour les ajuster. */
   gererNotifications: () => void;
+  /** Ouvre « Mes recherches » : les alertes, recherche par recherche. */
+  mesRecherches: () => void;
   /** UMP exige une entrée « gérer mes choix » (EEE) : la ligne s'affiche. */
   choixPublicitaires: boolean;
   gererChoixPublicitaires: () => void;
@@ -154,6 +162,7 @@ export function useParametres(): Parametres {
     changerTheme,
     notifications,
     gererNotifications,
+    mesRecherches: useCallback(() => pousser("/mes-recherches"), [pousser]),
     choixPublicitaires,
     gererChoixPublicitaires: useCallback(() => {
       ouvrirLesChoixDeConfidentialite().catch((cause: unknown) => {

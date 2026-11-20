@@ -14,6 +14,16 @@
  * sert déjà, en production : ici on ne fait que le reproduire pour
  * concevoir hors ligne et éprouver les écrans.
  *
+ * ═══ Les recherches enregistrées (ADR-0041 de l'API) ═══
+ *
+ * Chaque recherche appliquée est retenue (`/search/saved`), une par
+ * empreinte de critères, dix au plus — au-delà, la moins récemment
+ * utilisée sort, jamais la recherche en cours. La bascule du fil
+ * (`PUT /search/criteria/alerts`) et celle des paramètres
+ * (`PUT /search/saved/{id}/alerts`) écrivent le même drapeau ; « oublier
+ * la recherche » (`DELETE /search/criteria`) la garde, alerte coupée ;
+ * la supprimer alors qu'elle est en cours rend le fil à `all_offers`.
+ *
  * ═══ Ce qu'il n'est pas ═══
  *
  * Karria ne comprend rien ici : quelques mots-clés (un métier, une ville,
@@ -98,6 +108,20 @@ interface Criteres {
   alerts_enabled: boolean;
   updated_at: string;
 }
+
+/** Une recherche enregistrée : ses critères figés, et son alerte. */
+interface RechercheSimulee {
+  id: string;
+  empreinte: string;
+  criteres: Criteres;
+  alerts_enabled: boolean;
+  created_at: string;
+  last_used_at: string;
+  last_alert_at: string | null;
+}
+
+/** `MAX_SAVED_SEARCHES` du serveur. */
+const RECHERCHES_MAX = 10;
 
 interface EtatOffre {
   seen: boolean;
@@ -461,6 +485,7 @@ const OFFRES: OffreSimulee[] = [
 
 const etat = {
   criteres: null as Criteres | null,
+  enregistrees: [] as RechercheSimulee[],
   offres: new Map<string, EtatOffre>(),
   conversations: new Map<string, number>(),
 };
@@ -490,6 +515,7 @@ export function marquerPostuleeSimulee(id: string, postulee: boolean): void {
 /** Repart de zéro : pour les tests, et pour « oublier la recherche ». */
 export function reinitialiserOffres(): void {
   etat.criteres = null;
+  etat.enregistrees = [];
   etat.offres.clear();
   etat.conversations.clear();
 }
@@ -886,14 +912,115 @@ function geocoder(label: string) {
   return { latitude, longitude, department_codes: [dep] };
 }
 
+/** Ce qui fait qu'une recherche est « la même » : ses critères, pas ses mots. */
+function empreinteDe(c: Omit<Criteres, "alerts_enabled" | "updated_at">): string {
+  return JSON.stringify([
+    c.job_titles,
+    c.location?.label ?? null,
+    c.location?.radius_km ?? null,
+    c.whole_france,
+    c.contract_types,
+    c.remote,
+    c.schedule,
+    c.max_experience,
+    c.salary_min_monthly,
+  ]);
+}
+
+/** La recherche enregistrée qui correspond à la recherche en cours. */
+function enregistreeCourante(): RechercheSimulee | null {
+  if (etat.criteres === null) return null;
+  const empreinte = empreinteDe(etat.criteres);
+  return etat.enregistrees.find((r) => r.empreinte === empreinte) ?? null;
+}
+
+/** Retient la recherche qui vient d'être appliquée. `etat.enregistrees`
+ *  reste rangé par dernière utilisation (la plus récente à la fin) : deux
+ *  recherches posées dans la même milliseconde gardent ainsi leur ordre.
+ *  Au-delà de dix, la moins récemment utilisée sort — jamais celle-ci. */
+function retenir(stockes: Criteres): void {
+  const empreinte = empreinteDe(stockes);
+  const connue = etat.enregistrees.find((r) => r.empreinte === empreinte);
+  const retenue: RechercheSimulee = {
+    id: connue?.id ?? uuidAleatoire(),
+    empreinte,
+    criteres: stockes,
+    alerts_enabled: stockes.alerts_enabled,
+    created_at: connue?.created_at ?? stockes.updated_at,
+    last_used_at: stockes.updated_at,
+    last_alert_at: connue?.last_alert_at ?? null,
+  };
+  etat.enregistrees = [...etat.enregistrees.filter((r) => r !== connue), retenue].slice(
+    -RECHERCHES_MAX,
+  );
+}
+
 function appliquerCriteres(c: Omit<Criteres, "alerts_enabled" | "updated_at">): Criteres {
+  // Une recherche déjà enregistrée retrouve son alerte telle qu'on l'a
+  // laissée ; une nouvelle surveille d'emblée.
+  const connue = etat.enregistrees.find((r) => r.empreinte === empreinteDe(c));
   const stockes: Criteres = {
     ...c,
-    alerts_enabled: etat.criteres?.alerts_enabled ?? true,
+    alerts_enabled: connue?.alerts_enabled ?? true,
     updated_at: new Date().toISOString(),
   };
   etat.criteres = stockes;
+  retenir(stockes);
   return stockes;
+}
+
+function versEnregistree(r: RechercheSimulee) {
+  return {
+    id: r.id,
+    summary: resumeDesCriteres(r.criteres),
+    query: r.criteres.query,
+    job_titles: r.criteres.job_titles,
+    location_label: r.criteres.location?.label ?? null,
+    whole_france: r.criteres.whole_france,
+    contract_types: r.criteres.contract_types,
+    alerts_enabled: r.alerts_enabled,
+    is_current: r === enregistreeCourante(),
+    created_at: r.created_at,
+    last_used_at: r.last_used_at,
+    last_alert_at: r.last_alert_at,
+  };
+}
+
+/** `/search/saved`, `/search/saved/{id}/alerts`, `/search/saved/{id}`. */
+function routeDesEnregistrees(
+  methode: string,
+  chemin: string,
+  corps: unknown,
+): Response | null {
+  if (methode === "GET" && chemin === "/search/saved") {
+    return json(200, {
+      items: [...etat.enregistrees].reverse().map(versEnregistree),
+      max: RECHERCHES_MAX,
+    });
+  }
+  const trouve = /^\/search\/saved\/([^/]+)(\/alerts)?$/.exec(chemin);
+  if (trouve === null) return null;
+  const recherche = etat.enregistrees.find((r) => r.id === trouve[1]);
+  const alertes = trouve[2] !== undefined;
+  if ((alertes && methode !== "PUT") || (!alertes && methode !== "DELETE")) return null;
+  if (recherche === undefined) {
+    return erreur(404, "saved_search_not_found", "Cette recherche n'existe plus.");
+  }
+  if (alertes) {
+    const actives = champ(corps, "enabled");
+    if (typeof actives !== "boolean") {
+      return erreur(422, "invalid_input", "`enabled` est requis.", { field: "enabled" });
+    }
+    const courante = recherche === enregistreeCourante();
+    recherche.alerts_enabled = actives;
+    // La recherche en cours et son enregistrement disent la même chose.
+    if (courante && etat.criteres !== null) etat.criteres.alerts_enabled = actives;
+    return json(200, versEnregistree(recherche));
+  }
+  // Supprimée alors qu'elle fait le fil : le fil redevient général.
+  if (recherche === enregistreeCourante()) etat.criteres = null;
+  etat.enregistrees = etat.enregistrees.filter((r) => r !== recherche);
+  return json(204, undefined);
 }
 
 function mettreLesCriteres(corps: unknown): Response {
@@ -1267,6 +1394,9 @@ export function repondreOffres(
   }
   if (route === "PUT /search/criteria") return mettreLesCriteres(corps);
   if (route === "DELETE /search/criteria") {
+    // Oubliée, pas supprimée : elle reste enregistrée, alerte coupée.
+    const courante = enregistreeCourante();
+    if (courante !== null) courante.alerts_enabled = false;
     etat.criteres = null;
     return json(204, undefined);
   }
@@ -1275,8 +1405,12 @@ export function repondreOffres(
       return erreur(404, "criteria_not_found", "Aucune recherche en cours.");
     }
     etat.criteres.alerts_enabled = champ(corps, "enabled") === true;
+    const courante = enregistreeCourante();
+    if (courante !== null) courante.alerts_enabled = etat.criteres.alerts_enabled;
     return json(200, { enabled: etat.criteres.alerts_enabled });
   }
+  const enregistree = routeDesEnregistrees(methode, sansRequete, corps);
+  if (enregistree !== null) return enregistree;
 
   console.warn(`[karria] simulation : aucune route pour « ${route} »`);
   return erreur(404, "simulation_route_inconnue", `Route non simulée : ${route}.`);

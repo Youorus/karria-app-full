@@ -133,8 +133,63 @@ longitude?, radius_km?, department_codes? }`, `whole_france`,
   `contract_types`, `remote`, `schedule`, `max_experience`,
   `salary_min_monthly`. `422 criteria_incomplete` s'il manque un lieu.
 - `DELETE /search/criteria` → `204` : oublier la recherche ; le fil repasse
-  en `all_offers`.
-- `PUT /search/criteria/alerts` `{ enabled }` → `200 { enabled }`.
+  en `all_offers`. Depuis l'ADR-0041, elle n'est plus supprimée : elle reste
+  enregistrée (voir ci-dessous), alerte coupée, réactivable.
+- `PUT /search/criteria/alerts` `{ enabled }` → `200 { enabled }`. Écrit le
+  même drapeau que `PUT /search/saved/{id}/alerts` pour la recherche en
+  cours. `404 criteria_not_found` sans recherche en cours.
+
+## Les recherches enregistrées (ADR-0041 de l'API)
+
+Chaque recherche appliquée (par Karria ou par `PUT /search/criteria`) est
+retenue, une par jeu de critères, et **continue de surveiller** les nouvelles
+offres quand une autre devient la recherche en cours. C'est l'écran « Mes
+recherches » des paramètres (`features/profil/screens/ecran-mes-recherches.tsx`,
+route `/mes-recherches`).
+
+- `GET /search/saved` → `200 { items: SavedSearch[], max }`. La plus
+  récemment utilisée d'abord ; `items: []` tant que la personne n'a rien
+  cherché. `max` : recherches gardées au plus (10) ; au-delà, la moins
+  récemment utilisée sort, jamais la recherche en cours.
+- `PUT /search/saved/{id}/alerts` `{ enabled }` → `200 SavedSearch` (la
+  recherche à jour). Coupée : plus de notification pour elle, et Karria ne
+  collecte plus pour elle. Si c'est la recherche en cours, `GET
+/search/criteria` rend le même `alerts_enabled`.
+- `DELETE /search/saved/{id}` → `204`. Si c'était la recherche en cours, le
+  fil redevient `all_offers` (`criteria: null`).
+
+| Champ de `SavedSearch` | Type             | Sens                                                   |
+| ---------------------- | ---------------- | ------------------------------------------------------ |
+| `id`                   | UUID             | identifiant de la recherche enregistrée                |
+| `summary`              | string           | une ligne : « Serveur · Paris (30 km) · CDI »          |
+| `query`                | string           | ce que la personne a demandé, dans ses mots            |
+| `job_titles`           | string[]         | les intitulés                                          |
+| `location_label`       | string \| null   | le lieu nommé ; `null` : France entière                |
+| `whole_france`         | bool             |                                                        |
+| `contract_types`       | string[]         | codes de contrat                                       |
+| `alerts_enabled`       | bool             | Karria la surveille et prévient quand une offre arrive |
+| `is_current`           | bool             | c'est la recherche en cours : elle fait le fil         |
+| `created_at`           | ISO 8601         |                                                        |
+| `last_used_at`         | ISO 8601         | dernière fois qu'elle a été appliquée                  |
+| `last_alert_at`        | ISO 8601 \| null | dernière notification envoyée pour elle                |
+
+| HTTP | `details.reason`         | Quand                                                  |
+| ---- | ------------------------ | ------------------------------------------------------ |
+| 404  | `saved_search_not_found` | recherche inconnue, supprimée, ou d'une autre personne |
+
+**Ce que fait l'app.** La liste se relit à chaque retour sur l'écran et en
+tirant. La bascule est optimiste (retour arrière et phrase si l'appel
+échoue ; un `404` retire la ligne et relit la liste). La suppression se fait
+en glissant la ligne puis en confirmant ; quand c'était la recherche en
+cours, le fil — resté monté sous les paramètres — est prévenu
+(`features/offres/services/recherche-changee.ts`) et se relit **sans
+demander de `mode`** : c'est le serveur qui dit s'il reste une recherche.
+L'app ne garde aucun état des alertes de la recherche en cours (le fil
+n'affiche que `criteria_summary`) et n'appelle pas `PUT
+/search/criteria/alerts` : une bascule ici n'a donc rien d'autre à
+invalider. Le libellé de la rubrique, « Mes recherches », est celui que
+Karria cite en conversation ; il vit dans
+`features/profil/services/mes-recherches.ts`.
 
 ## Ce que Karria a retenu
 

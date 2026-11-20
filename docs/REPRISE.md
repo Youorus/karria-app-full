@@ -5,6 +5,31 @@
 
 **Dernière mise à jour : 2026-11-20**
 
+## 2026-11-20 — « Mes recherches » dans les paramètres (ADR-0041 de l'API)
+
+**Rien n'est commité ni poussé. Rien n'a tourné sur appareil ni en simulateur, et aucun appel n'a été fait à l'API de production** : tout est éprouvé contre le faux serveur et par les tests. `npm run check` vert (types, lint sans avertissement, format, **114 suites / 892 tests** ; 110 / 843 avant) ; `npm run bundle:check` produit le paquet iOS. Aucune dépendance ajoutée, `ios/` et `android/` intacts : pas de nouvelle build nécessaire pour ce lot.
+
+- **Où** : Paramètres › groupe « Notifications » › ligne **« Mes recherches »** (sous la ligne des notifications, absente sans compte) → route expo-router **`/mes-recherches`** (`src/app/(app)/mes-recherches.tsx`, déclarée dans la pile de `(app)/_layout.tsx`).
+- **API** (`features/assistant`, à côté de `recherche.api.ts`) : `api/recherches-enregistrees.api.ts` (`lireRecherchesEnregistrees`, `reglerAlertesDeRecherche`, `supprimerRechercheEnregistree`) et `types/recherches-enregistrees.types.ts` — `GET /search/saved`, `PUT /search/saved/{id}/alerts`, `DELETE /search/saved/{id}`. Contrat : `docs/contrat-api-recherche.md`, section « Les recherches enregistrées ».
+- **Écran** (`features/profil`) : `hooks/use-mes-recherches.ts`, `screens/ecran-mes-recherches.tsx`, `components/ligne-recherche.tsx`, `services/mes-recherches.ts` (tous les textes). Relu à chaque focus et en tirant ; bascule optimiste (retour arrière + phrase 3,5 s ; `404` → la ligne part, la liste se relit) ; suppression en glissant la ligne puis alerte de confirmation (texte complété pour la recherche en cours) ; état vide avec « Parler à Karria » ; pied avec le `max` du serveur.
+- **Le fil reste en phase** : supprimer la recherche en cours (ou la découvrir disparue) appelle `features/offres/services/recherche-changee.ts` ; `use-fil-offres.ts` se relit alors sans demander de vue, et retombe sur « toutes les offres ».
+- **Faux serveur** (`offres-simule.ts`) : recherches retenues à chaque recherche appliquée (une par jeu de critères, dix au plus), les trois routes, la bascule du fil et celle des paramètres sur le même drapeau, « oublier la recherche » qui la garde alerte coupée.
+
+**Choix d'interprétation à valider par Marc**
+
+- **Suppression = glisser vers la gauche** (le geste de l'onglet Candidatures, `carte-dossier.tsx`), puis alerte système. Pour VoiceOver / TalkBack, la même suppression est une action d'accessibilité de la ligne. Pas d'appui long ni de bouton visible.
+- **Le fil n'a pas de bascule d'alertes** aujourd'hui : l'app n'appelle ni `PUT /search/criteria/alerts` ni `GET /search/criteria` (`lireRecherche` n'a aucun appelant). Il n'y avait donc aucun état d'alerte à invalider ; seul le cas « recherche en cours supprimée » touche le fil.
+- **« Parler à Karria »** (état vide) : un `BoutonAction` secondaire qui revient aux onglets et ouvre le rideau par `/offres?karria=1` (le chemin d'une notification `assistant`). L'orbe du fil n'est pas réutilisée : elle est liée au défilement du fil.
+- La phrase d'en-tête ne s'affiche que s'il y a au moins une recherche (vide, c'est le texte de l'état vide qui parle) ; le pied aussi.
+- Sous une recherche qui n'est pas en cours : « Utilisée hier », « Utilisée le 3 nov. » (`dateCourte`, le format des dossiers et de Mes CV).
+- L'icône de la ligne des paramètres est le signet ; dans la liste, une cloche (barrée quand l'alerte est coupée).
+- Karria dit en conversation « vous pouvez couper cette alerte dans vos paramètres, rubrique « Mes recherches » » : le libellé correspond ; le vouvoiement de cette phrase, lui, tranche avec le tutoiement de l'app (côté serveur, non touché).
+
+**Reste à faire**
+
+- Essai sur appareil (iOS et Android) : le glissement dans la carte (coins arrondis, fond rouge qui ne déborde pas), l'interrupteur en mode sombre, VoiceOver / TalkBack, le retour au fil après suppression de la recherche en cours, « Parler à Karria » depuis l'état vide.
+- Vérifier contre le vrai serveur (jamais appelé ici) : la forme de `GET /search/saved` et le `404 saved_search_not_found`.
+
 ## 2026-11-20 — avant la campagne : précision du CV, filigrane, fiabilité, demande d'avis
 
 **Rien n'est commité ni poussé. Rien n'a tourné sur appareil ni en simulateur.** `npm run check` vert (types, lint sans avertissement, format, **110 suites / 843 tests** ; 95 / 690 avant) ; `npm run bundle:check` produit le paquet iOS. Le serveur correspondant (ADR-0040 de l'API) n'est pas encore déployé : tout est écrit pour marcher avec l'ancien comme avec le nouveau.
